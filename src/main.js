@@ -258,7 +258,7 @@ function burst(c,n=150,sp0=14,col){col=col||[[4,1,1.2],[4,3,.8],[1,2.4,4],[1.2,4
 const CFN=500,cfP=new Float32Array(CFN*3),cfC=new Float32Array(CFN*3),cf=Array.from({length:CFN},()=>({l:0,v:new THREE.Vector3(),ph:0}));
 const cfG=new THREE.BufferGeometry();cfG.setAttribute('position',new THREE.BufferAttribute(cfP,3));cfG.setAttribute('color',new THREE.BufferAttribute(cfC,3));
 const confetti=new THREE.Points(cfG,new THREE.PointsMaterial({size:0.55,vertexColors:true}));confetti.frustumCulled=false;scene.add(confetti);for(let i=0;i<CFN;i++)cfP[i*3+1]=-999;
-function confettiBurst(c){const pal=[[1,.15,.2],[1,.8,.2],[.2,.8,.4],[.3,.6,1],[1,1,1]];for(let i=0;i<CFN;i++){const p=cf[i];p.l=3+Math.random()*2;p.ph=Math.random()*6;p.v.set((Math.random()-.5)*16,10+Math.random()*12,(Math.random()-.5)*16);cfP.set([c.x+(Math.random()-.5)*4,c.y,c.z+(Math.random()-.5)*4],i*3);cfC.set(pal[i%5],i*3)}}
+function confettiBurst(c){const pal=[[1,.15,.2],[1,.8,.2],[.2,.8,.4],[.3,.6,1],[1,1,1]];for(let i=0;i<CFN;i++){const p=cf[i];p.l=3+Math.random()*2;p.ph=Math.random()*6;p.v.set((Math.random()-.5)*16,10+Math.random()*12,(Math.random()-.5)*16);cfP.set([c.x+(Math.random()-.5)*4,c.y,c.z+(Math.random()-.5)*4],i*3);cfC.set(pal[i%5],i*3)}cfG.attributes.color.needsUpdate=true}
 let flyer=null,fly=null;
 
 /* ================= salón (fijo) ================= */
