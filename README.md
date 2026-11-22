@@ -1,6 +1,12 @@
 # Adviento Express 🚂🎄
 
-Calendario de Adviento jugable: cada día del 1 al 24 de diciembre se abre una puerta con un circuito nuevo de tren de juguete en 3D. Conduce, apura las curvas para cargar el turbo, haz sonar las campanas encadenando combos, no pierdas los regalos en las curvas, bate a tu fantasma y consigue la medalla de oro.
+Calendario de Adviento jugable: cada día del 1 al 24 de diciembre se abre una puerta con un circuito nuevo de tren de juguete en 3D.
+
+- **Conducir**: apura las curvas sin pasarte (si te pasas, se cae un regalo y suma 2 s), haz sonar las campanas a la velocidad que piden y frena en las casitas para **repartir regalos** (≤ 40 km/h, −2 s cada uno).
+- **Turbo**: se carga apurando curvas o yendo **a rebufo** del fantasma.
+- **Cada puerta es distinta**: hielo, ventisca, túnel de estrellas, noche cerrada, viento de cola y **agujas** con un atajo más corto pero más cerrado.
+- **Tres estrellas por puerta** (oro, todas las campanas y el reto del día), **racha** y **cochera** con libreas, cargas y humos para desbloquear.
+- **Retos y ligas**: comparte el resultado al estilo Wordle con un enlace para correr contra tu fantasma, y crea una liga para la familia o la oficina.
 
 ## Probar en local
 
@@ -19,6 +25,7 @@ Abre `http://localhost:5173`. Antes del 1 de diciembre solo está abierta la pue
 | Dar vapor | Espacio / ↑ / W | Mantener pulsado el botón VAPOR o la pantalla |
 | Frenar | Soltar (↓ / S frena más) | Soltar |
 | Turbo (con la barra llena) | E / Mayús | Botón TURBO |
+| Cambiar aguja (antes de la bifurcación) | A | Botón AGUJA |
 | Cambiar cámara | C | Botón cámara |
 | Repetir | R | Botón en la pausa o en la llegada |
 | Pausa | P / Esc | Botón pausa |
@@ -39,7 +46,7 @@ Sin configurar, la clasificación se guarda solo en el dispositivo. Para tener r
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (región en Europa).
 2. Enlázalo desde la raíz del repo: `npx supabase login` y `npx supabase link --project-ref <ref>` (el `<ref>` son las 20 letras de la URL del proyecto, `https://<ref>.supabase.co`).
-3. Crea la tabla: `npx supabase db push --remote` (pide la contraseña de la base de datos), o pega `supabase/migrations/20261122000000_runs.sql` en el SQL Editor.
+3. Crea las tablas (tiempos y ligas): `npx supabase db push --remote` (pide la contraseña de la base de datos), o pega los dos archivos de `supabase/migrations/` en el SQL Editor, por orden.
    Ojo: con el CLI v3, `db push` sin `--remote` va a la base **local** de Docker, que puede ser la de otro proyecto. Si te sugiere `migration repair` o `db pull`, no lo hagas: falta el `--remote`.
 4. Secretos de la función:
    `npx supabase secrets set RUN_SALT=<32 caracteres aleatorios> ALLOWED_ORIGINS=https://tu-dominio,http://localhost:5173 SEASON=2026`
