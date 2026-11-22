@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Adviento Express</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Yesteryear&family=Rubik:wght@400;500;600;700&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<canvas id="c" aria-label="Mundo 3D del juego"></canvas>
+
+<section class="scr on" id="home" aria-label="Calendario de Adviento">
+  <div class="board">
+    <svg class="art" id="art" viewBox="0 0 1200 1400" preserveAspectRatio="xMidYMin slice" aria-hidden="true"></svg>
+    <div class="flakes"></div>
+    <div class="bin">
+      <div class="mast">
+        <div class="brand"><span class="b1 slab">Adviento</span><span class="b2 script">Express</span></div>
+        <div class="stamps">
+          <button class="stamp" id="bMusic" aria-label="Música"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="of" d="M3 3l18 18"/></svg></button>
+          <button class="stamp" id="bSfx" aria-label="Sonido"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/><path class="of" d="M17 9l5 6M22 9l-5 6"/></svg></button>
+        </div>
+      </div>
+      <p class="tagl">24 puertas, 24 circuitos de tren de juguete bajo el árbol. Exprime las curvas sin descarrilar, encadena campanas, bate a tu fantasma y gana el oro.</p>
+      <div class="today"><div class="pin slab" id="tPin">1</div><p id="tTxt"></p></div>
+      <div class="cal" id="cal"></div>
+      <label class="devrow"><input type="checkbox" id="dev"> Modo pruebas: abrir todas las puertas</label>
+      <p class="foot">Modelos 3D de Kenney (kenney.nl, CC0). Cada circuito se inspira en un tren de Navidad que se vende en tiendas. En calidad de Afiliado de Amazon, se obtienen ingresos por las compras adscritas que cumplen los requisitos aplicables.</p>
+    </div>
+  </div>
+</section>
+<div id="zoom"><div class="zt"><div class="zn slab" id="zN">1</div><div class="zm slab" id="zM">Alrededor del árbol</div><div class="bar"><i id="zBar"></i></div><div class="zs" id="zS">Colocando las vías…</div></div></div>
+
+<section class="scr overlay" id="pre" aria-label="Billete">
+  <div class="ticket">
+    <div class="tmain">
+      <div class="thead"><span class="slab">Adviento Express</span><small id="pNo">Billete nº 0001</small></div>
+      <div class="tbody">
+        <p class="lbl" id="pDay">Día 1 de 24</p>
+        <h2 class="slab" id="pName">Alrededor del árbol</h2>
+        <div class="fields" id="pFields"></div><p class="lbl">Medallas</p><div class="meds" id="pMed"></div><p class="ghostl" id="pGhost"></p>
+        <p class="lbl">Asiento</p>
+        <div class="punch" id="punch"><button data-cam="tp"><i></i>Detrás del tren</button><button data-cam="fp"><i></i>En la cabina</button></div>
+        <div class="go"><button class="btnR" id="bGo">Subir al tren</button><button class="btnL" id="bBack1">Volver al calendario</button></div>
+      </div>
+    </div>
+    <div class="stub"><h3 class="slab">Mejores tiempos</h3><ul class="mini-lb" id="pLB"></ul><div class="barcode"></div><small id="pStub">Válido el día 1</small></div>
+  </div>
+</section>
+
+<section class="scr" id="hud" aria-label="Carrera">
+  <div id="edge"></div><div class="hp hTime"><small id="hLap">DÍA 1</small><b id="hTime">0:00.0</b><div class="sub2"><span id="hDelta" class="delta"></span><span id="hTarget"></span></div></div><div class="split" id="split"></div>
+  <div id="mini"><svg viewBox="0 0 120 120" id="miniSvg"></svg></div>
+  <div class="hp hR"><span class="bellc" title="Campanas"><svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2v.3A6 6 0 0 1 18 10v4l2 3H4l2-3v-4a6 6 0 0 1 4-5.7V4a2 2 0 0 1 2-2zm-2 17h4a2 2 0 0 1-4 0z"/></svg><b id="hBells">0/0</b></span><button class="ib b" id="bCam" aria-label="Cambiar cámara (C)"><svg viewBox="0 0 24 24"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg></button><button class="ib b" id="bPause" aria-label="Pausa (P)"><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg></button></div>
+  <div class="cd" id="cd"></div>
+  <div class="msg" id="msg"></div>
+  <div class="warn" id="warn"></div>
+  <div class="dial"><svg viewBox="0 0 200 200" id="dialSvg"></svg><div class="kmh" id="kmh">0</div><div class="u">km/h</div></div>
+  <button class="pedal b" id="pedal">VAPOR</button>
+  <div class="hint">ESPACIO vapor · suelta para frenar · C cámara · R repetir</div>
+</section>
+
+<section class="scr overlay" id="pause" aria-label="Pausa" style="background:rgba(3,6,18,.5)">
+  <div class="pcard"><h2 class="slab">Pausa</h2><button class="p" id="bResume">Continuar</button><button id="bRestart">Repetir el viaje</button><button id="bQuit">Volver al calendario</button></div>
+</section>
+
+<section class="scr overlay" id="end" aria-label="Llegada">
+  <div class="ticket">
+    <div class="tmain">
+      <div class="thead"><span class="slab">Llegada · Adviento Express</span><small id="eNo">Día 1</small></div>
+      <div class="tbody">
+        <p class="lbl" id="eName">Alrededor del árbol</p>
+        <div class="bigtime mono" id="eTime">0:00.0</div><p class="edelta" id="eDelta"></p><p class="ehint" id="eHint"></p>
+        <div class="fields" id="eFields"></div>
+        <form class="sign" id="fName"><label>Firma del maquinista<input id="iName" maxlength="16" placeholder="Tu nombre" autocomplete="nickname" required></label><button class="btnS" type="submit" id="bSave">Fichar tiempo</button></form>
+        <div class="dep"><h4><span id="depT">LLEGADAS · DÍA 1</span><span>TIEMPO</span></h4><div id="eLB"></div></div>
+        <p class="lbl" style="margin-top:18px">Reta a tus amigos</p>
+        <div class="shares" id="share"></div>
+        <div class="gtag"><div><p>Este circuito existe de verdad</p><h4 id="prT"></h4></div><a id="prA" href="#" target="_blank" rel="noopener sponsored nofollow">Ver en Amazon</a></div>
+        <p class="fine">Enlace de ejemplo con la etiqueta TU-TAG-21: cámbiala por tu ID de afiliado.</p>
+        <div class="go" style="margin-top:16px"><button class="btnR" id="bAgain">Otra vez (R)</button><button class="btnL" id="bBack2">Volver al calendario</button></div>
+      </div>
+    </div>
+    <div class="stub"><h3 class="slab">Resumen</h3><ul class="mini-lb" id="eSum"></ul><div class="barcode"></div><small>Conserve este billete hasta Nochebuena</small></div>
+    <div class="stampbig" id="eStamp" hidden></div>
+  </div>
+</section>
+<div id="err"></div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script>window.__boot=setTimeout(()=>{const e=document.getElementById('err');e.textContent='No se ha podido cargar el motor 3D. Revisa la conexión y recarga la página.';e.style.display='block'},20000);</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
