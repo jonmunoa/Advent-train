@@ -782,14 +782,22 @@ function showEnd(){
   $('eSum').innerHTML=`<li><span>Recorrido</span><b>${fmt(G.time)}</b></li>${G.lost?`<li><span>Regalos perdidos (${G.lost})</span><b>+${G.pen} s</b></li>`:''}<li><span>Campanas</span><b>−${G.bonus.toFixed(1)} s</b></li><li><span>Total</span><b>${fmt(total)}</b></li>`;
   const st=$('eStamp');st.hidden=false;st.className='stampbig '+(medal?'m'+medal:'');st.textContent=medal?['','¡ORO!','PLATA','BRONCE'][medal]:(isBest?'¡RÉCORD!':'SIN MEDALLA');
   $('iName').value=store.get('advx-name')||'';$('bSave').disabled=false;$('bSave').textContent='Fichar tiempo';
-  const url=SITE_URL+'#dia-'+DAY.d,mtx=medal?['','🥇','🥈','🥉'][medal]+' ':'',txt=`🚂 Adviento Express · Día ${DAY.d} «${DAY.name}»\n${mtx}⏱ ${fmt(total)} · 🔔${G.bells}/${BELLS.length} · combo ×${G.bestCombo}\n¿Me ganas?`;
-  const u=encodeURIComponent(url),t=encodeURIComponent(txt);
-  $('share').innerHTML=`<a class="s-wa" href="https://wa.me/?text=${encodeURIComponent(txt+'\n'+url)}" target="_blank" rel="noopener">WhatsApp</a><a class="s-x" href="https://twitter.com/intent/tweet?text=${t}&url=${u}" target="_blank" rel="noopener">X</a><a class="s-tg" href="https://t.me/share/url?url=${u}&text=${t}" target="_blank" rel="noopener">Telegram</a><a class="s-fb" href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener">Facebook</a><button class="s-cp" id="bCopy" type="button">Copiar</button>`;
-  $('bCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt+'\n'+url);$('bCopy').textContent='¡Copiado!'}catch(e){$('bCopy').textContent='No se pudo'}};
+  renderShare(medal);
   $('prT').textContent=DAY.prod[0];$('prA').href=`https://www.amazon.es/s?k=${encodeURIComponent(DAY.prod[1])}&tag=${TAG}`;
   $('eLB').innerHTML='<div class="r"><span></span><span>CARGANDO…</span><span></span></div>';
   show('end');(async()=>{const res=await Board.top(DAY.d,10);renderDep(res)})();
 }
+/* compartir al estilo Wordle: sin nombre ni forma del circuito */
+const siteUrl=()=>SITE_URL&&!/tu-dominio/.test(SITE_URL)?SITE_URL:location.origin+location.pathname;
+let lastMedal=0;
+function shareUrl(){return siteUrl()+'#dia-'+DAY.d}
+function shareText(){const sq=BELLS.map(b=>b.st===1?'🟨':'⬛').join('');
+  return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)}`,`🔔 ${sq} ${G.bells}/${BELLS.length}`,`🎁 ${giftsOn()}/3`+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),'¿Me ganas?'].join('\n')}
+function renderShare(medal){lastMedal=medal;const txt=shareText(),url=shareUrl(),all=txt+'\n'+url,u=encodeURIComponent(url),t=encodeURIComponent(txt);
+  $('shareTxt').textContent=all;
+  $('share').innerHTML=(navigator.share?`<button class="s-sh" id="bShare" type="button">Compartir</button>`:'')+`<a class="s-wa" href="https://wa.me/?text=${encodeURIComponent(all)}" target="_blank" rel="noopener">WhatsApp</a><a class="s-x" href="https://twitter.com/intent/tweet?text=${t}&url=${u}" target="_blank" rel="noopener">X</a><a class="s-tg" href="https://t.me/share/url?url=${u}&text=${t}" target="_blank" rel="noopener">Telegram</a><button class="s-cp" id="bCopy" type="button">Copiar</button>`;
+  if(navigator.share)$('bShare').onclick=()=>navigator.share({title:'Adviento Express',text:txt,url}).catch(()=>{});
+  $('bCopy').onclick=async()=>{try{await navigator.clipboard.writeText(all);$('bCopy').textContent='¡Copiado!'}catch(e){$('bCopy').textContent='No se pudo'}}}
 function renderDep(res,hl){$('eLB').innerHTML=(res.rows.length?res.rows.map((r,i)=>`<div class="r ${r.me||(hl&&r.name===hl)?'me':''}" style="animation-delay:${i*70}ms"><span>${String(i+1).padStart(2,'0')}</span><span>${esc(r.name)}</span><span>${fmt(r.t)}</span></div>`).join(''):'<div class="r"><span>--</span><span>SIN LLEGADAS TODAVÍA</span><span>-:--.-</span></div>')+`<p class="src">${res.src==='online'?'Clasificación compartida':'Clasificación de este dispositivo'}</p>`}
 $('fName').addEventListener('submit',async e=>{e.preventDefault();const n=$('iName').value.trim().replace(/\s+/g,' ').slice(0,16);if(!n||!G||!G.total)return;
   store.set('advx-name',n);$('bSave').disabled=true;$('bSave').textContent='Fichando…';
@@ -884,7 +892,7 @@ function perf(n=120,pr=1){const ip=dynPR,ar=renderer.info.autoReset;dynPR=pr;res
   renderer.info.autoReset=ar;dynPR=ip;resize();return {ms:+ms.toFixed(2),calls,tris,tex:renderer.info.memory.textures,geo:renderer.info.memory.geometries,pr,w:innerWidth,h:innerHeight}}
 function pose(kind,f=0.25){const d=f*T.L;if(G)G.dist=d;poseTrain(d,0);camTarget(kind,0,wantP,wantL);camPos.copy(wantP);camLook.copy(wantL);camBlend=1;camera.position.copy(wantP);camera.lookAt(wantL);camera.fov=kind==='fp'?70:58;camera.updateProjectionMatrix();
   key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);grade.uniforms.blur.value=0;grade.uniforms.tilt.value=kind==='orbit'?1:0}
-window.__adv={newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn};
+window.__adv={newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn,shareText:()=>shareText()+'\n'+shareUrl()};
 drawArt();renderHome();
 {const m=/^#dia-(\d+)$/.exec(location.hash),hd=m?+m[1]:0;if(hd>=1&&hd<=24&&isOpen(hd)){setTimeout(()=>{const el=document.querySelector(`.door[data-d="${hd}"]`);if(el)openDoor(el,hd)},300)}}
 requestAnimationFrame(loop);

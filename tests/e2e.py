@@ -40,6 +40,12 @@ FINISH = BOT
 checks = []
 
 
+def fmt(t):
+    """Igual que fmt() de main.js: m:ss.d"""
+    m = int(t // 60)
+    return f'{m}:{t - m * 60:04.1f}'
+
+
 def check(name, cond, info=''):
     checks.append((name, bool(cond), info))
     print(('  ok   ' if cond else '  FALLO ') + name + (f'  {info}' if info else ''))
@@ -78,6 +84,13 @@ async def main():
                 await pg.screenshot(path=str(OUT / '3-llegada.png'), timeout=120000)
             except Exception as e:
                 print('captura de llegada omitida:', e.__class__.__name__)
+        share = await pg.evaluate("[__adv.shareText(), document.getElementById('shareTxt').textContent, document.getElementById('eName').textContent, __adv.BELLS().length]")
+        txt, shown, dayname, nb = share
+        print('compartir:\n' + txt)
+        line = next((l for l in txt.split('\n') if l.startswith('🔔')), '')
+        check('texto de compartir con día, tiempo, campanas y regalos', 'Día 1' in txt and fmt(res['total']) in txt and line.count('🟨') + line.count('⬛') == nb and '🎁 3/3' in txt)
+        check('el texto no desvela el circuito', dayname not in txt, dayname)
+        check('la llegada muestra el texto que se comparte', shown == txt)
         fields = await pg.evaluate("document.getElementById('eFields').textContent")
         check('la llegada muestra los regalos', 'Regalos3/3' in fields.replace(' ', ''), fields)
 
