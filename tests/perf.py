@@ -4,7 +4,8 @@
 Para cada día y pose coloca el tren y la cámara con window.__adv.pose(), renderiza
 3 tandas de N fotogramas síncronos (composer + readPixels de 1 px) con __adv.perf()
 y se queda con la más rápida. Anota:
-ms/fotograma, draw calls, triángulos, texturas y geometrías en memoria.
+ms/fotograma, draw calls, triángulos, texturas y geometrías en memoria y una
+estimación de la memoria de texturas (imágenes únicas × 4 bytes × mipmaps).
 
 Uso:
   python tests/perf.py              # GPU real, compara con tests/perf-baseline.json
@@ -49,14 +50,15 @@ async def main():
         await b.close()
     srv.shutdown()
     base = json.loads(BASE.read_text()) if BASE.exists() else {}
-    print(f"{'pose':<16}{'ms':>8}{'Δms':>8}{'calls':>7}{'Δ':>5}{'tris':>9}{'Δ':>8}{'tex':>5}{'Δ':>4}")
+    print(f"{'pose':<16}{'ms':>8}{'Δms':>8}{'calls':>7}{'Δ':>5}{'tris':>9}{'Δ':>8}{'tex':>5}{'Δ':>4}{'MB tex':>8}{'Δ':>6}")
     for k, r in res.items():
         o = base.get(k, {})
         dm = f"{r['ms'] - o['ms']:+.2f}" if o else ''
         dc = f"{r['calls'] - o['calls']:+d}" if o else ''
         dt = f"{(r['tris'] - o['tris']) / 1000:+.0f}k" if o else ''
         dx = f"{r['tex'] - o['tex']:+d}" if o else ''
-        print(f"{k:<16}{r['ms']:>8.2f}{dm:>8}{r['calls']:>7}{dc:>5}{r['tris'] / 1000:>8.0f}k{dt:>8}{r['tex']:>5}{dx:>4}")
+        mb = r.get('texMB', 0); dmb = f"{mb - o.get('texMB', 0):+.1f}" if o and 'texMB' in o else ''
+        print(f"{k:<16}{r['ms']:>8.2f}{dm:>8}{r['calls']:>7}{dc:>5}{r['tris'] / 1000:>8.0f}k{dt:>8}{r['tex']:>5}{dx:>4}{mb:>8.1f}{dmb:>6}")
     for e in errors:
         print('  error:', e)
     if SAVE:

@@ -5,3 +5,4 @@ __pycache__/
 .env
 supabase/.temp/
 supabase/.branches/
+assets-src/polyhaven/

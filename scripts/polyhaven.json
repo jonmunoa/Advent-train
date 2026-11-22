@@ -1,0 +1,19 @@
+{
+  "$comment": "Recursos de Poly Haven (CC0) para el salón. scripts/fetch-polyhaven.mjs los descarga a assets-src/polyhaven/ (no se sube) y deja las versiones ligeras en m/ph/ y m/env/. size = lado máximo en px de cada mapa; en modelos, detail = lado de normal/rugosidad/ARM.",
+  "textures": {
+    "herringbone_parquet": {"maps": {"diff": "Diffuse", "nor": "nor_gl", "arm": "arm"}, "size": {"diff": 1024, "nor": 512, "arm": 256}},
+    "snow_02": {"maps": {"nor": "nor_gl", "rough": "Rough"}, "size": {"nor": 1024, "rough": 256}},
+    "red_brick_03": {"maps": {"diff": "Diffuse", "nor": "nor_gl", "arm": "arm"}, "size": {"diff": 512, "nor": 512, "arm": 512}},
+    "quatrefoil_jacquard_fabric": {"maps": {"nor": "nor_gl"}, "size": {"nor": 256}},
+    "fabric_pattern_07": {"maps": {"diff": "col_1", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}}
+  },
+  "hdris": {"fireplace": "1k"},
+  "models": {
+    "Sofa_01": {"size": 512, "detail": 256},
+    "ArmChair_01": {"size": 512, "detail": 256},
+    "ClassicNightstand_01": {"size": 512, "detail": 256},
+    "vintage_oil_lamp": {"size": 512, "detail": 256},
+    "potted_plant_02": {"size": 512, "detail": 256, "simplify": 0.12},
+    "potted_plant_04": {"size": 512, "detail": 256}
+  }
+}
