@@ -53,13 +53,13 @@ Convenciones:
 
 - `TAG='TU-TAG-21'` (ID de afiliado de Amazon) y `SITE_URL` son marcadores: hay que poner los reales.
 - Los enlaces de Amazon son búsquedas genéricas, no productos concretos.
-- La clasificación compartida usa la capacidad `db` de los artifacts de Claude (`window.claude.use('db')`); fuera de Claude cae a `localStorage`. Para producción hay que cambiar el adaptador `Board` por un backend real (Jon tiene Supabase).
+- La clasificación compartida usa la capacidad `db` de los artifacts de Claude (`window.claude.use('db')`); fuera de Claude cae a `localStorage`. Para producción hay que cambiar el adaptador `Board` por un backend real (propuesta: Supabase).
 - No hay validación de tiempos en servidor (se puede trucar el ranking).
 - No se ha medido el rendimiento en un móvil real; hay resolución dinámica y un modo de baja calidad automático.
 
 ## Dirección de arte
 
-"Maqueta de juguete bajo el árbol": juguetes reales fotografiados de noche. Iluminación fría de luna desde la ventana + cálida de la chimenea, bloom, desenfoque de miniatura en vistas abiertas. Jon quiere más realismo: el siguiente paso es usar recursos fotográficos de **Poly Haven** (CC0: texturas de nieve/madera/tela/ladrillo, HDRIs de interior en mayor resolución y muebles escaneados para el salón: sofá, butaca, alfombra, lámpara, plantas). Desde esta máquina sí hay acceso a internet, así que se pueden descargar (API: `https://api.polyhaven.com/files/<slug>`).
+"Maqueta de juguete bajo el árbol": juguetes reales fotografiados de noche. Iluminación fría de luna desde la ventana + cálida de la chimenea, bloom, desenfoque de miniatura en vistas abiertas. Jon quiere más realismo: el siguiente paso es usar recursos fotográficos de **Poly Haven** (CC0: texturas de nieve/madera/tela/ladrillo, HDRIs de interior en mayor resolución y muebles escaneados para el salón: sofá, butaca, alfombra, lámpara, plantas). En el entorno cloud de Claude.ai estaba bloqueado; en un PC con internet normal se pueden descargar (API: `https://api.polyhaven.com/files/<slug>`).
 
 ## Licencias de recursos
 
