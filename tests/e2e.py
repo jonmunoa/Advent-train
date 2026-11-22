@@ -27,10 +27,10 @@ GPU = '--gpu' in sys.argv
 DIST = '--dist' in sys.argv
 TAG = os.environ.get('ADVX_TAG', 'TU-TAG-21') if DIST else 'TU-TAG-21'
 
-# maquinista bot: salida perfecta, va al 97 % de la envolvente y gasta el turbo cuando renta
+# maquinista bot: salida perfecta, va al 97 % de la envolvente (frenando para repartir) y gasta el turbo cuando renta
 BOT = """(()=>{const A=__adv;for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
- if(A.mode==='race'&&A.turboGood())A.turbo();A.step(1/60,A.mode==='race'&&G.v<A.vsAhead(G.dist)*0.97)}
- for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,time:+G.time.toFixed(1),total:+(G.total||0).toFixed(1),bells:G.bells,lost:G.lost,gifts:A.giftsOn(),turbos:G.turbos,med:A.MED}})()"""
+ if(A.mode==='race'&&A.turboGood())A.turbo();A.step(1/60,A.mode==='race'&&G.v<A.vsDrop(G.dist)*0.97)}
+ for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,time:+G.time.toFixed(1),total:+(G.total||0).toFixed(1),bells:G.bells,drops:G.drops,lost:G.lost,gifts:A.giftsOn(),turbos:G.turbos,med:A.MED}})()"""
 
 # acelera a fondo hasta perder un regalo; luego suelta y asienta la cámara para la captura
 OVERSPEED = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);let t=0;
@@ -44,6 +44,14 @@ FINISH = BOT
 # decodifica el reto actual con el mismo sim.js y lo compara con el circuito
 GHOST_RT = """(async()=>{const S=await __adv.sim(),code=__adv.code,g=await S.decodeGhost(code),T=S.trackFor(g.day);
  return {len:code.length,day:g.day,name:g.name,raw:g.raw,total:g.total,dist:g.cum[g.cum.length-1],L:T.L}})()"""
+
+# día con agujas: cambia a atajo antes de la bifurcación y termina
+SHORTCUT = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
+ if(!G.wantShort&&A.SC&&G.dist>A.SC.a-150)A.toggleSwitch();if(A.turboGood())A.turbo();A.step(1/60,G.v<A.vsDrop(G.dist)*0.97)}
+ for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,route:G.route,flags:G.run?G.run.flags:-1,total:+(G.total||0).toFixed(1),share:A.shareText()}})()"""
+
+# día del túnel: lleva el tren hasta la mitad del túnel y lo deja ahí en marcha
+TUNNEL = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);const tg=A.T.L*0.66;for(let k=0;k<60000;k++){const G=A.G;if(A.mode!=='race'||G.dist>=tg)break;A.step(1/60,G.v<A.vsDrop(G.dist)*0.6)}A.step(1/60,false);return A.G.dist})()"""
 
 # sigue con el bot hasta tener el turbo cargado, lo activa y asienta la cámara
 TURBO_ON = """(()=>{const A=__adv;for(let i=0;i<4000&&!(A.G.turbo>0)&&A.mode==='race';i++){if(A.turboGood())A.turbo();const G=A.G;A.step(1/60,G.v<A.vsAhead(G.dist)*0.97)}
@@ -69,8 +77,10 @@ def parse_ghost(code):
     name = b[5:5 + nl].decode('utf-8')
     o = 5 + nl
     raw_ms, total_ms = struct.unpack_from('<II', b, o)
-    return {'version': b[0], 'season': 2000 + b[1], 'day': b[2], 'name': name, 'raw_ms': raw_ms, 'total_ms': total_ms,
-            'bells': b[o + 8], 'lost': b[o + 9], 'turbos': b[o + 10], 'n': b[o + 11] | b[o + 12] << 8}
+    v2 = b[0] == 2
+    k = o + (12 if v2 else 11)
+    return {'version': b[0], 'season': 2000 + b[1], 'day': b[2], 'flags': b[3] if v2 else 0, 'name': name, 'raw_ms': raw_ms, 'total_ms': total_ms,
+            'bells': b[o + 8], 'lost': b[o + 9], 'turbos': b[o + 10], 'drops': b[o + 11] if v2 else 0, 'n': b[k] | b[k + 1] << 8}
 
 
 class FakeSupabase:
@@ -159,6 +169,7 @@ async def main():
         check('la carrera termina', res['mode'] == 'end' and res['total'] > 0)
         check('el bot no pierde regalos', res['lost'] == 0 and res['gifts'] == 3, f"perdidos {res['lost']}, a bordo {res['gifts']}")
         check('el bot usa el turbo', res['turbos'] >= 1, f"{res['turbos']} turbos")
+        check('el bot reparte en las tres paradas', res['drops'] == 3, f"{res['drops']} repartos")
         check('un buen maquinista consigue el oro', res['total'] <= res['med']['g'], f"{res['total']} s frente a oro {res['med']['g']} s")
         await pg.wait_for_timeout(1500)
         if SHOTS:
@@ -240,6 +251,31 @@ async def main():
         check('la llegada compara con el amigo', 'Ane' in end2[0], end2[0])
         check('el texto de compartir menciona el reto', '⚔️' in end2[1] and 'Ane' in end2[1])
         await p2.close()
+
+        # 3b) días especiales: agujas (13) y túnel de estrellas (14)
+        p5 = await b.new_page(viewport={'width': 1200, 'height': 760})
+        p5.on('pageerror', lambda e: errors.append(f'pageerror (días): {e}'))
+        await route_local_three(p5)
+        await p5.add_init_script("try{localStorage.setItem('advx-dev','1')}catch(e){}")
+        await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-13', wait_until='domcontentloaded', timeout=120000)
+        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        check('el billete del día 13 explica las agujas', 'Agujas' in await p5.evaluate("document.getElementById('pMod').textContent"))
+        await p5.evaluate("document.getElementById('bGo').click()")
+        await p5.wait_for_timeout(200)
+        sc = await p5.evaluate(SHORTCUT)
+        print('atajo:', sc)
+        check('con la aguja cambiada el tren va por el atajo y termina', sc['mode'] == 'end' and sc['route'] == 1 and sc['flags'] & 2, str(sc))
+        check('el texto de compartir dice que fue por el atajo', '🔀' in sc['share'])
+        await p5.goto('about:blank')
+        await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-14', wait_until='domcontentloaded', timeout=120000)
+        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p5.evaluate("document.getElementById('bGo').click()")
+        await p5.wait_for_timeout(200)
+        tun = await p5.evaluate(TUNNEL)
+        await p5.wait_for_timeout(1500)
+        lt = await p5.evaluate("__adv.LT")
+        check('dentro del túnel de estrellas el salón se apaga', lt < 0.5, f"luz {lt:.2f}")
+        await p5.close()
 
         # 4) clasificación global con un Supabase simulado
         sb = FakeSupabase(seed_ghost=challenge.split('#reto-')[1])

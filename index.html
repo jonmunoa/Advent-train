@@ -54,7 +54,7 @@
       <div class="tbody">
         <p class="lbl" id="pDay">Día 1 de 24</p>
         <h2 class="slab" id="pName">Alrededor del árbol</h2>
-        <div class="fields" id="pFields"></div><p class="lbl">Medallas</p><div class="meds" id="pMed"></div><p class="ghostl" id="pGhost"></p>
+        <div class="fields" id="pFields"></div><p class="lbl">Medallas</p><div class="meds" id="pMed"></div><p class="ghostl modl" id="pMod"></p><p class="ghostl" id="pGhost"></p>
         <p class="lbl">Asiento</p>
         <div class="punch" id="punch"><button data-cam="tp"><i></i>Detrás del tren</button><button data-cam="fp"><i></i>En la cabina</button></div>
         <div class="go"><button class="btnR" id="bGo">Subir al tren</button><button class="btnL" id="bBack1">Volver al calendario</button></div>
@@ -73,8 +73,9 @@
   <div class="warn" id="warn"></div>
   <div class="dial"><svg viewBox="0 0 200 200" id="dialSvg"></svg><div class="kmh" id="kmh">0</div><div class="u">km/h</div></div>
   <button class="pedal b" id="pedal">VAPOR</button>
+  <button class="switch b" id="bSwitch" aria-label="Cambiar aguja (A)">AGUJA</button>
   <button class="turbo b" id="bTurbo" aria-label="Turbo (E)"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tr0" cx="50" cy="50" r="44"/><circle class="tr1" id="tRing" cx="50" cy="50" r="44"/></svg><span>TURBO</span></button>
-  <div class="hint">ESPACIO vapor · E turbo · suelta para frenar · C cámara · R repetir</div>
+  <div class="hint">ESPACIO vapor · E turbo · A aguja · suelta para frenar · C cámara · R repetir</div>
 </section>
 
 <section class="scr overlay" id="pause" aria-label="Pausa" style="background:rgba(3,6,18,.5)">

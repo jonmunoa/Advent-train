@@ -4,35 +4,36 @@
 // las valida y las envía al handler con un PostgREST en memoria.
 import {strict as assert} from 'node:assert';
 import {
-  trackFor, bellsFor, vsNow, veAtT, accel, turboCharging, turboGood, bellBonus, encodeGhost, decodeGhost, validateRun, dayOpen,
-  VMAX, VTURBO, BRAKE, DRAG, VDECAY, TURBO_DUR, TURBO_KICK, TURBO_FILL, PEN_GIFT, SLIP_T, SLIP_V, GDT, SEASON,
+  routesFor, vsNow, veAtT, envelope, accel, turboCharging, turboGood, bellBonus, encodeGhost, decodeGhost, validateRun, dayOpen, medalsFor,
+  VMAX, VTURBO, BRAKE, VDECAY, TURBO_DUR, TURBO_KICK, PEN_GIFT, SLIP_T, SLIP_V, GDT, SEASON, DROP_TOL, DROP_BONUS, F_SHORTCUT,
 } from '../supabase/functions/_shared/sim.js';
 import {makeHandler} from '../supabase/functions/submit-run/handler.js';
 
 let fails = 0;
 const ok = (name, fn) => Promise.resolve().then(fn).then(() => console.log('  ok   ' + name), e => {fails++; console.log('  FALLO ' + name + '\n        ' + e.message)});
 
-/* carrera simulada con la física del juego (60 Hz) */
-function simulateRun(day, {k = 0.97, turbo = true, overspeed = false, name = 'Bot'} = {}) {
-  const T = trackFor(day), bells = bellsFor(T), dt = 1 / 60, gv = [];
-  let v = 9, dist = 0, t = 0, tb = 0, tt = 0, turbos = 0, stress = 0, slip = 0, lost = 0, bonus = 0, combo = 0, bi = 0, hits = 0, gAcc = 0, gLast = 0;
+/* carrera simulada con la física del juego (60 Hz): ruta, reparto, turbo, regalos y campanas */
+function simulateRun(day, {k = 0.97, turbo = true, overspeed = false, name = 'Bot', route = 0, deliver = true} = {}) {
+  const R = routesFor(day)[route], {T, bells, drops} = R, P = T.phys, env = deliver && drops.length ? envelope(T, drops) : T.ve, dt = 1 / 60, gv = [];
+  let v = 9, dist = 0, t = 0, tb = 0, tt = 0, turbos = 0, stress = 0, slip = 0, lost = 0, bonus = 0, combo = 0, bi = 0, di = 0, hits = 0, nd = 0, gAcc = 0, gLast = 0;
   while (dist < T.L) {
     t += dt;
-    if (turbo && tb >= 1 && tt <= 0 && turboGood(T, dist, v)) {tt = TURBO_DUR; tb = 0; turbos++; v = Math.min(VTURBO, v + TURBO_KICK)}
-    const on = tt > 0, cap = on ? VTURBO : VMAX, thr = overspeed || v < Math.min(veAtT(T, dist), cap) * k;
+    if (turbo && tb >= 1 && tt <= 0 && turboGood(T, dist, v, env)) {tt = TURBO_DUR; tb = 0; turbos++; v = Math.min(VTURBO, v + TURBO_KICK)}
+    const on = tt > 0, cap = on ? VTURBO : VMAX, thr = overspeed || v < Math.min(veAtT(T, dist, env), cap) * k;
     if (slip > 0) slip -= dt;
-    if (thr) {if (slip <= 0 && v < cap) v = Math.min(cap, v + accel(v, on) * dt)} else v -= BRAKE * dt;
+    if (thr) {if (slip <= 0 && v < cap) v = Math.min(cap, v + accel(v, on, P) * dt)} else v -= BRAKE * dt;
     if (on) tt -= dt;
-    v -= DRAG * dt; if (v > cap) v = Math.max(cap, v - VDECAY * dt); v = Math.max(0, v);
+    v -= P.drag * dt; if (v > cap) v = Math.max(cap, v - VDECAY * dt); v = Math.max(0, v);
     dist += v * dt; gAcc += dt; while (gAcc >= GDT) {gAcc -= GDT; const dB = dist - v * gAcc; gv.push((dB - gLast) / GDT); gLast = dB}
     const vs = vsNow(T, dist), over = v / vs - 1;
-    if (!(tt > 0) && tb < 1 && turboCharging(vs, v)) tb = Math.min(1, tb + dt / TURBO_FILL);
+    if (!(tt > 0) && tb < 1 && turboCharging(vs, v)) tb = Math.min(1, tb + dt / P.fill);
     if (over > 0.03) stress += over * 3.6 * dt; else stress = Math.max(0, stress - dt);
     if (stress >= 1) {lost++; tb = 0; tt = 0; slip = SLIP_T; stress = 0.4; v = Math.min(v, vs * SLIP_V)}
     while (bi < bells.length && dist >= bells[bi].s) {if (v >= bells[bi].v) {combo++; hits++; bonus += bellBonus(combo)} else combo = 0; bi++}
+    while (di < drops.length && dist >= drops[di].s) {if (v <= drops[di].v + DROP_TOL) {nd++; bonus += DROP_BONUS} di++}
   }
   if (gAcc > 1e-4) gv.push((dist - gLast) / gAcc);
-  return {day, name, raw: t, total: t + PEN_GIFT * lost - bonus, bells: hits, lost, turbos, v: gv};
+  return {day, name, raw: t, total: t + PEN_GIFT * lost - bonus, bells: hits, drops: nd, lost, turbos, flags: route ? F_SHORTCUT : 0, v: gv};
 }
 const roundTrip = async run => decodeGhost(await encodeGhost(run));
 const opts = {allowAnyDay: true};
@@ -40,6 +41,18 @@ const opts = {allowAnyDay: true};
 console.log('validación');
 const days = [1, 5, 9, 14, 19, 24], clean = {};
 for (const d of days) clean[d] = simulateRun(d);
+await ok('con atajo (día 13), la carrera por la ruta corta también pasa', async () => {
+  const run = simulateRun(13, {route: 1}), r = validateRun(await roundTrip(run), opts); assert.ok(r.ok && r.route === 'atajo', String(r.errs)); assert.ok(run.drops >= 1, 'reparte');
+});
+await ok('declarar el atajo en un día sin agujas se rechaza', async () => {
+  const r = validateRun(await roundTrip({...clean[5], flags: F_SHORTCUT}), opts); assert.ok(!r.ok, 'debería fallar');
+});
+await ok('declarar repartos que no se hicieron se rechaza', async () => {
+  const run = simulateRun(14, {deliver: false}), r = validateRun(await roundTrip({...run, drops: 3, total: run.total - 6}), opts); assert.ok(r.errs.includes('repartos'), String(r.errs));
+});
+await ok('el maquinista simulado reparte y queda cerca del ideal', () => {
+  for (const d of days) {const m = medalsFor(d); assert.ok(clean[d].total < m.g + 1.5, `día ${d}: ${clean[d].total.toFixed(1)} frente a oro ${m.g}`)}
+});
 await ok('carreras limpias de 6 días pasan la validación', async () => {
   for (const d of days) {const g = await roundTrip(clean[d]), r = validateRun(g, opts); assert.ok(r.ok, `día ${d}: ${r.errs}`); assert.ok(Math.abs(r.total - clean[d].total) < 1, `día ${d}: total ${r.total} vs ${clean[d].total}`)}
 });
