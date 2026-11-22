@@ -161,7 +161,8 @@ async def main():
             OUT.mkdir(exist_ok=True)
             await pg.screenshot(path=str(OUT / '1-calendario.png'))
         await pg.evaluate("document.querySelector('.door.today').click()")
-        await pg.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        # con SwiftShader y una captura justo antes, Chromium tarda más en el primer render (en un navegador real no pasa)
+        await pg.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=420000)
         if SHOTS:
             await pg.evaluate('__adv.settle()'); await pg.wait_for_timeout(2000)
             await pg.screenshot(path=str(OUT / '2-billete.png'))
@@ -200,7 +201,7 @@ async def main():
 
         # 1b) fantasma codificado: ida y vuelta y enlace de reto con nombre
         await pg.fill('#iName', 'Ane')
-        await pg.wait_for_function("__adv.code && location.hash !== null", timeout=10000)
+        await pg.wait_for_function("__adv.code && location.hash !== null", polling=500, timeout=10000)
         await pg.wait_for_timeout(600)
         gh = await pg.evaluate(GHOST_RT)
         print('fantasma:', gh)
@@ -231,7 +232,7 @@ async def main():
         p2.on('pageerror', lambda e: errors.append(f'pageerror (reto): {e}'))
         await route_local_three(p2)
         await p2.goto(challenge, wait_until='domcontentloaded', timeout=120000)
-        await p2.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p2.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         pre = await p2.evaluate("document.getElementById('pGhost').textContent")
         check('el billete anuncia el reto del amigo', 'Ane' in pre, pre)
         if SHOTS:
@@ -240,7 +241,10 @@ async def main():
         await p2.evaluate("document.getElementById('bGo').click()")
         await p2.wait_for_timeout(200)
         mid = await p2.evaluate(CHALLENGE_MID)
-        await p2.wait_for_timeout(400)
+        try:
+            await p2.wait_for_function("document.getElementById('hDelta').textContent!==''", polling=500, timeout=30000)
+        except Exception:
+            pass
         mid['delta'] = await p2.evaluate("document.getElementById('hDelta').textContent")
         check('en carrera el fantasma es del amigo y hay delta', mid['src'] == 'amigo' and mid['ghost'] and mid['delta'] != '', str(mid))
         if SHOTS:
@@ -266,7 +270,7 @@ async def main():
         await route_local_three(p5)
         await p5.add_init_script("try{localStorage.setItem('advx-dev','1')}catch(e){}")
         await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-13', wait_until='domcontentloaded', timeout=120000)
-        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         check('el billete del día 13 explica las agujas', 'Agujas' in await p5.evaluate("document.getElementById('pMod').textContent"))
         await p5.evaluate("document.getElementById('bGo').click()")
         await p5.wait_for_timeout(200)
@@ -276,11 +280,14 @@ async def main():
         check('el texto de compartir dice que fue por el atajo', '🔀' in sc['share'])
         await p5.goto('about:blank')
         await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-14', wait_until='domcontentloaded', timeout=120000)
-        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         await p5.evaluate("document.getElementById('bGo').click()")
         await p5.wait_for_timeout(200)
         tun = await p5.evaluate(TUNNEL)
-        await p5.wait_for_timeout(1500)
+        try:
+            await p5.wait_for_function("__adv.LT<0.5", polling=300, timeout=30000)
+        except Exception:
+            pass
         lt = await p5.evaluate("__adv.LT")
         check('dentro del túnel de estrellas el salón se apaga', lt < 0.5, f"luz {lt:.2f}")
         await p5.close()
@@ -307,8 +314,8 @@ async def main():
         p3.on('pageerror', lambda e: errors.append(f'pageerror (supabase): {e}'))
         await route_local_three(p3)
         await p3.goto(f'http://127.0.0.1:{PORT}/index.html?liga=fam123&n=Familia#dia-1', wait_until='domcontentloaded', timeout=120000)
-        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
-        await p3.wait_for_function("document.querySelector('#pLB [data-beat]')", timeout=15000)
+        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
+        await p3.wait_for_function("document.querySelector('#pLB [data-beat]')", polling=500, timeout=15000)
         check('el billete carga la clasificación compartida con «Bátelo»', 'Leire' in await p3.evaluate("document.getElementById('pLB').textContent"))
         lg = await p3.evaluate("[__adv.ligas().map(l=>l.code+':'+l.name).join(), document.getElementById('pTabs').textContent, document.getElementById('pLB').textContent, location.search]")
         check('el enlace ?liga= une a la liga y limpia la URL', lg[0] == 'fam123:Familia' and lg[3] == '', str(lg[0]) + ' ' + lg[3])
@@ -319,7 +326,7 @@ async def main():
         await p3.wait_for_timeout(800)
         await p3.fill('#iName', 'Ane')
         await p3.evaluate("document.getElementById('bSave').click()")
-        await p3.wait_for_function("/Fichado/.test(document.getElementById('bSave').textContent)", timeout=15000)
+        await p3.wait_for_function("/Fichado/.test(document.getElementById('bSave').textContent)", polling=500, timeout=15000)
         saved = await p3.evaluate("[document.getElementById('bSave').textContent, document.getElementById('eLB').textContent, __adv.shareText()]")
         print('fichado:', saved[0], '| envío:', sb.last)
         check('fichar envía el fantasma con el nombre a submit-run', sb.last.get('name') == 'Ane' and sb.last.get('day') == 1 and len(sb.last.get('device', '')) == 36)
@@ -331,7 +338,7 @@ async def main():
         check('la pestaña General muestra a todos', 'Desconocido' in await p3.evaluate("document.getElementById('eLB').textContent"))
         short = saved[2].split('\n')[-1]
         await p3.evaluate("[...document.querySelectorAll('#eLB [data-beat]')].find(b=>b.closest('.r').textContent.includes('Leire')).click()")
-        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=15000)
+        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=15000)
         pre3 = await p3.evaluate("document.getElementById('pGhost').textContent")
         check('«Bátelo» en la clasificación abre el reto de esa fila', 'Leire' in pre3, pre3)
         await p3.close()
@@ -339,7 +346,7 @@ async def main():
         p4.on('pageerror', lambda e: errors.append(f'pageerror (enlace corto): {e}'))
         await route_local_three(p4)
         await p4.goto(short, wait_until='domcontentloaded', timeout=120000)
-        await p4.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p4.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         pre4 = await p4.evaluate("document.getElementById('pGhost').textContent")
         check('el enlace corto abre el reto de Ane desde el servidor', 'Ane' in pre4, pre4)
         await ctx.close()

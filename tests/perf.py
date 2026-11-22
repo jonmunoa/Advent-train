@@ -24,7 +24,7 @@ PORT = 8767
 GPU = '--swiftshader' not in sys.argv
 SAVE = '--save' in sys.argv
 N = 40 if not GPU else 120
-DAYS = [1, 7]
+DAYS = [1, 7, 13, 14]
 POSES = [('orbit', 0.0), ('tp', 0.25), ('fp', 0.25), ('tp', 0.6)]
 BASE = ROOT / 'tests' / ('perf-baseline.json' if GPU else 'perf-baseline-swiftshader.json')
 
@@ -41,7 +41,7 @@ async def main():
         for d in DAYS:
             await pg.goto('about:blank')
             await pg.goto(f'http://127.0.0.1:{PORT}/index.html#dia-{d}')
-            await pg.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+            await pg.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
             await pg.wait_for_timeout(500)
             for kind, f in POSES:
                 # mínimo de 3 tandas: el ruido de reloj/temperatura de la GPU solo suma tiempo
