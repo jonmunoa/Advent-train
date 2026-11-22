@@ -37,6 +37,15 @@ KEEPGOING = """(()=>{const A=__adv;let vmin=99;for(let i=0;i<60;i++){A.step(1/60
 
 FINISH = BOT
 
+# decodifica el reto actual con el mismo sim.js y lo compara con el circuito
+GHOST_RT = """(async()=>{const S=await __adv.sim(),code=__adv.code,g=await S.decodeGhost(code),T=S.trackFor(g.day);
+ return {len:code.length,day:g.day,name:g.name,raw:g.raw,total:g.total,dist:g.cum[g.cum.length-1],L:T.L}})()"""
+
+# 6 s de carrera con el bot contra el fantasma del amigo
+CHALLENGE_MID = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);
+ for(let i=0;i<360;i++){const G=A.G;A.step(1/60,G.v<A.vsAhead(G.dist)*0.95)}A.settle();
+ return {src:A.GH&&A.GH.src,ghost:A.GH?A.ghostTimeAt(A.G.dist)!==null:false,delta:document.getElementById('hDelta').textContent}})()"""
+
 checks = []
 
 
@@ -94,6 +103,18 @@ async def main():
         fields = await pg.evaluate("document.getElementById('eFields').textContent")
         check('la llegada muestra los regalos', 'Regalos3/3' in fields.replace(' ', ''), fields)
 
+        # 1b) fantasma codificado: ida y vuelta y enlace de reto con nombre
+        await pg.fill('#iName', 'Ane')
+        await pg.wait_for_function("__adv.code && location.hash !== null", timeout=10000)
+        await pg.wait_for_timeout(600)
+        gh = await pg.evaluate(GHOST_RT)
+        print('fantasma:', gh)
+        check('el fantasma se codifica en un enlace corto', gh['len'] < 600, f"{gh['len']} caracteres")
+        check('ida y vuelta del codec conserva día, nombre y tiempos', gh['day'] == 1 and gh['name'] == 'Ane' and abs(gh['raw'] - res['time']) < 0.06 and abs(gh['total'] - res['total']) < 0.06)
+        check('la distancia integrada del fantasma cuadra con el circuito', -0.5 < gh['dist'] - gh['L'] < 1.0, f"{gh['dist']:.2f} m frente a {gh['L']:.2f} m")
+        challenge = await pg.evaluate("document.getElementById('shareTxt').textContent.split('\\n').pop()")
+        check('el texto de compartir lleva el enlace de reto', '#reto-' in challenge, challenge[:60] + '…')
+
         # 2) a fondo: se pierde un regalo, se penaliza y el tren no se para
         await pg.evaluate("document.getElementById('bAgain').click()")
         await pg.wait_for_timeout(200)
@@ -108,6 +129,33 @@ async def main():
         check('el tren no se para tras perderlo', kg['mode'] == 'race' and kg['vmin'] > 3, f"vmin {kg['vmin']} m/s")
         fin = await pg.evaluate(FINISH)
         check('la carrera con pérdidas termina', fin['mode'] == 'end', str(fin))
+
+        # 3) abrir el reto en otra pestaña: billete con el nombre, fantasma dorado y delta
+        await pg.close()
+        p2 = await b.new_page(viewport={'width': 1200, 'height': 760})
+        p2.on('pageerror', lambda e: errors.append(f'pageerror (reto): {e}'))
+        await route_local_three(p2)
+        await p2.goto(challenge, wait_until='domcontentloaded', timeout=120000)
+        await p2.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        pre = await p2.evaluate("document.getElementById('pGhost').textContent")
+        check('el billete anuncia el reto del amigo', 'Ane' in pre, pre)
+        if SHOTS:
+            await p2.evaluate('__adv.settle()'); await p2.wait_for_timeout(1500)
+            await p2.screenshot(path=str(OUT / '5-billete-reto.png'))
+        await p2.evaluate("document.getElementById('bGo').click()")
+        await p2.wait_for_timeout(200)
+        mid = await p2.evaluate(CHALLENGE_MID)
+        await p2.wait_for_timeout(400)
+        mid['delta'] = await p2.evaluate("document.getElementById('hDelta').textContent")
+        check('en carrera el fantasma es del amigo y hay delta', mid['src'] == 'amigo' and mid['ghost'] and mid['delta'] != '', str(mid))
+        if SHOTS:
+            await p2.wait_for_timeout(700)
+            await p2.screenshot(path=str(OUT / '6-carrera-reto.png'))
+        await p2.evaluate(FINISH)
+        await p2.wait_for_timeout(800)
+        end2 = await p2.evaluate("[document.getElementById('eDelta').textContent, __adv.shareText()]")
+        check('la llegada compara con el amigo', 'Ane' in end2[0], end2[0])
+        check('el texto de compartir menciona el reto', '⚔️' in end2[1] and 'Ane' in end2[1])
         await b.close()
     srv.shutdown()
     for e in errors:
