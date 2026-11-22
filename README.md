@@ -38,11 +38,12 @@ python tests/perf.py           # coste por fotograma frente a tests/perf-baselin
 Sin configurar, la clasificación se guarda solo en el dispositivo. Para tener ranking global:
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (región en Europa).
-2. Enlázalo desde la raíz del repo: `npx supabase login` y `npx supabase link --project-ref <ref>`.
-3. Crea la tabla: `npx supabase db push` (o pega `supabase/migrations/20261122000000_runs.sql` en el SQL Editor).
+2. Enlázalo desde la raíz del repo: `npx supabase login` y `npx supabase link --project-ref <ref>` (el `<ref>` son las 20 letras de la URL del proyecto, `https://<ref>.supabase.co`).
+3. Crea la tabla: `npx supabase db push --remote` (pide la contraseña de la base de datos), o pega `supabase/migrations/20261122000000_runs.sql` en el SQL Editor.
+   Ojo: con el CLI v3, `db push` sin `--remote` va a la base **local** de Docker, que puede ser la de otro proyecto. Si te sugiere `migration repair` o `db pull`, no lo hagas: falta el `--remote`.
 4. Secretos de la función:
    `npx supabase secrets set RUN_SALT=<32 caracteres aleatorios> ALLOWED_ORIGINS=https://tu-dominio,http://localhost:5173 SEASON=2026`
-5. Despliega la función: `npx supabase functions deploy submit-run --no-verify-jwt`.
+5. Despliega la función: `npx supabase functions deploy submit-run --no-verify-jwt` (añade `--use-api` si Docker no está arrancado).
 6. En *Project Settings → API Keys*, copia la **Project URL** y la **publishable key** a las variables `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` (en Vercel) o a `config.js` (en local).
 
 Para probar antes de diciembre, añade `ALLOW_ANY_DAY=1` a los secretos y quítalo después.
