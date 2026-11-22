@@ -77,7 +77,7 @@ export function medals(T, bells, {turbo = true} = {}) {
   for (let k = 0; k < 60000 && dist < T.L; k++) {
     if (turbo && tb >= 1 && tt <= 0 && turboGood(T, dist, v)) {tt = TURBO_DUR; tb = 0; v = Math.min(VTURBO, v + TURBO_KICK); nT++}
     const on = tt > 0, cap = on ? VTURBO : VMAX;
-    if (v < Math.min(veAtT(T, dist), cap)) v += accel(v, on) * dt; else v -= BRAKE * dt;
+    if (v < Math.min(veAtT(T, dist), cap)) v = Math.min(cap, v + accel(v, on) * dt); else v -= BRAKE * dt;
     if (on) tt -= dt;
     v -= DRAG * dt; if (v > cap) v = Math.max(cap, v - VDECAY * dt); v = Math.max(0, v); dist += v * dt; t += dt;
     if (!on && turboCharging(vsNow(T, dist), v)) tb = Math.min(1, tb + dt / TURBO_FILL);

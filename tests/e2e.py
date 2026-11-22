@@ -46,6 +46,9 @@ GHOST_RT = """(async()=>{const S=await __adv.sim(),code=__adv.code,g=await S.dec
 TURBO_ON = """(()=>{const A=__adv;for(let i=0;i<4000&&!(A.G.turbo>0)&&A.mode==='race';i++){if(A.turboGood())A.turbo();const G=A.G;A.step(1/60,G.v<A.vsAhead(G.dist)*0.97)}
  for(let i=0;i<15;i++)A.step(1/60,true);A.settle();return {turbo:+A.G.turbo.toFixed(2),v:+A.G.v.toFixed(1),turbos:A.G.turbos}})()"""
 
+# turbo activo y vapor a fondo 1,5 s: la velocidad no puede pasar de VTURBO (35 m/s)
+TURBO_CAP = """(()=>{const A=__adv;let m=0;for(let i=0;i<90&&A.mode==='race';i++){A.step(1/60,true);m=Math.max(m,A.G.v)}A.step(1/60,false);return m})()"""
+
 # 6 s de carrera con el bot contra el fantasma del amigo
 CHALLENGE_MID = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);
  for(let i=0;i<360;i++){const G=A.G;A.step(1/60,G.v<A.vsAhead(G.dist)*0.95)}A.settle();
@@ -160,6 +163,8 @@ async def main():
             await p2.screenshot(path=str(OUT / '6-carrera-reto.png'))
         tb = await p2.evaluate(TURBO_ON)
         check('el turbo se carga apurando curvas y se activa', tb['turbo'] > 0 and tb['v'] > 0, str(tb))
+        cap = await p2.evaluate(TURBO_CAP)
+        check('con turbo y vapor a fondo no se pasa del tope', cap <= 35.01, f"{cap:.2f} m/s")
         if SHOTS:
             await p2.wait_for_timeout(300)
             await p2.screenshot(path=str(OUT / '7-turbo.png'))

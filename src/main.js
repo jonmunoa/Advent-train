@@ -612,7 +612,7 @@ function race(dt){
   G.time+=dt;
   if(G.slip>0){G.slip-=dt;if(Math.random()<0.5)spark(tmpV.set(cars[0].position.x,0.5,cars[0].position.z),2,6)}
   const tOn=G.turbo>0,cap=tOn?VTURBO:VMAX;
-  if(input.thr){if(G.slip<=0)G.v+=accel(G.v,tOn)*dt}else G.v-=(input.brk?HARD:BRAKE)*dt;
+  if(input.thr){if(G.slip<=0&&G.v<cap)G.v=Math.min(cap,G.v+accel(G.v,tOn)*dt)}else G.v-=(input.brk?HARD:BRAKE)*dt;
   if(tOn){G.turbo-=dt;if(G.turbo<=0)turboEnd()}
   G.v-=DRAG*dt;if(G.v>cap)G.v=Math.max(cap,G.v-VDECAY*dt);G.v=Math.max(0,G.v);
   const ds=G.v*dt;G.dist+=ds;G.chuff+=ds;spinWheels(ds);
