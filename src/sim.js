@@ -8,6 +8,10 @@ import {CatmullRomCurve3, Vector3} from 'three';
 export const SEASON = 2026;
 export const STEP = 0.5, VMAX = 30, ACC = 6.4, BRAKE = 9, HARD = 13, DRAG = 0.25, ALAT = 6.6, TAIL = 16;
 export const PEN_GIFT = 2, SLIP_V = 0.75, SLIP_T = 0.7, BELL_BONUS = 0.5;
+export const VS_CAP = 40; // tope del límite lateral: en recta no hay curva que frene, solo VMAX (o VTURBO con turbo)
+/* turbo: se carga apurando curvas (cerca de vs sin pasarse) y da un empujón con el vapor pisado */
+export const VTURBO = 35, TURBO_ACC = 9, TURBO_DUR = 2.5, TURBO_KICK = 4, TURBO_FILL = 3, VDECAY = 3;
+export const turboCharging = (vsN, v) => vsN < 0.8 * VMAX && v >= 0.88 * vsN && v <= 1.03 * vsN;
 export const STFR = [0.2, 0.52, 0.8];
 export const GDT = 0.1, VQ = 0.15; // fantasma: una velocidad media cada 0,1 s, en pasos de 0,15 m/s
 export const bellBonus = c => BELL_BONUS * Math.min(2, 1 + 0.25 * (c - 1));
@@ -35,8 +39,8 @@ export function buildTrack(pts) {
   const x = new Float32Array(N), z = new Float32Array(N), a = new Float32Array(N), vs0 = new Float32Array(N), vs = new Float32Array(N);
   for (let i = 0; i < N; i++) {x[i] = sp[i].x; z[i] = sp[i].z}
   for (let i = 0; i < N; i++) {const p = (i - 1 + N) % N, q = (i + 1) % N; a[i] = Math.atan2(z[q] - z[p], x[q] - x[p])}
-  const w = Math.round(6 / ds); for (let i = 0; i < N; i++) {const k = Math.abs(wrapA(a[(i + w) % N] - a[(i - w + N) % N])) / (2 * w * ds); vs0[i] = Math.min(VMAX, Math.sqrt(ALAT / Math.max(k, 1e-5)))}
-  const m = Math.round(8 / ds); for (let i = 0; i < N; i++) {let v = VMAX; for (let j = -m; j <= m; j += 2) v = Math.min(v, vs0[(i + j + N) % N]); vs[i] = v}
+  const w = Math.round(6 / ds); for (let i = 0; i < N; i++) {const k = Math.abs(wrapA(a[(i + w) % N] - a[(i - w + N) % N])) / (2 * w * ds); vs0[i] = Math.min(VS_CAP, Math.sqrt(ALAT / Math.max(k, 1e-5)))}
+  const m = Math.round(8 / ds); for (let i = 0; i < N; i++) {let v = VS_CAP; for (let j = -m; j <= m; j += 2) v = Math.min(v, vs0[(i + j + N) % N]); vs[i] = v}
   const tl = Math.round(TAIL / ds), ve = new Float32Array(N); for (let i = 0; i < N; i++) ve[i] = Math.min(vs[i], vs[(i - tl + N) % N]);
   for (let pass = 0; pass < 2; pass++) for (let i = N - 1; i >= 0; i--) {const j = (i + 1) % N; ve[i] = Math.min(ve[i], Math.sqrt(ve[j] * ve[j] + 2 * BRAKE * ds))}
   return {x, z, a, vs, ve, N, L, ds};
@@ -46,6 +50,15 @@ export const idxT = (T, s) => Math.floor((((s % T.L) + T.L) % T.L) / T.ds) % T.N
 export const atT = (T, s) => {s = ((s % T.L) + T.L) % T.L; const f = s / T.ds, i = Math.floor(f) % T.N, j = (i + 1) % T.N, t = f - Math.floor(f); return {x: lerp(T.x[i], T.x[j], t), z: lerp(T.z[i], T.z[j], t), a: T.a[i] + wrapA(T.a[j] - T.a[i]) * t}};
 export const vsAtT = (T, s) => T.vs[idxT(T, s)];
 export const veAtT = (T, s) => T.ve[idxT(T, s)];
+/* velocidad límite de morro y cola: por encima de 1,03× sube el stress */
+export const vsNow = (T, s) => Math.min(vsAtT(T, s), vsAtT(T, s - TAIL));
+/* aceleración del vapor (más el turbo si está activo) */
+export const accel = (v, on) => ACC * (1 - 0.5 * Math.min(v, VMAX) / VMAX) + (on ? TURBO_ACC : 0);
+/* ¿merece la pena gastar el turbo aquí? Hay margen en la envolvente durante todo el empujón */
+export function turboGood(T, s, v) {
+  let m = VS_CAP; for (let d = 0; d <= 20; d += 2) m = Math.min(m, veAtT(T, s + d));
+  return m >= v + TURBO_KICK + 1;
+}
 /* campanas: posición s y velocidad mínima para que suenen */
 export function bellsFor(T) {
   const st = STFR.map(f => f * T.L), out = [], nb = Math.max(10, Math.round(T.L / 52));
@@ -59,16 +72,21 @@ export function bellsFor(T) {
 export const curvesOf = T => {let n = 0, inC = false; for (let i = 0; i < T.N; i += 4) {const c = T.vs[i] < 15.5; if (c && !inC) n++; inC = c} return n};
 
 /* ================= maquinista ideal (medallas) ================= */
-export function medals(T, bells) {
-  let v = 9, dist = 0, t = 0, bonus = 0, combo = 0, bi = 0; const dt = 1 / 60; // «salida perfecta» y siempre a la envolvente
+export function medals(T, bells, {turbo = true} = {}) {
+  let v = 9, dist = 0, t = 0, bonus = 0, combo = 0, bi = 0, tb = 0, tt = 0, nT = 0; const dt = 1 / 60; // «salida perfecta», siempre a la envolvente y turbo en cuanto renta
   for (let k = 0; k < 60000 && dist < T.L; k++) {
-    if (v < veAtT(T, dist)) v += ACC * (1 - 0.5 * v / VMAX) * dt; else v -= BRAKE * dt;
-    v = Math.max(0, Math.min(VMAX, v - DRAG * dt)); dist += v * dt; t += dt;
+    if (turbo && tb >= 1 && tt <= 0 && turboGood(T, dist, v)) {tt = TURBO_DUR; tb = 0; v = Math.min(VTURBO, v + TURBO_KICK); nT++}
+    const on = tt > 0, cap = on ? VTURBO : VMAX;
+    if (v < Math.min(veAtT(T, dist), cap)) v += accel(v, on) * dt; else v -= BRAKE * dt;
+    if (on) tt -= dt;
+    v -= DRAG * dt; if (v > cap) v = Math.max(cap, v - VDECAY * dt); v = Math.max(0, v); dist += v * dt; t += dt;
+    if (!on && turboCharging(vsNow(T, dist), v)) tb = Math.min(1, tb + dt / TURBO_FILL);
     while (bi < bells.length && dist >= bells[bi].s) {if (v >= bells[bi].v) {combo++; bonus += bellBonus(combo)} else combo = 0; bi++}
   }
   const ideal = t - bonus, r1 = x => Math.round(x * 10) / 10;
-  return {ideal, g: r1(ideal * 1.08), s: r1(ideal * 1.22), b: r1(ideal * 1.4)};
+  return {ideal, turbos: nT, g: r1(ideal * MEDAL_K[0]), s: r1(ideal * MEDAL_K[1]), b: r1(ideal * MEDAL_K[2])};
 }
+export const MEDAL_K = [1.08, 1.22, 1.40];
 
 /* ================= fantasma: codec v1 =================
    Cabecera: versión, temporada-2000, día, flags, nombre (UTF-8), tiempo bruto (ms),

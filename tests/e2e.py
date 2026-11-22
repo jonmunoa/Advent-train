@@ -24,9 +24,10 @@ PORT = 8765
 SHOTS = '--shots' in sys.argv
 GPU = '--gpu' in sys.argv
 
+# maquinista bot: salida perfecta, va al 97 % de la envolvente y gasta el turbo cuando renta
 BOT = """(()=>{const A=__adv;for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
- const va=A.vsAhead(G.dist,G.v);A.step(1/60,G.v<va*0.95)}
- for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,time:+G.time.toFixed(1),total:+(G.total||0).toFixed(1),bells:G.bells,lost:G.lost,gifts:A.giftsOn(),med:A.MED}})()"""
+ if(A.mode==='race'&&A.turboGood())A.turbo();A.step(1/60,A.mode==='race'&&G.v<A.vsAhead(G.dist)*0.97)}
+ for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,time:+G.time.toFixed(1),total:+(G.total||0).toFixed(1),bells:G.bells,lost:G.lost,gifts:A.giftsOn(),turbos:G.turbos,med:A.MED}})()"""
 
 # acelera a fondo hasta perder un regalo; luego suelta y asienta la cámara para la captura
 OVERSPEED = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);let t=0;
@@ -40,6 +41,10 @@ FINISH = BOT
 # decodifica el reto actual con el mismo sim.js y lo compara con el circuito
 GHOST_RT = """(async()=>{const S=await __adv.sim(),code=__adv.code,g=await S.decodeGhost(code),T=S.trackFor(g.day);
  return {len:code.length,day:g.day,name:g.name,raw:g.raw,total:g.total,dist:g.cum[g.cum.length-1],L:T.L}})()"""
+
+# sigue con el bot hasta tener el turbo cargado, lo activa y asienta la cámara
+TURBO_ON = """(()=>{const A=__adv;for(let i=0;i<4000&&!(A.G.turbo>0)&&A.mode==='race';i++){if(A.turboGood())A.turbo();const G=A.G;A.step(1/60,G.v<A.vsAhead(G.dist)*0.97)}
+ for(let i=0;i<15;i++)A.step(1/60,true);A.settle();return {turbo:+A.G.turbo.toFixed(2),v:+A.G.v.toFixed(1),turbos:A.G.turbos}})()"""
 
 # 6 s de carrera con el bot contra el fantasma del amigo
 CHALLENGE_MID = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A.step(1/60);
@@ -87,6 +92,8 @@ async def main():
         print('carrera bot:', res)
         check('la carrera termina', res['mode'] == 'end' and res['total'] > 0)
         check('el bot no pierde regalos', res['lost'] == 0 and res['gifts'] == 3, f"perdidos {res['lost']}, a bordo {res['gifts']}")
+        check('el bot usa el turbo', res['turbos'] >= 1, f"{res['turbos']} turbos")
+        check('un buen maquinista consigue el oro', res['total'] <= res['med']['g'], f"{res['total']} s frente a oro {res['med']['g']} s")
         await pg.wait_for_timeout(1500)
         if SHOTS:
             try:
@@ -151,6 +158,11 @@ async def main():
         if SHOTS:
             await p2.wait_for_timeout(700)
             await p2.screenshot(path=str(OUT / '6-carrera-reto.png'))
+        tb = await p2.evaluate(TURBO_ON)
+        check('el turbo se carga apurando curvas y se activa', tb['turbo'] > 0 and tb['v'] > 0, str(tb))
+        if SHOTS:
+            await p2.wait_for_timeout(300)
+            await p2.screenshot(path=str(OUT / '7-turbo.png'))
         await p2.evaluate(FINISH)
         await p2.wait_for_timeout(800)
         end2 = await p2.evaluate("[document.getElementById('eDelta').textContent, __adv.shareText()]")

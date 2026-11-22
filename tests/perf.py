@@ -2,7 +2,8 @@
 """Banco de rendimiento: coste por fotograma en poses fijas de cámara.
 
 Para cada día y pose coloca el tren y la cámara con window.__adv.pose(), renderiza
-N fotogramas síncronos (composer + readPixels de 1 px) con __adv.perf() y anota:
+3 tandas de N fotogramas síncronos (composer + readPixels de 1 px) con __adv.perf()
+y se queda con la más rápida. Anota:
 ms/fotograma, draw calls, triángulos, texturas y geometrías en memoria.
 
 Uso:
@@ -21,7 +22,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 PORT = 8767
 GPU = '--swiftshader' not in sys.argv
 SAVE = '--save' in sys.argv
-N = 60 if not GPU else 180
+N = 40 if not GPU else 120
 DAYS = [1, 7]
 POSES = [('orbit', 0.0), ('tp', 0.25), ('fp', 0.25), ('tp', 0.6)]
 BASE = ROOT / 'tests' / ('perf-baseline.json' if GPU else 'perf-baseline-swiftshader.json')
@@ -42,8 +43,9 @@ async def main():
             await pg.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
             await pg.wait_for_timeout(500)
             for kind, f in POSES:
-                r = await pg.evaluate(f"(()=>{{__adv.pose('{kind}',{f});return __adv.perf({N},1)}})()")
-                res[f'd{d}-{kind}-{f}'] = r
+                # mínimo de 3 tandas: el ruido de reloj/temperatura de la GPU solo suma tiempo
+                runs = [await pg.evaluate(f"(()=>{{__adv.pose('{kind}',{f});return __adv.perf({N},1)}})()") for _ in range(3)]
+                res[f'd{d}-{kind}-{f}'] = min(runs, key=lambda r: r['ms'])
         await b.close()
     srv.shutdown()
     base = json.loads(BASE.read_text()) if BASE.exists() else {}

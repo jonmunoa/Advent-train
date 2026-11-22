@@ -7,7 +7,7 @@ import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
-import {STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medals,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
+import {VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medals,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled=true;
 
@@ -479,7 +479,7 @@ function buildMini(){
   $('miniSvg').innerHTML=`<path d="${d}" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="3" stroke-linejoin="round"/>`+BELLS.map((b,i)=>{const p=at(b.s),[x,y]=P(p.x,p.z);return `<circle id="mb${i}" cx="${x}" cy="${y}" r="2.6" fill="#6fe39a"/>`}).join('')+ST.map(o=>{const [a,b]=P(o.x,o.z);return `<circle id="mst${o.j}" cx="${a}" cy="${b}" r="5" fill="#e0ad45" stroke="#2b1a12" stroke-width="1.5"/>`}).join('')+`<circle id="mgh" r="4.5" fill="#7fe6ff" opacity=".8"/><circle id="mtr" r="6" fill="#c41e2e" stroke="#fff" stroke-width="2"/>`;
   mini={P,tr:$('mtr'),gh:$('mgh')};
 }
-const vsAhead=dist=>veAtT(T,dist);
+const vsAhead=dist=>Math.min(veAtT(T,dist),G&&G.turbo>0?VTURBO:VMAX);
 
 /* ================= sonido ================= */
 let ac=null,sfx=store.get('advx-sfx')!=='0',music=store.get('advx-music')!=='0';
@@ -495,6 +495,8 @@ const whistle=()=>{tone(740,1.1,'triangle',0.07);tone(932,1.1,'triangle',0.05);t
 const beep=hi=>tone(hi?1046:523,hi?0.6:0.22,'square',0.06);
 const creak=()=>{noise(0.5,0.08,900,'bandpass');tone(180,0.35,'sawtooth',0.02)};
 const hiss=()=>noise(0.45,0.07,3500,'highpass');
+function whoosh(){if(!sfx||!ac)return;nb();const t=ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),v=ac.createGain();s.buffer=nbuf;f.type='bandpass';f.Q.value=1.2;f.frequency.setValueAtTime(300,t);f.frequency.exponentialRampToValueAtTime(5000,t+0.7);
+  v.gain.setValueAtTime(0.0001,t);v.gain.exponentialRampToValueAtTime(0.22,t+0.08);v.gain.exponentialRampToValueAtTime(0.0001,t+0.9);s.connect(f);f.connect(v);v.connect(ac.destination);s.start(t,0,1);tone(220,0.5,'sawtooth',0.03);tone(440,0.6,'triangle',0.04,0.05)}
 let wind=null;
 function windOn(){if(!ac||wind)return;const s=ac.createBufferSource();s.buffer=nb();s.loop=true;const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=600;const g=ac.createGain();g.gain.value=0;s.connect(f);f.connect(g);g.connect(ac.destination);s.start();wind={s,f,g}}
 function windSet(v){if(!wind)return;const x=sfx&&mode==='race'?Math.pow(v/VMAX,2)*0.11:0;wind.g.gain.setTargetAtTime(x,ac.currentTime,0.15);wind.f.frequency.setTargetAtTime(400+v*45,ac.currentTime,0.2)}
@@ -560,7 +562,7 @@ async function loadGhost(){GH=null;if(CH&&CH.day===DAY.d){GH={...CH,src:'amigo'}
   const raw=store.get('advx-gh-'+DAY.d);if(!raw)return;if(ghostCache[DAY.d]&&ghostCache[DAY.d].code===raw){GH=ghostCache[DAY.d];return}
   try{if(raw[0]==='{'){const o=JSON.parse(raw),tr=o.tr.filter((_,i)=>i%2===0),v=tr.slice(1).map((d,i)=>(d-tr[i])/GDT),raw2=v.length*GDT;GH={src:'propio',name:'',total:o.t,raw:raw2,cum:ghostCum(v,raw2),code:raw}}
     else{const g=await decodeGhost(raw);GH={...g,src:'propio',code:raw}}ghostCache[DAY.d]=GH}catch(e){GH=null}}
-function newRun(){G={dist:0,v:0,stress:0,time:0,pen:0,lost:0,slip:0,reload:0,bells:0,combo:0,bestCombo:0,bonus:0,vmax:0,ci:0,bi:0,chuff:0,cd:0,smokeAcc:0,gv:[],gAcc:0,gLast:0,heldAtGo:false,ps:false,fin:0,splits:[]};
+function newRun(){G={dist:0,v:0,stress:0,time:0,pen:0,lost:0,slip:0,reload:0,bells:0,combo:0,bestCombo:0,bonus:0,vmax:0,ci:0,bi:0,chuff:0,cd:0,smokeAcc:0,tb:0,turbo:0,turbos:0,gv:[],gAcc:0,gLast:0,heldAtGo:false,ps:false,fin:0,splits:[]};
   cars.forEach((c,i)=>{if(i){const g=c.userData.gift;g.visible=true;g.scale.setScalar(g.userData.s0);g.position.z=0;g.rotation.set(0,i,0);delete c.userData.pop}});
   loose.forEach(L=>scene.remove(L.o));loose.length=0;fly=null;if(flyer)flyer.visible=false;BELLS.forEach(b=>{b.st=0;b.g.visible=true;b.g.scale.setScalar(1);b.rg.visible=true});ghost.visible=!!GH;ghostLook();
   BELLS.forEach((b,i)=>{const el=$('mb'+i);if(el)el.setAttribute('fill','#6fe39a')})}
@@ -589,7 +591,7 @@ function toast(t,cls){const el=$('split');el.innerHTML=t;el.className='split on 
 const loose=[];
 const groundY=(x,z)=>{const d=dTrack(x,z);return d<GAUGE+1.4?0.3:d<GAUGE+1.6?0:matH(x,z,d)};
 const giftsOn=()=>cars.reduce((n,c,i)=>n+(i&&(c.userData.gift.visible||(fly&&fly.car===c))?1:0),0);
-function loseGift(vs){G.pen+=PEN_GIFT;G.lost++;G.slip=SLIP_T;G.stress=0.4;G.v=Math.min(G.v,vs*SLIP_V);
+function loseGift(vs){G.pen+=PEN_GIFT;G.lost++;G.tb=0;G.turbo=0;G.slip=SLIP_T;G.stress=0.4;G.v=Math.min(G.v,vs*SLIP_V);
   let car=null;for(let i=1;i<cars.length;i++){const c=cars[i];if(c.userData.gift.visible&&!(c.userData.pop<1)&&!(fly&&fly.car===c)){car=c;break}}
   if(car){const g=car.userData.gift,o=g.clone(),p=at(G.dist+OFFS[cars.indexOf(car)]),sg=turnSign(G.dist),nx=-Math.sin(p.a),nz=Math.cos(p.a);
     g.getWorldPosition(o.position);g.getWorldQuaternion(o.quaternion);g.getWorldScale(o.scale);o.rotation.setFromQuaternion(o.quaternion);scene.add(o);g.visible=false;
@@ -600,16 +602,24 @@ function loseGift(vs){G.pen+=PEN_GIFT;G.lost++;G.slip=SLIP_T;G.stress=0.4;G.v=Ma
 function looseStep(dt){for(const L of loose){if(L.rest)continue;const o=L.o;L.v.y-=22*dt;o.position.addScaledVector(L.v,dt);o.rotation.x+=L.w.x*dt;o.rotation.y+=L.w.y*dt;o.rotation.z+=L.w.z*dt;
   const gy=groundY(o.position.x,o.position.z);if(o.position.y<gy){o.position.y=gy;if(L.b++===0)puff(o.position.clone().setY(gy+0.5),new THREE.Vector3(0,1.5,0),2.2,.4,1.2);
     L.v.y*=-0.28;L.v.x*=0.55;L.v.z*=0.55;L.w.multiplyScalar(0.5);o.rotation.x*=0.4;o.rotation.z*=0.4;if(L.v.lengthSq()<1.5||L.b>4){L.rest=true;o.rotation.x=0;o.rotation.z=0}}}}
+/* turbo */
+function turboReady(){tone(1318,0.15,'triangle',0.05);tone(1760,0.3,'triangle',0.05,0.09);flash(coarse?'¡Turbo listo!':'¡Turbo listo! Pulsa E',0.9,'good')}
+function turbo(){if(mode!=='race'||!G||G.tb<1||G.turbo>0)return;G.tb=0;G.turbo=TURBO_DUR;G.turbos++;G.v=Math.min(VTURBO,G.v+TURBO_KICK);
+  grade.uniforms.flash.value=0.18;whoosh();flash('¡TURBO!',0.8,'good');const L=cars[0];[-1,1].forEach(sd=>puff(L.localToWorld(tmpV.set(-2,0.8,sd*1.8)),new THREE.Vector3(-3,1.2,sd*2).applyEuler(L.rotation),2.2,.4,1.1))}
+function turboEnd(){G.turbo=0;hiss()}
 function reloadGift(st){const c=cars.find((c,i)=>i&&!c.userData.gift.visible);if(!c||fly||!flyer)return;fly={car:c,from:st.pileWorld.clone(),t:0};flyer.position.copy(fly.from);flyer.visible=true;G.reload++;tone(1568,0.25,'triangle',0.05);tone(2093,0.3,'triangle',0.04,0.1)}
 function race(dt){
   G.time+=dt;
   if(G.slip>0){G.slip-=dt;if(Math.random()<0.5)spark(tmpV.set(cars[0].position.x,0.5,cars[0].position.z),2,6)}
-  if(input.thr){if(G.slip<=0)G.v+=ACC*(1-0.5*G.v/VMAX)*dt}else G.v-=(input.brk?HARD:BRAKE)*dt;
-  G.v=Math.max(0,Math.min(VMAX,G.v-DRAG*dt));
+  const tOn=G.turbo>0,cap=tOn?VTURBO:VMAX;
+  if(input.thr){if(G.slip<=0)G.v+=accel(G.v,tOn)*dt}else G.v-=(input.brk?HARD:BRAKE)*dt;
+  if(tOn){G.turbo-=dt;if(G.turbo<=0)turboEnd()}
+  G.v-=DRAG*dt;if(G.v>cap)G.v=Math.max(cap,G.v-VDECAY*dt);G.v=Math.max(0,G.v);
   const ds=G.v*dt;G.dist+=ds;G.chuff+=ds;spinWheels(ds);
   G.gAcc+=dt;while(G.gAcc>=GDT){G.gAcc-=GDT;const dB=G.dist-G.v*G.gAcc;G.gv.push((dB-G.gLast)/GDT);G.gLast=dB}
-  if(G.chuff>3.2){G.chuff=0;if(G.v>0.5)noise(0.09,0.06+0.12*G.v/VMAX,600+G.v*25)}
-  const vs=Math.min(vsAt(G.dist),vsAt(G.dist-TAIL)),over=G.v/vs-1;
+  if(G.chuff>3.2){G.chuff=0;if(G.v>0.5)noise(0.09,0.06+0.12*G.v/VMAX,600+G.v*25+(tOn?700:0))}
+  const vs=vsNow(T,G.dist),over=G.v/vs-1;
+  if(!tOn&&G.tb<1&&turboCharging(vs,G.v)){G.tb=Math.min(1,G.tb+dt/TURBO_FILL);if(G.tb>=1)turboReady()}
   if(over>0.03)G.stress+=over*3.6*dt;else G.stress=Math.max(0,G.stress-1.0*dt);
   if(G.stress>0.3&&Math.random()<0.6){spark(tmpV.set(cars[2].position.x,0.6,cars[2].position.z),2,5);if(Math.random()<0.12)tone(2600+Math.random()*600,0.12,'sawtooth',0.012)}
   if(G.stress>=1)loseGift(vs);
@@ -652,8 +662,9 @@ function updateCam(dt){
   const v=G&&(mode==='race'||mode==='count')?G.v:0,vr=v/VMAX;
   if(mode==='race'&&v>2){const a=(camMode==='fp'?0.022:0.035)*vr,tt=performance.now()/1000;camera.position.x+=Math.sin(tt*37)*a;camera.position.y+=Math.sin(tt*53+1)*a}
   if(G&&mode==='race'&&G.stress>0.2){const s=G.stress*(camMode==='fp'?0.05:0.18);camera.position.x+=(Math.random()-.5)*s;camera.position.y+=(Math.random()-.5)*s}
-  const fov=(kind==='fp'?70:kind==='finish'?50:58)+vr*16;if(Math.abs(camera.fov-fov)>0.05){camera.fov=lerp(camera.fov,fov,1-Math.exp(-3*dt));camera.updateProjectionMatrix()}
-  grade.uniforms.blur.value=coarse?0:(mode==='race'?Math.pow(Math.max(0,vr-0.45)/0.55,2)*(camMode==='fp'?0.007:0.005):0);
+  const tb=G&&mode==='race'&&G.turbo>0?1:0;
+  const fov=(kind==='fp'?70:kind==='finish'?50:58)+Math.min(vr,1.15)*16+tb*10;if(Math.abs(camera.fov-fov)>0.05){camera.fov=lerp(camera.fov,fov,1-Math.exp(-3*dt));camera.updateProjectionMatrix()}
+  grade.uniforms.blur.value=coarse?0:(mode==='race'?Math.pow(Math.max(0,Math.min(vr,1.15)-0.45)/0.55,2)*(camMode==='fp'?0.007:0.005):0);
   grade.uniforms.tilt.value=coarse?0:lerp(grade.uniforms.tilt.value,(mode==='pre'||mode==='end'||mode==='finish')?1:0,1-Math.exp(-3*dt));
   grade.uniforms.focus.value=kind==='orbit'?0.5:0.46;
   key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);
@@ -678,6 +689,8 @@ function hud(){
   else if(nb&&nb.s-G.dist<70&&nb.s-G.dist>0){const ok=G.v>=nb.v;w=`CAMPANA · ${nb.kmh} km/h ${ok?'✓':'¡MÁS VAPOR!'}`;c=ok?'ok':'st'}
   const k=w+c;if(k!==lastWarn){lastWarn=k;const el=$('warn');el.textContent=w;el.className='warn'+(w?' on '+c:'')}
   sst('edge','opacity',Math.min(1,G.stress*1.2).toFixed(2));
+  const on=G.turbo>0,tc='turbo b'+(on?' on':G.tb>=1?' ready':'');if(hc.get('tbc')!==tc){hc.set('tbc',tc);$('bTurbo').className=tc}
+  sat('tRing','stroke-dashoffset',(276.5*(1-(on?G.turbo/TURBO_DUR:G.tb))).toFixed(1));
   if(mini){const p=at(G.dist),[x,y]=mini.P(p.x,p.z);sat('mtr','cx',x);sat('mtr','cy',y);if(GH){const q=at(ghostDistAt(G.time)),[gx,gy]=mini.P(q.x,q.z);mini.gh.setAttribute('cx',gx);mini.gh.setAttribute('cy',gy)}else mini.gh.setAttribute('cx',-50);
 }
   if(MED){const nxt=[['oro',MED.g],['plata',MED.s],['bronce',MED.b]].find(([n,t])=>G.time+G.pen<t);stx('hTarget',nxt?`Objetivo ${nxt[0]} ${fmt(nxt[1])}`:'Sin medalla');}
@@ -743,6 +756,7 @@ $('bGo').onclick=()=>startRace(false);$('bBack1').onclick=goHome;$('bBack2').onc
 $('bAgain').onclick=()=>startRace(true);
 $('bPause').onclick=pause;$('bResume').onclick=resume;$('bRestart').onclick=()=>startRace(true);$('bQuit').onclick=goHome;
 $('bCam').onclick=toggleCam;
+$('bTurbo').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();au();turbo()});
 let pausedFrom=null;
 function pause(){if(mode!=='race'&&mode!=='count')return;pausedFrom=mode;mode='paused';input.thr=false;windSet(0);$('pedal').classList.remove('on');show('pause');$('bResume').focus()}
 function resume(){if(mode!=='paused')return;mode=pausedFrom;show('hud')}
@@ -760,7 +774,7 @@ function showEnd(){
   const nxt=[[1,'oro',MED.g],[2,'plata',MED.s],[3,'bronce',MED.b]].filter(([m])=>!medal||m<medal).pop();
   $('eHint').textContent=nxt?`Te faltan ${(total-nxt[2]).toFixed(1).replace('.',',')} s para la medalla de ${nxt[1]}.`:'¡Medalla de oro! Ahora a por el primer puesto.';
   $('eFields').innerHTML=[['Campanas',`${G.bells}/${BELLS.length}`],['Mejor combo','×'+G.bestCombo],['Vel. máxima',Math.round(G.vmax*3.6)+' km/h'],['Regalos',`${giftsOn()}/3`]].map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join('');
-  $('eSum').innerHTML=`<li><span>Recorrido</span><b>${fmt(G.time)}</b></li>${G.lost?`<li><span>Regalos perdidos (${G.lost})</span><b>+${G.pen} s</b></li>`:''}<li><span>Campanas</span><b>−${G.bonus.toFixed(1)} s</b></li><li><span>Total</span><b>${fmt(total)}</b></li>`;
+  $('eSum').innerHTML=`<li><span>Recorrido</span><b>${fmt(G.time)}</b></li>${G.lost?`<li><span>Regalos perdidos (${G.lost})</span><b>+${G.pen} s</b></li>`:''}<li><span>Campanas</span><b>−${G.bonus.toFixed(1)} s</b></li>${G.turbos?`<li><span>Turbos</span><b>×${G.turbos}</b></li>`:''}<li><span>Total</span><b>${fmt(total)}</b></li>`;
   const st=$('eStamp');st.hidden=false;st.className='stampbig '+(medal?'m'+medal:'');st.textContent=medal?['','¡ORO!','PLATA','BRONCE'][medal]:(isBest?'¡RÉCORD!':'SIN MEDALLA');
   $('iName').value=store.get('advx-name')||'';$('bSave').disabled=false;$('bSave').textContent='Fichar tiempo';
   renderShare(medal);refreshCode();
@@ -773,7 +787,7 @@ const siteUrl=()=>SITE_URL&&!/tu-dominio/.test(SITE_URL)?SITE_URL:location.origi
 let lastMedal=0;
 function shareUrl(){return siteUrl()+(G&&G.code?'#reto-'+G.code:'#dia-'+DAY.d)}
 function shareText(){const sq=BELLS.map(b=>b.st===1?'🟨':'⬛').join('');
-  return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)}`,`🔔 ${sq} ${G.bells}/${BELLS.length}`,`🎁 ${giftsOn()}/3`+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),...(GH&&GH.src==='amigo'?[G.total<GH.total?`⚔️ Le he ganado a ${GH.name||'mi amigo'} por ${(GH.total-G.total).toFixed(1).replace('.',',')} s`:`⚔️ ${GH.name||'Mi amigo'} me gana por ${(G.total-GH.total).toFixed(1).replace('.',',')} s`]:[]),'¿Me ganas? Bate a mi fantasma:'].join('\n')}
+  return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)}`,`🔔 ${sq} ${G.bells}/${BELLS.length}`,`🎁 ${giftsOn()}/3`+(G.turbos?` · 🚀×${G.turbos}`:'')+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),...(GH&&GH.src==='amigo'?[G.total<GH.total?`⚔️ Le he ganado a ${GH.name||'mi amigo'} por ${(GH.total-G.total).toFixed(1).replace('.',',')} s`:`⚔️ ${GH.name||'Mi amigo'} me gana por ${(G.total-GH.total).toFixed(1).replace('.',',')} s`]:[]),'¿Me ganas? Bate a mi fantasma:'].join('\n')}
 let shareSeq=0;
 async function refreshCode(){if(!G||!G.run)return;const my=++shareSeq;try{const c=await encodeGhost({...G.run,name:$('iName').value||store.get('advx-name')||''});if(my!==shareSeq)return;G.code=c;renderShare(lastMedal)}catch(e){}}
 function renderShare(medal){lastMedal=medal;const txt=shareText(),url=shareUrl(),all=txt+'\n'+url,u=encodeURIComponent(url),t=encodeURIComponent(txt);
@@ -800,6 +814,7 @@ const GK=[' ','ArrowUp','w','W'],BK=['ArrowDown','s','S'];
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;
   if(GK.includes(e.key)&&racing()){e.preventDefault();if(!e.repeat)press(true)}
   else if(BK.includes(e.key))input.brk=true;
+  else if((e.key==='e'||e.key==='E'||e.key==='Shift')&&mode==='race'){e.preventDefault();turbo()}
   else if((e.key==='c'||e.key==='C')&&racing())toggleCam();
   else if((e.key==='r'||e.key==='R')&&(racing()||mode==='end'||mode==='paused')){e.preventDefault();startRace(true)}
   else if(e.key==='p'||e.key==='P'||e.key==='Escape'){mode==='paused'?resume():pause()}
@@ -813,9 +828,10 @@ let last=performance.now(),fA=0,fN=0,lastAdj=0;
 function fx(dt,t){
   const L=cars[0],v=G?G.v:0;
   const ch=L.localToWorld(tmpV.copy(L.userData.chimney));
-  const rate=2+v*0.6;G.smokeAcc=(G.smokeAcc||0)+dt*rate;
+  const tOn=G.turbo>0&&mode==='race',rate=(2+v*0.6)*(tOn?2:1);G.smokeAcc=(G.smokeAcc||0)+dt*rate;
+  if(tOn){grade.uniforms.flash.value=Math.max(grade.uniforms.flash.value,0.035);if(Math.random()<0.5)spark(tmpV.set(cars[0].position.x,0.5,cars[0].position.z),2,7)}
   const so=camMode==='fp'&&racing()?0.12:0.26;
-  while(G.smokeAcc>1){G.smokeAcc-=1;puff(ch,tmpV2.set((Math.random()-.5)*0.8,4.2+Math.random(),(Math.random()-.5)*0.8),1,so,1.7)}
+  while(G.smokeAcc>1){G.smokeAcc-=1;puff(ch,tmpV2.set((Math.random()-.5)*0.8,(tOn?6:4.2)+Math.random(),(Math.random()-.5)*0.8),tOn?1.6:1,so,1.7)}
   smoke.forEach(p=>{if(p.life<=0)return;p.life-=dt/(p.ml||1.7);if(p.life<=0){p.s.visible=false;return}p.s.position.addScaledVector(p.v,dt);p.v.multiplyScalar(Math.exp(-0.6*dt));p.sz+=dt*1.7;p.s.scale.setScalar(p.sz);p.s.material.opacity=p.life*p.op});
   for(let i=0;i<SPK;i++){const s=spk[i];if(s.life<=0){spkP[i*3+1]=-99;continue}s.life-=dt;s.v.y-=18*dt;spkP[i*3]+=s.v.x*dt;spkP[i*3+1]+=s.v.y*dt;spkP[i*3+2]+=s.v.z*dt}spkG.attributes.position.needsUpdate=true;
   snowU.px.value=renderer.getPixelRatio();snowU.t.value=t;
@@ -876,7 +892,7 @@ function perf(n=120,pr=1){const ip=dynPR,ar=renderer.info.autoReset;dynPR=pr;res
   renderer.info.autoReset=ar;dynPR=ip;resize();return {ms:+ms.toFixed(2),calls,tris,tex:renderer.info.memory.textures,geo:renderer.info.memory.geometries,pr,w:innerWidth,h:innerHeight}}
 function pose(kind,f=0.25){const d=f*T.L;if(G)G.dist=d;poseTrain(d,0);camTarget(kind,0,wantP,wantL);camPos.copy(wantP);camLook.copy(wantL);camBlend=1;camera.position.copy(wantP);camera.lookAt(wantL);camera.fov=kind==='fp'?70:58;camera.updateProjectionMatrix();
   key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);grade.uniforms.blur.value=0;grade.uniforms.tilt.value=kind==='orbit'?1:0}
-window.__adv={sim:()=>import('./sim.js'),get code(){return G&&G.code},get GH(){return GH},ghostTimeAt,newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn,shareText:()=>shareText()+'\n'+shareUrl()};
+window.__adv={turbo,turboGood:()=>!!G&&G.tb>=1&&G.turbo<=0&&turboGood(T,G.dist,G.v),sim:()=>import('./sim.js'),get code(){return G&&G.code},get GH(){return GH},ghostTimeAt,newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn,shareText:()=>shareText()+'\n'+shareUrl()};
 drawArt();renderHome();
 async function boot(){let hd=0;const h=location.hash,m=/^#dia-(\d+)$/.exec(h);
   if(m)hd=+m[1];
