@@ -10,7 +10,7 @@ import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import CFG from '../config.js';
 import PRODUCTS from './products.js';
-import {SEASON,VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medalsFor,routesFor,envelope,modOf,MOD_INFO,DROP_V,DROP_KMH,DROP_TOL,DROP_BONUS,DRAFT_MIN,DRAFT_MAX,DRAFT_RATE,F_DRAFT,F_SHORTCUT,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
+import {SEASON,VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medalsFor,routesFor,envelope,modOf,MOD_INFO,DROP_V,DROP_KMH,DROP_TOL,DROP_BONUS,DRAFT_MIN,DRAFT_MAX,DRAFT_RATE,F_DRAFT,F_SHORTCUT,SHORTCUT_DAYS,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled=true;
 
@@ -223,6 +223,13 @@ function buildTrain(){train.clear();cars.length=0;
   const L=carFrom('loco',7.6);cars.push(L);train.add(L);
   let wx=0.425;MD.loco.scene.traverse(o=>{if(o.name==='wheel')wx=Math.abs(o.position.x)});GAUGE=wx*L.userData.s;
   for(let i=1;i<4;i++){const W=carFrom('flat',6.6);const pk=['presA','presB','presD'][i-1],p=obj(pk,2.25);p.position.y=W.userData.top-0.25;p.rotation.y=i;p.visible=false;p.userData.s0=p.scale.x;W.add(p);W.userData.gift=p;cars.push(W);train.add(W)}
+  {const base=toyMat(MD.loco.scene.getObjectByProperty('isMesh',true).material,true);trainMat=base.clone();const u={uHue:{value:0},uSat:{value:1}};trainMat.userData.u=u;
+   trainMat.onBeforeCompile=sh=>{Object.assign(sh.uniforms,u);sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform float uHue,uSat;').replace('#include <map_fragment>',`#include <map_fragment>
+     {vec3 c=diffuseColor.rgb;float mx=max(c.r,max(c.g,c.b)),mn=min(c.r,min(c.g,c.b)),st=mx>0.0?(mx-mn)/mx:0.0;
+      float Y=dot(c,vec3(.299,.587,.114)),I=dot(c,vec3(.596,-.274,-.322)),Q=dot(c,vec3(.211,-.523,.312)),ch=cos(uHue),sh2=sin(uHue);
+      float I2=(I*ch-Q*sh2)*uSat,Q2=(I*sh2+Q*ch)*uSat;vec3 r=max(vec3(Y+.956*I2+.621*Q2,Y-.272*I2-.647*Q2,Y-1.106*I2+1.703*Q2),0.0);
+      diffuseColor.rgb=mix(c,r,smoothstep(.3,.5,st));}`)};
+   cars.forEach(c=>c.traverse(o=>{if(o.isMesh&&o.material&&o.material.map===base.map)o.material=trainMat}))}
   OFFS=[0];for(let i=1;i<cars.length;i++)OFFS.push(OFFS[i-1]-(cars[i-1].userData.len/2+cars[i].userData.len/2+0.8));
   const top=L.userData.top,len=L.userData.len;
   const lampM=new THREE.Mesh(new THREE.SphereGeometry(0.34,14,10),M.lamp);lampM.position.set(len*0.5+0.05,top*0.58,0);L.add(lampM);
@@ -231,13 +238,13 @@ function buildTrain(){train.clear();cars.length=0;
   L.userData.chimney=new THREE.Vector3(len*0.3,top+0.2,0);L.userData.fp=new THREE.Vector3(-len*0.02,top+0.45,0);
   // fantasma
   ghost=carFrom('loco',7.6);const gm=new THREE.MeshBasicMaterial({color:0x7fe6ff,transparent:true,opacity:.28,depthWrite:false,blending:THREE.AdditiveBlending});ghost.traverse(o=>{if(o.isMesh){o.material=gm;o.castShadow=false;o.receiveShadow=false}});ghost.userData.mat=gm;ghost.visible=false;scene.add(ghost);
-  flyer=obj('presA',2.6);flyer.visible=false;scene.add(flyer);
+  flyer=obj('presA',2.6);flyer.visible=false;scene.add(flyer);applyLook();
 }
 
 /* humo, chispas, fuegos, confeti */
 const smoke=[];for(let i=0;i<48;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,color:0xeef1f6,transparent:true,opacity:0,depthWrite:false}));s.visible=false;scene.add(s);smoke.push({s,life:0,v:new THREE.Vector3(),sz:1,op:.26})}
 let smokeI=0;
-function puff(p,v,sz,op,life){const q=smoke[smokeI=(smokeI+1)%smoke.length];q.life=1;q.ml=life||1.7;q.s.visible=true;q.s.position.copy(p);q.v.copy(v);q.sz=sz;q.op=op}
+function puff(p,v,sz,op,life){const q=smoke[smokeI=(smokeI+1)%smoke.length];if(smokeRainbow)q.s.material.color.setHSL(smokeI*0.07%1,0.75,0.78);q.life=1;q.ml=life||1.7;q.s.visible=true;q.s.position.copy(p);q.v.copy(v);q.sz=sz;q.op=op}
 const SPK=100,spkP=new Float32Array(SPK*3),spk=Array.from({length:SPK},()=>({life:0,v:new THREE.Vector3()}));
 const spkG=new THREE.BufferGeometry();spkG.setAttribute('position',new THREE.BufferAttribute(spkP,3));
 const sparks=new THREE.Points(spkG,new THREE.PointsMaterial({map:dotTex,size:0.35,color:new THREE.Color(3,1.6,.5),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));sparks.frustumCulled=false;scene.add(sparks);
@@ -623,6 +630,48 @@ const Board={online:!!SB,
   async ghost(id){if(!SB)throw new Error('sin servidor');const [r]=await this.rest(`runs?select=name,ghost&id=eq.${id}&season=eq.${SEASON}`);if(!r)throw new Error('no existe');const g=await decodeGhost(r.ghost);return {...g,name:r.name,code:'i'+id.toString(36)}}
 };
 
+/* ================= estrellas, reto del día, cochera y racha ================= */
+/* tres estrellas por puerta: oro, todas las campanas y el reto del día */
+const RETOS={
+  reparto:{t:'Reparte en todas las paradas',ok:G=>G.DL.length>0&&G.drops===G.DL.length},
+  sinRegalos:{t:'Llega sin perder ningún regalo',ok:G=>G.lost===0},
+  combo:{t:n=>`Encadena ${n} campanas seguidas`,ok:(G,n)=>G.bestCombo>=n},
+  turbos:{t:n=>`Usa el turbo ${n} veces`,ok:(G,n)=>G.turbos>=n},
+  velocidad:{t:'Pasa de 120 km/h',ok:G=>G.vmax*3.6>=120},
+  atajo:{t:'Llega por el atajo con todas sus campanas',ok:G=>G.route===1&&G.bells===G.BL.length},
+};
+function retoOf(d){const mod=modOf(d),sc=SHORTCUT_DAYS.includes(d)&&ROUTES[1];
+  const id=sc?'atajo':mod==='hielo'||mod==='noche'?'sinRegalos':mod==='viento'?'turbos':mod==='ventisca'?'reparto':mod==='tunel'?'combo':['reparto','combo','velocidad','sinRegalos','turbos'][d%5];
+  const n=id==='combo'?Math.min(ROUTES[0].bells.length,5+d%4):id==='turbos'?(T&&T.mod==='viento'?3:2):0,R=RETOS[id];return {id,n,t:typeof R.t==='function'?R.t(n):R.t,ok:G=>R.ok(G,n)}}
+const starsOf=d=>+store.get('advx-stars-'+d)||0;
+const popc=m=>(m&1)+(m>>1&1)+(m>>2&1);
+const totalStars=()=>{let n=0;for(let d=1;d<=24;d++)n+=popc(starsOf(d));return n};
+const starTxt=m=>[1,2,4].map(b=>m&b?'★':'☆').join('');
+function starRows(m,fresh=0){const r=retoOf(DAY.d);return [[1,'Medalla de oro'],[2,'Todas las campanas'],[4,r.t]].map(([b,t])=>`<div class="star ${m&b?'got':''} ${fresh&b?'new':''}"><i aria-hidden="true">★</i><span>${esc(t)}</span></div>`).join('')}
+/* racha: puertas jugadas el mismo día que se abren (en diciembre) */
+const madrid=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).split('-').map(Number);
+function rachaDays(){try{return JSON.parse(store.get('advx-racha')||'[]')}catch(e){return[]}}
+function racha(){const [y,m,d]=madrid();if(y!==SEASON||m!==12)return 0;const set=new Set(rachaDays());let k=set.has(d)?d:d-1,n=0;while(k>=1&&set.has(k)){n++;k--}return n}
+function markRacha(day){const [y,m,d]=madrid();if(y===SEASON&&m===12&&d===day){const l=rachaDays();if(!l.includes(day)){l.push(day);store.set('advx-racha',JSON.stringify(l))}}}
+/* cochera: libreas (shader de tono), cargas y humo que se desbloquean con estrellas o racha */
+const LOOKS={
+  loco:[{id:'roja',n:'Roja',hue:0,sat:1},{id:'abeto',n:'Verde abeto',need:3,hue:3.4,sat:0.9},{id:'hielo',n:'Azul hielo',need:8,hue:2.2,sat:0.85},{id:'ciruela',n:'Ciruela',need:14,hue:0.95,sat:0.9},{id:'dorada',n:'Dorada',need:24,hue:-1.0,sat:1.2,metal:0.75},{id:'nochebuena',n:'Nochebuena',racha:5,hue:2.6,sat:0.5,metal:0.5}],
+  carga:[{id:'regalos',n:'Regalos',m:['presA','presB','presD'],h:2.25},{id:'abetos',n:'Abetos',need:5,m:['treeD','treeA','treeB'],h:2.7},{id:'munecos',n:'Muñecos de nieve',need:10,m:['snowman'],h:2.5},{id:'renos',n:'Renos',need:16,m:['deer'],h:2.4},{id:'cascanueces',n:'Cascanueces',racha:3,m:['nut'],h:2.6},{id:'galletas',n:'Galletas',need:30,m:['ginger','ginger2'],h:2.3}],
+  humo:[{id:'blanco',n:'Blanco',c:0xeef1f6},{id:'dorado',n:'Dorado',need:12,c:0xffd77a},{id:'rosa',n:'Algodón de azúcar',need:20,c:0xffb3d9},{id:'arcoiris',n:'Arcoíris',racha:7,c:-1}]};
+const LOOKN={loco:'Locomotora',carga:'Carga',humo:'Humo'};
+const unlocked=it=>(!it.need||totalStars()>=it.need)&&(!it.racha||racha()>=it.racha);
+const lockTxt=it=>it.need?`${it.need} ★`:`racha de ${it.racha} días`;
+function lookSel(){let l={};try{l=JSON.parse(store.get('advx-look')||'{}')}catch(e){}const o={};for(const k in LOOKS){const it=LOOKS[k].find(x=>x.id===l[k]);o[k]=it&&unlocked(it)?it:LOOKS[k][0]}return o}
+let trainMat=null,smokeRainbow=false;
+function applyLook(){if(!cars.length)return;const L=lookSel();
+  if(trainMat){trainMat.userData.u.uHue.value=L.loco.hue;trainMat.userData.u.uSat.value=L.loco.sat;trainMat.metalness=L.loco.metal||0;trainMat.roughness=L.loco.metal?0.28:0.36}
+  cars.forEach((c,i)=>{if(!i)return;const old=c.userData.gift,k=L.carga.m[(i-1)%L.carga.m.length];if(old&&old.userData.k===k)return;const p=obj(k,L.carga.h);p.position.y=c.userData.top-0.25;p.rotation.y=i;p.userData.s0=p.scale.x;p.userData.k=k;p.visible=old?old.visible:false;if(old)c.remove(old);c.add(p);c.userData.gift=p});
+  smokeRainbow=L.humo.c<0;smoke.forEach(q=>q.s.material.color.setHex(smokeRainbow?0xffffff:L.humo.c))}
+function renderGarage(){const L=lookSel();$('pGarage').innerHTML='<h3 class="slab">Cochera</h3>'+Object.keys(LOOKS).map(k=>{const list=LOOKS[k],it=L[k],locked=list.filter(x=>!unlocked(x));
+  return `<div class="gr"><span>${LOOKN[k]}</span><div class="gsel"><button type="button" data-look="${k}" data-dir="-1" aria-label="${LOOKN[k]} anterior">‹</button><b>${esc(it.n)}</b><button type="button" data-look="${k}" data-dir="1" aria-label="${LOOKN[k]} siguiente">›</button></div>${locked.length?`<small>🔒 ${locked.map(x=>`${esc(x.n)}: ${lockTxt(x)}`).join(' · ')}</small>`:''}</div>`}).join('')}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-look]');if(!b)return;const k=b.dataset.look,list=LOOKS[k].filter(unlocked),cur=lookSel()[k],i=list.indexOf(cur),nx=list[(i+(+b.dataset.dir)+list.length)%list.length];
+  let l={};try{l=JSON.parse(store.get('advx-look')||'{}')}catch(_){}l[k]=nx.id;store.set('advx-look',JSON.stringify(l));applyLook();renderGarage();tone(880,0.06,'square',0.03)});
+
 /* ================= juego ================= */
 let mode='home',camMode=store.get('advx-cam')||'tp',G=null,flashT=0,timeScale=1,GH=null;
 const input={thr:false,brk:false};
@@ -796,12 +845,12 @@ function todayDay(){const now=new Date();if(now.getMonth()===11&&now.getDate()<=
 const previews={};const MEDN=['','oro','plata','bronce'];
 function renderHome(){
   const now=new Date(),td=todayDay(),pre=now.getMonth()<11,ds=now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}),left=Math.ceil((new Date(now.getFullYear(),11,1)-now)/864e5);
-  $('tPin').textContent=td;
+  $('tPin').textContent=td;{const n=totalStars(),rc=racha();$('hStats').innerHTML=(n?`<span>⭐ <b>${n}</b>/72 estrellas</span>`:'<span>Gana hasta 3 ⭐ por puerta: oro, todas las campanas y el reto del día.</span>')+(rc?`<span>🔥 Racha de <b>${rc}</b> ${rc===1?'día':'días'}</span>`:'')}
   $('tTxt').innerHTML=pre?`Hoy es <b>${esc(ds)}</b>. Faltan ${left} ${left===1?'día':'días'} para la primera puerta: abre la <b>1</b> para calentar motores.`:`Hoy es <b>${esc(ds)}</b>. Toca abrir la puerta <b>${td}</b>: <b>${esc(DAYS[td-1].name)}</b>.`;
   $('cal').innerHTML=ORDER.map(d=>{const D=DAYS[d-1],open=isOpen(d),b=store.get('advx-best-'+d),md=+store.get('advx-medal-'+d)||0,isT=d===td,played=!!b&&open;
     if(!previews[d])previews[d]=previewPath(d);
     const inner=`<div class="in"><svg viewBox="0 0 120 100"><path d="${previews[d]}" fill="none" stroke="#e0ad45" stroke-width="3" stroke-linejoin="round"/></svg><span>${esc(D.name)}${b?'<br>Récord '+fmt(+b):''}</span>${md?`<i class="med m${md}" title="Medalla de ${MEDN[md]}"></i>`:''}</div>`;
-    return `<button class="door ${SPAN[d]||''} d${d%5} ${open?'':'lock'} ${isT?'today':''} ${played&&!isT?'open':''}" data-d="${d}" aria-label="Puerta ${d}${open?'':' (cerrada)'}">${inner}<div class="flap"><div class="face"><span class="num ${d%3===1?'s':'slab'}">${d}</span>${md?`<i class="med m${md}"></i>`:''}</div><div class="back"></div></div>${isT?'<span class="rib">¡Ábreme!</span>':''}</button>`}).join('');
+    return `<button class="door ${SPAN[d]||''} d${d%5} ${open?'':'lock'} ${isT?'today':''} ${played&&!isT?'open':''}" data-d="${d}" aria-label="Puerta ${d}${open?'':' (cerrada)'}">${inner}<div class="flap"><div class="face"><span class="num ${d%3===1?'s':'slab'}">${d}</span>${md?`<i class="med m${md}"></i>`:''}${starsOf(d)?`<i class="dst">${starTxt(starsOf(d))}</i>`:''}</div><div class="back"></div></div>${isT?'<span class="rib">¡Ábreme!</span>':''}</button>`}).join('');
 }
 $('cal').addEventListener('click',e=>{const b=e.target.closest('.door');if(!b||busy)return;const d=+b.dataset.d;au();
   if(!isOpen(d)){b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');tone(200,0.15,'square',0.04);const t=document.createElement('span');t.className='tip';t.textContent='Se abre el '+d+' de diciembre';b.appendChild(t);setTimeout(()=>t.remove(),1600);return}
@@ -831,6 +880,7 @@ async function fillPre(){mode='pre';
   $('pNo').textContent='Billete nº '+String(DAY.d*137+1000).padStart(5,'0');$('pDay').textContent=`Día ${DAY.d} de 24`;$('pName').textContent=DAY.name;$('pStub').textContent=`Válido el ${DAY.d} de diciembre`;
   $('pFields').innerHTML=[['Recorrido',(T.L/1000).toFixed(2).replace('.',',')+' km'],['Campanas',BELLS.length],['Curvas cerradas',curvesOf(T)],['Tu récord',store.get('advx-best-'+DAY.d)?fmt(+store.get('advx-best-'+DAY.d)):'—']].map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join('');
   const md=+store.get('advx-medal-'+DAY.d)||0;
+  $('pStars').innerHTML=starRows(starsOf(DAY.d));renderGarage();
   $('pMed').innerHTML=[['m1','Oro',MED.g],['m2','Plata',MED.s],['m3','Bronce',MED.b]].map(([c,n,t],i)=>`<div class="${md&&md<=i+1?'got':''}"><i class="med ${c}"></i><span>${n}</span><b>${fmt(t)}</b></div>`).join('');
   $('pMod').innerHTML=[T.mod?`<b>${MOD_INFO[T.mod].n}:</b> ${MOD_INFO[T.mod].t}`:'',SC?`<b>Agujas:</b> atajo de ${Math.round(-SC.delta)} m más corto, con curvas más cerradas. Pulsa ${coarse?'AGUJA':'A'} antes de la bifurcación.`:'',DROPS.length?`<b>Reparto:</b> pasa por las casitas a ≤ ${DROP_KMH} km/h y lanza un regalo (−${DROP_BONUS} s).`:''].filter(Boolean).join('<br>');
   $('pGhost').innerHTML=GH?(GH.src==='amigo'?`<b>Reto de ${esc(GH.name||'un amigo')}: ${fmt(GH.total)}</b>. Su fantasma dorado irá contigo.`:`Competirás contra tu fantasma: ${fmt(GH.total)}`):'Tu primer viaje dejará un fantasma para batirlo después.';
@@ -862,6 +912,10 @@ function showEnd(){
   const run={day:DAY.d,raw:G.time,total,bells:G.bells,lost:G.lost,turbos:G.turbos||0,drops:G.drops,flags:(G.drafted?F_DRAFT:0)|(G.route?F_SHORTCUT:0),v:G.gv};G.run=run;G.code=null;
   if(isBest){store.set(key,total.toFixed(1));encodeGhost({...run,name:store.get('advx-name')||''}).then(c=>{store.set('advx-gh-'+DAY.d,c);delete ghostCache[DAY.d]}).catch(()=>{})}
   const medal=total<=MED.g?1:total<=MED.s?2:total<=MED.b?3:0,pm=+store.get('advx-medal-'+DAY.d)||0;if(medal&&(!pm||medal<pm))store.set('advx-medal-'+DAY.d,medal);
+  const before=Object.values(LOOKS).flat().filter(unlocked),prevStars=starsOf(DAY.d),won=(medal===1?1:0)|(G.bells===G.BL.length?2:0)|(retoOf(DAY.d).ok(G)?4:0),nowStars=prevStars|won;
+  store.set('advx-stars-'+DAY.d,nowStars);markRacha(DAY.d);G.stars=won;
+  const fresh=Object.values(LOOKS).flat().filter(it=>unlocked(it)&&!before.includes(it));
+  $('eStars').innerHTML=starRows(won,won&~prevStars);$('eUnlock').textContent=fresh.length?'¡Desbloqueado en la cochera: '+fresh.map(x=>x.n).join(', ')+'!':'';
   $('eNo').textContent=`Día ${DAY.d} de 24`;$('eName').textContent=DAY.name;$('eTime').textContent=fmt(total);$('depT').textContent='LLEGADAS · DÍA '+DAY.d;
   const dPrev=prev?total-prev:null;
   const vs=GH&&GH.src==='amigo'?GH:null;
@@ -883,7 +937,7 @@ const siteUrl=()=>SITE_URL&&!/tu-dominio/.test(SITE_URL)?SITE_URL:location.origi
 let lastMedal=0;
 function shareUrl(){return siteUrl()+(G&&G.short?'#reto-'+G.short:G&&G.code?'#reto-'+G.code:'#dia-'+DAY.d)}
 function shareText(){const sq=G.BL.map(b=>b.st===1?'🟨':'⬛').join('');
-  return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)}`,`🔔 ${sq} ${G.bells}/${G.BL.length}`,`🎁 ${giftsOn()}/3`+(G.DL.length?` · 🏠 ${G.drops}/${G.DL.length}`:'')+(G.route?' · 🔀 atajo':'')+(G.turbos?` · 🚀×${G.turbos}`:'')+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),...(GH&&GH.src==='amigo'?[G.total<GH.total?`⚔️ Le he ganado a ${GH.name||'mi amigo'} por ${(GH.total-G.total).toFixed(1).replace('.',',')} s`:`⚔️ ${GH.name||'Mi amigo'} me gana por ${(G.total-GH.total).toFixed(1).replace('.',',')} s`]:[]),'¿Me ganas? Bate a mi fantasma:'].join('\n')}
+  return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)} · ${starTxt(G.stars||0).replace(/★/g,'⭐').replace(/☆/g,'▫️')}`,`🔔 ${sq} ${G.bells}/${G.BL.length}`,`🎁 ${giftsOn()}/3`+(G.DL.length?` · 🏠 ${G.drops}/${G.DL.length}`:'')+(G.route?' · 🔀 atajo':'')+(G.turbos?` · 🚀×${G.turbos}`:'')+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),...(GH&&GH.src==='amigo'?[G.total<GH.total?`⚔️ Le he ganado a ${GH.name||'mi amigo'} por ${(GH.total-G.total).toFixed(1).replace('.',',')} s`:`⚔️ ${GH.name||'Mi amigo'} me gana por ${(G.total-GH.total).toFixed(1).replace('.',',')} s`]:[]),'¿Me ganas? Bate a mi fantasma:'].join('\n')}
 let shareSeq=0;
 async function refreshCode(){if(!G||!G.run)return;const my=++shareSeq;try{const c=await encodeGhost({...G.run,name:$('iName').value||store.get('advx-name')||''});if(my!==shareSeq)return;G.code=c;renderShare(lastMedal)}catch(e){}}
 function renderShare(medal){lastMedal=medal;const txt=shareText(),url=shareUrl(),all=txt+'\n'+url,u=encodeURIComponent(url),t=encodeURIComponent(txt);
@@ -1002,7 +1056,7 @@ function perf(n=120,pr=1){const ip=dynPR,ar=renderer.info.autoReset;dynPR=pr;res
   renderer.info.autoReset=ar;dynPR=ip;resize();return {ms:+ms.toFixed(2),calls,tris,tex:renderer.info.memory.textures,texMB:+(bytes/1048576).toFixed(1),geo:renderer.info.memory.geometries,pr,w:innerWidth,h:innerHeight}}
 function pose(kind,f=0.25){const d=f*T.L;if(G)G.dist=d;poseTrain(d,0);camTarget(kind,0,wantP,wantL);camPos.copy(wantP);camLook.copy(wantL);camBlend=1;camera.position.copy(wantP);camera.lookAt(wantL);camera.fov=kind==='fp'?70:58;camera.updateProjectionMatrix();
   key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);grade.uniforms.blur.value=0;grade.uniforms.tilt.value=kind==='orbit'?1:0}
-window.__adv={vsDrop,toggleSwitch,get route(){return G&&G.route},get SC(){return SC},DROPS:()=>DROPS,get T(){return T},get LT(){return LT},get scene(){return scene},look:(p,t,fov=50)=>{window.__advFreezeCam=true;camera.position.set(...p);camera.lookAt(...t);camera.fov=fov;camera.updateProjectionMatrix();grade.uniforms.tilt.value=0;grade.uniforms.blur.value=0},roomReady:()=>roomReady,env:(r,i)=>{ENV_ROT=r;scene.environmentRotation.y=r;if(i!==undefined)scene.environmentIntensity=i},turbo,turboGood:()=>!!G&&G.tb>=1&&G.turbo<=0&&turboGood(T,G.dist,G.v,ENVD[G.route]),sim:()=>import('./sim.js'),get code(){return G&&G.code},get GH(){return GH},ghostTimeAt,newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn,shareText:()=>shareText()+'\n'+shareUrl()};
+window.__adv={reto:()=>retoOf(DAY.d),totalStars,racha,lookSel,applyLook,renderHome:()=>renderHome(),vsDrop,toggleSwitch,get route(){return G&&G.route},get SC(){return SC},DROPS:()=>DROPS,get T(){return T},get LT(){return LT},get scene(){return scene},look:(p,t,fov=50)=>{window.__advFreezeCam=true;camera.position.set(...p);camera.lookAt(...t);camera.fov=fov;camera.updateProjectionMatrix();grade.uniforms.tilt.value=0;grade.uniforms.blur.value=0},roomReady:()=>roomReady,env:(r,i)=>{ENV_ROT=r;scene.environmentRotation.y=r;if(i!==undefined)scene.environmentIntensity=i},turbo,turboGood:()=>!!G&&G.tb>=1&&G.turbo<=0&&turboGood(T,G.dist,G.v,ENVD[G.route]),sim:()=>import('./sim.js'),get code(){return G&&G.code},get GH(){return GH},ghostTimeAt,newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn,shareText:()=>shareText()+'\n'+shareUrl()};
 drawArt();renderHome();
 async function boot(){let hd=0;const h=location.hash,m=/^#dia-(\d+)$/.exec(h);
   if(m)hd=+m[1];

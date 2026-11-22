@@ -187,6 +187,9 @@ async def main():
         amz = await pg.evaluate("[document.getElementById('prA').href, document.getElementById('fine').hidden, document.getElementById('prT').textContent]")
         check('el enlace de Amazon lleva el ID de afiliado y el producto del día', f'tag={TAG}' in amz[0] and 'amazon.es' in amz[0] and amz[2], amz[0])
         check('el aviso de enlace de ejemplo solo sale con el TAG de marcador', amz[1] == (TAG != 'TU-TAG-21'))
+        st = await pg.evaluate("[localStorage.getItem('advx-stars-1'), document.querySelectorAll('#eStars .star.got').length, __adv.reto().t]")
+        check('una carrera de oro con todas las campanas y el reto da tres estrellas', st[0] == '7' and st[1] == 3, f"estrellas {st[0]}, reto «{st[2]}»")
+        check('el texto de compartir lleva las estrellas', '⭐⭐⭐' in txt)
         fields = await pg.evaluate("document.getElementById('eFields').textContent")
         check('la llegada muestra los regalos', 'Regalos3/3' in fields.replace(' ', ''), fields)
 
@@ -276,6 +279,20 @@ async def main():
         lt = await p5.evaluate("__adv.LT")
         check('dentro del túnel de estrellas el salón se apaga', lt < 0.5, f"luz {lt:.2f}")
         await p5.close()
+
+        # 3c) estrellas, racha y cochera (con el reloj en diciembre)
+        p6 = await b.new_page(viewport={'width': 1200, 'height': 760})
+        p6.on('pageerror', lambda e: errors.append(f'pageerror (cochera): {e}'))
+        await route_local_three(p6)
+        await p6.clock.set_fixed_time('2026-12-08T10:00:00+01:00')
+        await p6.add_init_script("try{for(let d=1;d<=12;d++)localStorage.setItem('advx-stars-'+d,'7');localStorage.setItem('advx-racha',JSON.stringify([5,6,7,8]))}catch(e){}")
+        await p6.goto(f'http://127.0.0.1:{PORT}/index.html', wait_until='domcontentloaded', timeout=120000)
+        await p6.wait_for_timeout(1500)
+        stats = await p6.evaluate("document.getElementById('hStats').textContent")
+        check('el calendario muestra estrellas y racha', '36/72' in stats and 'Racha de 4' in stats, stats)
+        look = await p6.evaluate("(()=>{const u=['abeto','hielo','ciruela','dorada'].map(id=>localStorage.setItem('advx-look',JSON.stringify({loco:id}))||__adv.lookSel().loco.id);return u})()")
+        check('la cochera desbloquea por estrellas (36: hasta la dorada)', look == ['abeto', 'hielo', 'ciruela', 'dorada'], str(look))
+        await p6.close()
 
         # 4) clasificación global con un Supabase simulado
         sb = FakeSupabase(seed_ghost=challenge.split('#reto-')[1])

@@ -39,6 +39,7 @@
       </div>
       <p class="tagl">24 puertas, 24 circuitos de tren de juguete bajo el árbol. Exprime las curvas sin perder los regalos, carga el turbo, encadena campanas, bate a tu fantasma y gana el oro.</p>
       <div class="today"><div class="pin slab" id="tPin">1</div><p id="tTxt"></p></div>
+      <p class="hstats" id="hStats"></p>
       <div class="cal" id="cal"></div>
       <label class="devrow"><input type="checkbox" id="dev"> Modo pruebas: abrir todas las puertas</label>
       <p class="foot">Modelos 3D de Kenney (kenney.nl, CC0); muebles, texturas y HDRI de Poly Haven (polyhaven.com, CC0). Cada circuito se inspira en un tren de Navidad que se vende en tiendas. En calidad de Afiliado de Amazon, se obtienen ingresos por las compras adscritas que cumplen los requisitos aplicables.</p>
@@ -54,13 +55,13 @@
       <div class="tbody">
         <p class="lbl" id="pDay">Día 1 de 24</p>
         <h2 class="slab" id="pName">Alrededor del árbol</h2>
-        <div class="fields" id="pFields"></div><p class="lbl">Medallas</p><div class="meds" id="pMed"></div><p class="ghostl modl" id="pMod"></p><p class="ghostl" id="pGhost"></p>
+        <div class="fields" id="pFields"></div><p class="lbl">Medallas</p><div class="meds" id="pMed"></div><p class="lbl">Estrellas</p><div class="stars" id="pStars"></div><p class="ghostl modl" id="pMod"></p><p class="ghostl" id="pGhost"></p>
         <p class="lbl">Asiento</p>
         <div class="punch" id="punch"><button data-cam="tp"><i></i>Detrás del tren</button><button data-cam="fp"><i></i>En la cabina</button></div>
         <div class="go"><button class="btnR" id="bGo">Subir al tren</button><button class="btnL" id="bBack1">Volver al calendario</button></div>
       </div>
     </div>
-    <div class="stub"><h3 class="slab">Mejores tiempos</h3><ul class="mini-lb" id="pLB"></ul><div class="barcode"></div><small id="pStub">Válido el día 1</small></div>
+    <div class="stub"><h3 class="slab">Mejores tiempos</h3><ul class="mini-lb" id="pLB"></ul><div class="garage" id="pGarage"></div><div class="barcode"></div><small id="pStub">Válido el día 1</small></div>
   </div>
 </section>
 
@@ -88,7 +89,7 @@
       <div class="thead"><span class="slab">Llegada · Adviento Express</span><small id="eNo">Día 1</small></div>
       <div class="tbody">
         <p class="lbl" id="eName">Alrededor del árbol</p>
-        <div class="bigtime mono" id="eTime">0:00.0</div><p class="edelta" id="eDelta"></p><p class="ehint" id="eHint"></p>
+        <div class="bigtime mono" id="eTime">0:00.0</div><p class="edelta" id="eDelta"></p><p class="ehint" id="eHint"></p><div class="stars" id="eStars"></div><p class="ehint unlock" id="eUnlock"></p>
         <div class="fields" id="eFields"></div>
         <form class="sign" id="fName"><label>Firma del maquinista<input id="iName" maxlength="16" placeholder="Tu nombre" autocomplete="nickname" required></label><button class="btnS" type="submit" id="bSave">Fichar tiempo</button></form>
         <div class="dep"><h4><span id="depT">LLEGADAS · DÍA 1</span><span>TIEMPO</span></h4><div id="eLB"></div></div>
