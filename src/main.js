@@ -9,6 +9,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import CFG from '../config.js';
+import PRODUCTS from './products.js';
 import {SEASON,VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medals,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled=true;
@@ -31,13 +32,12 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
 const TAG=CFG.TAG||'TU-TAG-21',SITE_URL=CFG.SITE_URL||'';
 const NAMES=['Alrededor del árbol','Bosque de abetos','Lago helado','Pueblo de las luces','Colina del reno','Valle de los muñecos','Estación del Polo','Curvas de turrón','Sendero de bastones','Aldea de los elfos','Paso de la ventisca','Río de chocolate','Plaza del belén','Túnel de estrellas','Granja de renos','Mercadillo navideño','Cumbre nevada','Fábrica de juguetes','Bahía de hielo','Camino de los Reyes','Bosque encantado','Pista del trineo','Noche de luces','Nochebuena Express'];
 const STN=['Polo Norte','Villa Abeto','Taller de Elfos','Pino Alto','Monte Reno','Valle Nevado','Plaza Mayor','Calle Turrón','Cueva de Hielo','Granja Cascabel','Puente Viejo','Mirador'];
-const PRODUCTS=[['Tren navideño para poner alrededor del árbol','tren navidad arbol'],['Tren de vapor navideño con luces y sonido','tren navidad luces sonido'],['Tren eléctrico de juguete con vías','tren electrico juguete vias'],['Pueblo navideño con tren en movimiento','pueblo navideño tren'],['Tren de Navidad a pilas para niños','tren navidad pilas niños'],['Tren navideño de madera','tren navidad madera'],['Tren de Navidad que echa humo','tren navidad humo'],['Tren navideño con mando a distancia','tren navidad mando distancia']];
 const THEMES=[
   {wall:'#16301f',fire:0xff7a2e,mat:[0.95,0.97,1],fog:'#120d0d'},
   {wall:'#3a1219',fire:0xff8a3a,mat:[0.97,0.96,0.99],fog:'#130b0c'},
   {wall:'#14223d',fire:0xff7030,mat:[0.94,0.97,1],fog:'#0b0d14'},
   {wall:'#2c1f12',fire:0xff9440,mat:[0.98,0.96,0.94],fog:'#130e09'}];
-const DAYS=Array.from({length:24},(_,i)=>({d:i+1,name:NAMES[i],laps:1,th:THEMES[i%4],prod:PRODUCTS[i%8]}));
+const DAYS=Array.from({length:24},(_,i)=>({d:i+1,name:NAMES[i],laps:1,th:THEMES[i%4],prod:PRODUCTS[i]}));
 const ORDER=[7,19,1,12,24,3,15,9,22,5,17,11,2,20,8,14,23,6,10,18,4,21,13,16];
 const SPAN={24:'w h',1:'w',6:'h',13:'w',18:'h',9:'w',20:'h',3:'w',15:'w',11:'h'};
 let OFFS=[0,-8.6,-16.2,-23.8],GAUGE=1.24;const RAILY=0.72;
@@ -808,7 +808,8 @@ function showEnd(){
   const st=$('eStamp');st.hidden=false;st.className='stampbig '+(medal?'m'+medal:'');st.textContent=medal?['','¡ORO!','PLATA','BRONCE'][medal]:(isBest?'¡RÉCORD!':'SIN MEDALLA');
   $('iName').value=store.get('advx-name')||'';$('bSave').disabled=false;$('bSave').textContent='Fichar tiempo';
   renderShare(medal);refreshCode();
-  $('prT').textContent=DAY.prod[0];$('prA').href=`https://www.amazon.es/s?k=${encodeURIComponent(DAY.prod[1])}&tag=${TAG}`;
+  const pr=DAY.prod,asin=/^[A-Z0-9]{10}$/.test(pr.asin||'')?pr.asin:'',tg=encodeURIComponent(TAG);$('prT').textContent=pr.titulo;
+  $('prA').href=asin?`https://www.amazon.es/dp/${asin}?tag=${tg}`:`https://www.amazon.es/s?k=${encodeURIComponent(pr.busqueda)}&tag=${tg}`;$('fine').hidden=TAG!=='TU-TAG-21';
   $('eLB').innerHTML='<div class="r"><span></span><span>CARGANDO…</span><span></span></div>';
   show('end');(async()=>{const res=await Board.top(DAY.d,10);renderDep(res)})();
 }

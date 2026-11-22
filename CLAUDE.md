@@ -27,6 +27,9 @@ src/styles.css             estilos (estética papel/cartón/billete de tren)
 src/main.js                todo el juego (módulo ES, ~900 líneas, secciones marcadas con /* ==== */)
 src/sim.js                 física, circuitos, campanas, medallas, codec del fantasma y validateRun (sin DOM; lo comparte la Edge Function)
 config.js                  configuración pública: TAG de Amazon, SITE_URL, SUPABASE_URL/KEY
+src/products.js            producto de Amazon de cada día (titulo, asin, busqueda)
+scripts/build.mjs, vercel.json   despliegue: copia a dist/ y genera dist/config.js desde ADVX_TAG, ADVX_SITE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
+og.jpg, favicon.svg        imagen para compartir (1200×630) e icono
 supabase/                  migración SQL (tabla runs + RLS) y Edge Function submit-run (handler.js + _shared/sim.js copiado)
 scripts/sync-shared.mjs    copia src/sim.js a supabase/functions/_shared (el e2e falla si difieren)
 m/{holiday,train}/*.glb    modelos Kenney usados (27), servidos tal cual; textura en m/<kit>/Textures/colormap.png
@@ -59,8 +62,9 @@ Convenciones:
 
 ## Pendientes conocidos
 
-- `config.js`: `TAG='TU-TAG-21'` (ID de afiliado de Amazon) es un marcador y `SITE_URL` vacío usa la URL actual. Faltan los valores reales.
-- Los enlaces de Amazon son búsquedas genéricas, no productos concretos.
+- Faltan los valores reales en Vercel: `ADVX_TAG` (en local, `config.js` usa el marcador `TU-TAG-21` y se ve el aviso de enlace de ejemplo) y `ADVX_SITE_URL`.
+- Faltan los ASIN de `src/products.js`: sin ellos los enlaces son búsquedas de Amazon.
+- Despliegue preparado (Vercel), pero aún no hecho.
 - La clasificación global está preparada (Supabase: `supabase/`), pero falta crear el proyecto y poner `SUPABASE_URL`/`SUPABASE_KEY` (README → «Clasificación global»). Sin ellos, `Board` guarda en `localStorage`.
 - La validación antitrampas (`validateRun` en `sim.js`) acota la física, pero no puede impedir un bot que conduzca de verdad.
 - No se ha medido el rendimiento en un móvil real; hay resolución dinámica, un modo de baja calidad automático y `?debug`.

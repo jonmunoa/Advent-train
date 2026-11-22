@@ -50,9 +50,21 @@ Para probar antes de diciembre, añade `ALLOW_ANY_DAY=1` a los secretos y quíta
 
 Cómo funciona: el navegador lee `runs` directamente (solo columnas públicas) y envía cada tiempo con su fantasma a `submit-run`. La función repite la carrera a partir del fantasma (velocidades, aceleraciones, turbos, distancia, campanas y regalos perdidos), rechaza lo imposible y guarda **su propio** total. Solo guarda la mejor marca de cada dispositivo y acepta un envío cada 10 s. La lógica es `src/sim.js`, compartida con el juego. Tras cambiarla: `node scripts/sync-shared.mjs`.
 
-## Desplegar
+## Desplegar (Vercel)
 
-Es una web estática: vale cualquier hosting (Vercel, Netlify, GitHub Pages, Cloudflare Pages). La configuración pública (ID de afiliado, URL, Supabase) está en `config.js`.
+La web sigue siendo estática. `scripts/build.mjs` solo copia los archivos a `dist/` y genera `dist/config.js` con las variables de entorno. `vercel.json` ya lo configura todo: build, carpeta de salida y caché de `m/` una semana.
+
+1. En [vercel.com](https://vercel.com), *Add New → Project* e importa `jonmunoa/Advent-train` (framework: *Other*; el resto lo lee de `vercel.json`).
+2. *Settings → Environment Variables* (Production y Preview):
+   - `ADVX_TAG`: tu ID de afiliado de Amazon (p. ej. `tunombre-21`).
+   - `ADVX_SITE_URL`: la URL pública (p. ej. `https://adviento.vercel.app`); vacío = la de producción de Vercel.
+   - `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`: los del paso 6 de Supabase.
+3. Despliega: cada push a `main` publica en producción (y cada rama, una vista previa). Desde la terminal: `npx vercel --prod`.
+4. Con la URL definitiva, añádela a `ALLOWED_ORIGINS` en Supabase: `npx supabase secrets set ALLOWED_ORIGINS=https://tu-dominio`.
+
+Productos: rellena el `asin` de cada día en `src/products.js`. Sin ASIN, el enlace va a una búsqueda de Amazon con tu ID de afiliado.
+
+Probar la build en local: `ADVX_TAG=prueba-21 node scripts/build.mjs && python tests/e2e.py --dist`.
 
 ## Recursos y créditos
 

@@ -11,18 +11,21 @@ Uso:
   python tests/e2e.py                 # sirve el repo en :8765 y prueba
   python tests/e2e.py --shots         # además guarda capturas en tests/out/
   python tests/e2e.py --gpu           # usa la GPU real en vez de SwiftShader (más rápido)
+  ADVX_TAG=prueba-21 node scripts/build.mjs && python tests/e2e.py --dist   # prueba la build de despliegue
   THREE_LOCAL=node_modules/three python tests/e2e.py   # sin internet: sirve three.js local
 
 Por defecto usa SwiftShader (CPU): más lento pero igual en cualquier máquina.
 """
 import asyncio, os, sys
 from playwright.async_api import async_playwright
-from harness import OUT, serve, chromium_args, route_local_three
+from harness import ROOT, OUT, serve, chromium_args, route_local_three
 
 sys.stdout.reconfigure(encoding='utf-8')
 PORT = 8765
 SHOTS = '--shots' in sys.argv
 GPU = '--gpu' in sys.argv
+DIST = '--dist' in sys.argv
+TAG = os.environ.get('ADVX_TAG', 'TU-TAG-21') if DIST else 'TU-TAG-21'
 
 # maquinista bot: salida perfecta, va al 97 % de la envolvente y gasta el turbo cuando renta
 BOT = """(()=>{const A=__adv;for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
@@ -129,7 +132,7 @@ async def main():
         check('supabase/functions/_shared/sim.js coincide con src/sim.js', sync.returncode == 0, (sync.stdout + sync.stderr).strip())
     except FileNotFoundError:
         print('  (sin Node: no se comprueba la copia de sim.js)')
-    srv = serve(PORT)
+    srv = serve(PORT, ROOT / 'dist' if DIST else ROOT)
     errors = []
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=os.environ.get('CHROME') or None, args=chromium_args(GPU))
@@ -170,6 +173,9 @@ async def main():
         check('texto de compartir con día, tiempo, campanas y regalos', 'Día 1' in txt and fmt(res['total']) in txt and line.count('🟨') + line.count('⬛') == nb and '🎁 3/3' in txt)
         check('el texto no desvela el circuito', dayname not in txt, dayname)
         check('la llegada muestra el texto que se comparte', shown == txt)
+        amz = await pg.evaluate("[document.getElementById('prA').href, document.getElementById('fine').hidden, document.getElementById('prT').textContent]")
+        check('el enlace de Amazon lleva el ID de afiliado y el producto del día', f'tag={TAG}' in amz[0] and 'amazon.es' in amz[0] and amz[2], amz[0])
+        check('el aviso de enlace de ejemplo solo sale con el TAG de marcador', amz[1] == (TAG != 'TU-TAG-21'))
         fields = await pg.evaluate("document.getElementById('eFields').textContent")
         check('la llegada muestra los regalos', 'Regalos3/3' in fields.replace(' ', ''), fields)
 
