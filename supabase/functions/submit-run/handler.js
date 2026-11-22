@@ -1,10 +1,10 @@
-/* submit-run: recibe {ghost, device}, valida el fantasma repitiendo la carrera y guarda
+/* submit-run: recibe {ghost, device, leagues?}, valida el fantasma repitiendo la carrera y guarda
    la mejor marca del dispositivo en public.runs. Escribe con la service role (RLS no deja
    escribir a anon). JS plano para poder probarlo con Node (tests/edge.test.mjs). */
 import {decodeGhost, validateRun, cleanName, SEASON} from '../_shared/sim.js';
 
 const HEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CODE = /^[zr][A-Za-z0-9_-]+$/;
+const CODE = /^[zr][A-Za-z0-9_-]+$/, LEAGUE = /^[a-z0-9]{6}$/;
 const RATE_MS = 10000;
 
 async function sha256(s) {
@@ -32,7 +32,7 @@ export function makeHandler({env, fetch: f = globalThis.fetch, now = () => new D
     if (!key || !salt) return out(500, {error: 'configuración'});
 
     let body; try {body = await req.json()} catch {return out(400, {error: 'json'})}
-    const {ghost, device} = body || {};
+    const {ghost, device} = body || {}, leagues = Array.isArray(body && body.leagues) ? [...new Set(body.leagues.filter(c => typeof c === 'string' && LEAGUE.test(c)))].slice(0, 5) : [];
     if (typeof ghost !== 'string' || ghost.length > 4000 || !CODE.test(ghost)) return out(400, {error: 'fantasma'});
     if (typeof device !== 'string' || !HEX.test(device)) return out(400, {error: 'dispositivo'});
     let g; try {g = await decodeGhost(ghost)} catch {return out(400, {error: 'fantasma'})}
@@ -56,6 +56,11 @@ export function makeHandler({env, fetch: f = globalThis.fetch, now = () => new D
     } else {
       // no mejora: conserva la marca y su fantasma, pero actualiza el nombre y la hora del último envío
       const w = await db(`runs?id=eq.${id}`, {method: 'PATCH', body: JSON.stringify({name: cleanName(g.name), updated_at: t.toISOString()})});
+      if (!w.ok) return out(502, {error: 'db'});
+    }
+    // ligas de amigos: el dispositivo entra (o sigue) en las ligas que manda el navegador
+    if (leagues.length) {
+      const w = await db('league_members?on_conflict=league,device_hash', {method: 'POST', headers: {Prefer: 'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify(leagues.map(league => ({league, device_hash: hash})))});
       if (!w.ok) return out(502, {error: 'db'});
     }
     const c = await db(`runs?select=id&season=eq.${season}&day=eq.${g.day}&total_ms=lt.${best}`, {headers: {Prefer: 'count=exact', Range: '0-0'}});

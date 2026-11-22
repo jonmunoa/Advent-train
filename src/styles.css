@@ -181,6 +181,17 @@ form.sign input:focus{outline:none;border-bottom-color:var(--red)}
 .gsel{display:flex;align-items:center;gap:6px}.gsel b{flex:1;text-align:center;font-size:13.5px}
 .gsel button{border:0;width:30px;height:30px;border-radius:7px;background:var(--ink);color:var(--cream);font-size:18px;line-height:1;cursor:pointer;transition:transform .12s}.gsel button:active{transform:scale(.92)}
 .gr small{display:block;margin-top:3px;font-size:10.5px;color:#8a7660;line-height:1.3}
+.ltabs{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}.ltabs:empty{display:none}
+.ltab{border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:5px 11px;font:600 12px/1 Rubik,sans-serif;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ltab.on{background:var(--ink);color:var(--cream)}
+.ligas{margin:22px 0 6px;padding:16px 18px;border-radius:12px;background:rgba(241,230,204,.95);color:var(--ink)}
+.ligas h3{margin:0 0 4px;font-size:20px}.ligas p{margin:0 0 10px;font-size:14px;line-height:1.4}
+.ligas ul{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.ligas li{display:flex;gap:6px;align-items:center}.ligas li.on .lname{background:var(--green);color:#fff;border-color:var(--green)}
+.ligas button{border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:8px;min-height:38px;padding:0 12px;font:600 13px/1 Rubik,sans-serif;cursor:pointer}
+.ligas .lname{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ligas .linv{background:var(--red);border-color:var(--red);color:var(--cream)}
+.lnew{display:flex;gap:8px}.lnew input{flex:1;min-width:0;min-height:40px;border:1.5px solid rgba(43,26,18,.4);border-radius:8px;padding:0 10px;font:500 16px Rubik,sans-serif;background:#fffaf0}
+.lnew button{background:var(--ink);color:var(--cream)}.lmsg{min-height:1em;margin:8px 0 0!important;font-size:13px!important;color:#1f6b3a}
 .hint{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:14px;color:#e6e9f3;background:rgba(6,9,20,.6);padding:6px 14px;white-space:nowrap}
 .pcard{background:var(--paper);color:var(--ink);border-radius:12px;padding:24px;width:min(360px,92vw);display:grid;gap:10px;box-shadow:0 30px 70px rgba(0,0,0,.6)}
 .pcard h2{margin:0 0 4px;font-size:34px;color:var(--red2)}

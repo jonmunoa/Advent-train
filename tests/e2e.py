@@ -88,7 +88,8 @@ class FakeSupabase:
     URL = 'http://sb.test'
 
     def __init__(self, seed_ghost):
-        self.rows = [{'id': 7, 'name': 'Leire', 'total_ms': 99000, 'ghost': seed_ghost, 'day': 1}]
+        self.rows = [{'id': 7, 'name': 'Leire', 'total_ms': 99000, 'ghost': seed_ghost, 'day': 1}, {'id': 8, 'name': 'Desconocido', 'total_ms': 98000, 'ghost': seed_ghost, 'day': 1}]
+        self.members = {('fam123', 7)}
         self.last = {}
 
     async def attach(self, ctx):
@@ -107,13 +108,17 @@ class FakeSupabase:
         if u.path == '/functions/v1/submit-run':
             body = json.loads(req.post_data)
             g = parse_ghost(body['ghost'])
-            self.last = {**g, 'device': body['device']}
+            self.last = {**g, 'device': body['device'], 'leagues': body.get('leagues', [])}
+            for lg in body.get('leagues', []):
+                self.members.add((lg, 1))
             row = {'id': 1, 'name': g['name'], 'total_ms': g['total_ms'], 'ghost': body['ghost'], 'day': g['day']}
             self.rows = [r for r in self.rows if r['id'] != 1] + [row]
             rank = 1 + sum(r['total_ms'] < row['total_ms'] and r['day'] == row['day'] for r in self.rows)
             return await route.fulfill(json={'id': 1, 'total_ms': row['total_ms'], 'rank': rank, 'mejor': True}, headers=h)
-        if u.path == '/rest/v1/runs':
+        if u.path in ('/rest/v1/runs', '/rest/v1/league_board'):
             rows = self.rows
+            if 'league' in q:
+                rows = [r for r in rows if (q['league'][3:], r['id']) in self.members]
             if 'id' in q:
                 rows = [r for r in rows if str(r['id']) == q['id'][3:]]
             if 'day' in q:
@@ -301,10 +306,13 @@ async def main():
         p3 = await ctx.new_page()
         p3.on('pageerror', lambda e: errors.append(f'pageerror (supabase): {e}'))
         await route_local_three(p3)
-        await p3.goto(f'http://127.0.0.1:{PORT}/index.html#dia-1', wait_until='domcontentloaded', timeout=120000)
+        await p3.goto(f'http://127.0.0.1:{PORT}/index.html?liga=fam123&n=Familia#dia-1', wait_until='domcontentloaded', timeout=120000)
         await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
         await p3.wait_for_function("document.querySelector('#pLB [data-beat]')", timeout=15000)
         check('el billete carga la clasificación compartida con «Bátelo»', 'Leire' in await p3.evaluate("document.getElementById('pLB').textContent"))
+        lg = await p3.evaluate("[__adv.ligas().map(l=>l.code+':'+l.name).join(), document.getElementById('pTabs').textContent, document.getElementById('pLB').textContent, location.search]")
+        check('el enlace ?liga= une a la liga y limpia la URL', lg[0] == 'fam123:Familia' and lg[3] == '', str(lg[0]) + ' ' + lg[3])
+        check('el billete muestra la clasificación de la liga (sin desconocidos)', 'Liga «Familia»' in lg[1] and 'Leire' in lg[2] and 'Desconocido' not in lg[2], lg[2])
         await p3.evaluate("document.getElementById('bGo').click()")
         await p3.wait_for_timeout(200)
         await p3.evaluate(BOT)
@@ -315,10 +323,14 @@ async def main():
         saved = await p3.evaluate("[document.getElementById('bSave').textContent, document.getElementById('eLB').textContent, __adv.shareText()]")
         print('fichado:', saved[0], '| envío:', sb.last)
         check('fichar envía el fantasma con el nombre a submit-run', sb.last.get('name') == 'Ane' and sb.last.get('day') == 1 and len(sb.last.get('device', '')) == 36)
-        check('la llegada muestra la posición y la clasificación compartida', 'Fichado · 1º' in saved[0] and 'Clasificación compartida' in saved[1] and 'Leire' in saved[1])
-        check('tras fichar, el enlace de reto es corto', '#reto-i' in saved[2], saved[2].split('\n')[-1])
+        check('fichar manda las ligas del jugador', sb.last.get('leagues') == ['fam123'], str(sb.last.get('leagues')))
+        check('la llegada muestra la posición y la clasificación de la liga', 'Fichado · 1º' in saved[0] and 'Liga «Familia»' in saved[1] and 'Leire' in saved[1] and 'Desconocido' not in saved[1], saved[1][-80:])
+        check('tras fichar, el enlace de reto es corto y lleva la liga', '#reto-i' in saved[2] and '?liga=fam123' in saved[2], saved[2].split('\n')[-1])
+        await p3.evaluate("document.querySelector('#eTabs [data-tab=general]').click()")
+        await p3.wait_for_timeout(500)
+        check('la pestaña General muestra a todos', 'Desconocido' in await p3.evaluate("document.getElementById('eLB').textContent"))
         short = saved[2].split('\n')[-1]
-        await p3.evaluate("document.querySelector('#eLB [data-beat]').click()")
+        await p3.evaluate("[...document.querySelectorAll('#eLB [data-beat]')].find(b=>b.closest('.r').textContent.includes('Leire')).click()")
         await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=15000)
         pre3 = await p3.evaluate("document.getElementById('pGhost').textContent")
         check('«Bátelo» en la clasificación abre el reto de esa fila', 'Leire' in pre3, pre3)

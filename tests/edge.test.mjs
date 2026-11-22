@@ -97,7 +97,7 @@ await ok('una carrera de un día cerrado se rechaza sin allowAnyDay', async () =
 console.log('submit-run');
 /* PostgREST en memoria: lo justo para las llamadas del handler */
 function fakeDb() {
-  const rows = []; let seq = 0;
+  const rows = [], members = []; let seq = 0;
   const parse = url => {const u = new URL(url), f = {}; for (const [k, v] of u.searchParams) if (!['select', 'on_conflict'].includes(k)) {const [op, val] = v.split(/\.(.*)/s); f[k] = [op, val]} return {path: u.pathname, f}};
   const match = (r, f) => Object.entries(f).every(([k, [op, val]]) => op === 'eq' ? String(r[k]) === val : op === 'lt' ? r[k] < +val : true);
   const fetch = async (url, init = {}) => {
@@ -105,10 +105,11 @@ function fakeDb() {
     assert.equal(H.apikey, 'service', 'usa la service role');
     if (m === 'GET') {const res = rows.filter(r => match(r, f)); if (H.Prefer === 'count=exact') return new Response('[]', {headers: {'content-range': res.length ? `0-0/${res.length}` : '*/0'}}); return new Response(JSON.stringify(res))}
     const body = JSON.parse(init.body);
+    if (m === 'POST' && url.includes('/league_members')) {for (const x of body) if (!members.some(y => y.league === x.league && y.device_hash === x.device_hash)) members.push(x); return new Response(null, {status: 201})}
     if (m === 'POST') {let r = rows.find(x => x.season === body.season && x.day === body.day && x.device_hash === body.device_hash); if (r) Object.assign(r, body); else rows.push(r = {id: ++seq, ...body}); return new Response(JSON.stringify([r]), {status: 201})}
     if (m === 'PATCH') {rows.filter(r => match(r, f)).forEach(r => Object.assign(r, body)); return new Response(null, {status: 204})}
   };
-  return {rows, fetch};
+  return {rows, members, fetch};
 }
 let clock = new Date('2026-12-05T10:00:00Z');
 const env = {SUPABASE_URL: 'http://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service', RUN_SALT: 'sal', ALLOWED_ORIGINS: 'https://adviento.test', SEASON: String(SEASON)};
@@ -152,6 +153,14 @@ await ok('una carrera manipulada devuelve 422 con los motivos', async () => {
   const bad = await encodeGhost({...clean[1], name: 'Trampas', total: clean[1].total - 6});
   const r = await post({ghost: bad, device: dev2}), j = await r.json();
   assert.equal(r.status, 422); assert.ok(j.motivos.includes('total'));
+});
+await ok('las ligas válidas se apuntan y las inválidas se ignoran', async () => {
+  clock = new Date(clock.getTime() + 20000);
+  const g = await encodeGhost({...simulateRun(1, {k: 0.8}), name: 'Leire'});
+  const r = await post({ghost: g, device: dev2, leagues: ['fam123', 'MAL', 'fam123', 'trab99', 7]});
+  assert.equal(r.status, 200);
+  assert.deepEqual(DB.members.map(m => m.league).sort(), ['fam123', 'trab99']);
+  assert.ok(DB.members.every(m => m.device_hash.length === 64));
 });
 await ok('un día que aún no se ha abierto devuelve 422', async () => {
   const later = await encodeGhost({...clean[24], name: 'Ane'});
