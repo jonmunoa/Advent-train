@@ -29,17 +29,16 @@ src/sim.js                 física, circuitos, campanas, medallas, codec del fan
 config.js                  configuración pública: TAG de Amazon, SITE_URL, SUPABASE_URL/KEY
 supabase/                  migración SQL (tabla runs + RLS) y Edge Function submit-run (handler.js + _shared/sim.js copiado)
 scripts/sync-shared.mjs    copia src/sim.js a supabase/functions/_shared (el e2e falla si difieren)
-m/models.json              modelos Kenney empaquetados en base64 (ver scripts/pack-models.py)
-m/{holiday,train}/Textures/colormap.png   texturas que referencian esos modelos
-m/env.json                 HDRI de interior (Poly Haven "apartment", EXR en base64)
-m/snow_n.webp, m/wood_n.webp   normal maps CC0 (nieve, madera)
-assets-src/kenney/         .glb originales (Kenney Holiday Kit + Train Kit, CC0)
-scripts/pack-models.py     regenera m/models.json desde scripts/models.config.json
+m/{holiday,train}/*.glb    modelos Kenney usados (27), servidos tal cual; textura en m/<kit>/Textures/colormap.png
+m/ph/                      Poly Haven: texturas webp (parqué, nieve, ladrillo, tejidos) y muebles .glb (meshopt + webp)
+m/env/fireplace_1k.exr     HDRI de interior nocturno (Poly Haven "fireplace")
+assets-src/kenney/         .glb originales (Kenney Holiday Kit + Train Kit, CC0); los usados están copiados en m/
+scripts/fetch-polyhaven.mjs   descarga y aligera los recursos de Poly Haven (lista en scripts/polyhaven.json)
 tests/e2e.py, perf.py      prueba end-to-end (con Supabase simulado) y banco de rendimiento (harness.py: servidor y Chromium)
 tests/edge.test.mjs        validación antitrampas y submit-run con Node (npm i para tener three)
 ```
 
-Los modelos van en base64 dentro de JSON porque el primer hosting (artifacts de Claude) no servía `.glb`. En un hosting normal se pueden servir los `.glb` directamente y cambiar `loadModels()` por `GLTFLoader.loadAsync`; si lo cambias, mantén `pack-models.py` o elimínalo a conciencia.
+Los modelos Kenney se cargan con `GLTFLoader.loadAsync` desde el mapa `MODELS` de `main.js`. Los muebles de Poly Haven usan `loadGLB` (con `MeshoptDecoder`) y se cargan sin bloquear la carga del día (`buildFurniture`, `__adv.roomReady()`). Para añadir un modelo Kenney, cópialo de `assets-src/kenney/` a `m/<kit>/` y añádelo a `MODELS`.
 
 ## Arquitectura de `src/main.js`
 
