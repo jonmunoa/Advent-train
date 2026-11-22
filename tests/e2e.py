@@ -9,50 +9,34 @@ Uso:
   pip install playwright && python -m playwright install chromium
   python tests/e2e.py                 # sirve el repo en :8765 y prueba
   python tests/e2e.py --shots         # además guarda capturas en tests/out/
+  python tests/e2e.py --gpu           # usa la GPU real en vez de SwiftShader (más rápido)
   THREE_LOCAL=node_modules/three python tests/e2e.py   # sin internet: sirve three.js local
 
-En máquinas sin GPU usa SwiftShader (lento pero fiable).
+Por defecto usa SwiftShader (CPU): más lento pero igual en cualquier máquina.
 """
-import asyncio, functools, http.server, os, pathlib, sys, threading
+import asyncio, os, sys
 from playwright.async_api import async_playwright
+from harness import OUT, serve, chromium_args, route_local_three
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-OUT = ROOT / 'tests' / 'out'
+sys.stdout.reconfigure(encoding='utf-8')
 PORT = 8765
-CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/'
 SHOTS = '--shots' in sys.argv
+GPU = '--gpu' in sys.argv
 
 BOT = """(()=>{const A=__adv;for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
  const va=A.vsAhead(G.dist,G.v);A.step(1/60,G.v<va*0.95)}
  for(let i=0;i<200;i++)A.step(1/30);const G=A.G;return {mode:A.mode,time:+G.time.toFixed(1),total:+(G.total||0).toFixed(1),bells:G.bells,der:G.der,med:A.MED}})()"""
 
 
-def serve():
-    class Quiet(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, *a):
-            pass
-    h = functools.partial(Quiet, directory=str(ROOT))
-    srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), h)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    return srv
-
-
 async def main():
-    srv = serve()
-    local = os.environ.get('THREE_LOCAL')
+    srv = serve(PORT)
     errors = []
     async with async_playwright() as p:
-        b = await p.chromium.launch(executable_path=os.environ.get('CHROME') or None, args=['--no-sandbox','--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
+        b = await p.chromium.launch(executable_path=os.environ.get('CHROME') or None, args=chromium_args(GPU))
         pg = await b.new_page(viewport={'width': 1200, 'height': 760})
         pg.on('pageerror', lambda e: errors.append(f'pageerror: {e}'))
         pg.on('response', lambda r: errors.append(f'HTTP {r.status} {r.url}') if r.status >= 400 and 'favicon' not in r.url else None)
-        if local:
-            base = pathlib.Path(local).resolve()
-            async def fulfil(route):
-                rel = route.request.url[len(CDN):]
-                f = base / rel.replace('.module.min.js', '.module.js')
-                await route.fulfill(path=str(f), content_type='application/javascript')
-            await pg.route(CDN + '**', fulfil)
+        await route_local_three(pg)
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html')
         await pg.wait_for_timeout(1500)
         if SHOTS:

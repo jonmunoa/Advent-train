@@ -79,6 +79,7 @@ function drawArt(){const r=rng(77);let s=`<defs><linearGradient id="sky" x1="0" 
 
 /* ================= motor ================= */
 const coarse=matchMedia('(pointer:coarse)').matches;
+const QS=new URLSearchParams(location.search),DEBUG=QS.has('debug');
 const canvas=$('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance',stencil:false});
 const MAXPR=Math.min(devicePixelRatio||1,coarse?1.4:1.75);let dynPR=coarse?Math.min(1.0,MAXPR):Math.min(1.5,MAXPR);
@@ -106,6 +107,10 @@ const grade=new ShaderPass({uniforms:{tDiffuse:{value:null},t:{value:0},blur:{va
 composer.addPass(bloom);composer.addPass(grade);composer.addPass(new OutputPass());
 function resize(){const w=innerWidth,h=innerHeight;renderer.setPixelRatio(dynPR);composer.setPixelRatio(dynPR);renderer.setSize(w,h,false);composer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();grade.uniforms.asp.value=w/h}
 addEventListener('resize',resize);resize();
+const dbg=DEBUG?Object.assign(document.body.appendChild(document.createElement('div')),{id:'dbg'}):null;
+if(dbg){renderer.info.autoReset=false;Object.assign(dbg.style,{position:'fixed',left:'50%',top:'calc(4px + env(safe-area-inset-top))',transform:'translateX(-50%)',zIndex:99,font:'700 11px/1.3 JetBrains Mono,monospace',color:'#fff',background:'rgba(0,0,0,.6)',padding:'3px 8px',pointerEvents:'none',whiteSpace:'nowrap'})}
+let dbgN=0,dbgT=0;
+function dbgFrame(raw){if(!dbg)return;dbgN++;dbgT+=raw;if(dbgT<0.5)return;const i=renderer.info.render;dbg.textContent=`${Math.round(dbgN/dbgT)} fps · ${(dbgT/dbgN*1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${i.calls} dc · ${(i.triangles/1000).toFixed(0)}k tri · sombras ${renderer.shadowMap.enabled?'sí':'no'}`;dbgN=0;dbgT=0}
 
 /* ================= texturas ================= */
 const texCache={};
@@ -852,12 +857,19 @@ function loop(now){
     if(racing())hud();
     windSet(G.v);
     if(flashT>0){flashT-=dt;if(flashT<=0)$('msg').classList.remove('on')}
-    composer.render(dt);
-    if(mode==='race'||mode==='pre')adapt(raw,now);
+    if(dbg)renderer.info.reset();
+    composer.render(dt);dbgFrame(raw);
+    if((mode==='race'||mode==='pre')&&!window.__advNoAdapt)adapt(raw,now);
   }
   requestAnimationFrame(loop);
 }
-window.__adv={settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='derail')derailStep(dt);else if(mode==='finish')finishStep(dt)}};
+function perf(n=120,pr=1){const ip=dynPR,ar=renderer.info.autoReset;dynPR=pr;resize();renderer.info.autoReset=false;const gl=renderer.getContext(),px=new Uint8Array(4),sync=()=>gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  for(let i=0;i<3;i++){composer.render(1/60);sync()}renderer.info.reset();composer.render(1/60);sync();const calls=renderer.info.render.calls,tris=renderer.info.render.triangles;
+  const t0=performance.now();for(let i=0;i<n;i++){renderer.info.reset();composer.render(1/60);sync()}const ms=(performance.now()-t0)/n;
+  renderer.info.autoReset=ar;dynPR=ip;resize();return {ms:+ms.toFixed(2),calls,tris,tex:renderer.info.memory.textures,geo:renderer.info.memory.geometries,pr,w:innerWidth,h:innerHeight}}
+function pose(kind,f=0.25){const d=f*T.L;if(G)G.dist=d;poseTrain(d,0);camTarget(kind,0,wantP,wantL);camPos.copy(wantP);camLook.copy(wantL);camBlend=1;camera.position.copy(wantP);camera.lookAt(wantL);camera.fov=kind==='fp'?70:58;camera.updateProjectionMatrix();
+  key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);grade.uniforms.blur.value=0;grade.uniforms.tilt.value=kind==='orbit'?1:0}
+window.__adv={perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='derail')derailStep(dt);else if(mode==='finish')finishStep(dt)}};
 drawArt();renderHome();
 {const m=/^#dia-(\d+)$/.exec(location.hash),hd=m?+m[1]:0;if(hd>=1&&hd<=24&&isOpen(hd)){setTimeout(()=>{const el=document.querySelector(`.door[data-d="${hd}"]`);if(el)openDoor(el,hd)},300)}}
 requestAnimationFrame(loop);
