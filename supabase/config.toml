@@ -1,0 +1,6 @@
+# Configuración mínima para el CLI de Supabase (supabase link / db push / functions deploy).
+project_id = "adviento-express"
+
+[functions.submit-run]
+# La llamada viene del navegador sin sesión: la función valida el fantasma por su cuenta.
+verify_jwt = false

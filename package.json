@@ -2,11 +2,17 @@
   "name": "advent-train",
   "version": "0.5.0",
   "private": true,
+  "type": "module",
   "description": "Adviento Express: calendario de Adviento jugable con un tren de juguete en 3D (three.js)",
   "scripts": {
     "dev": "npx --yes serve -l 5173 .",
     "pack-models": "python scripts/pack-models.py",
-    "test": "python tests/e2e.py"
+    "test": "python tests/e2e.py && node tests/edge.test.mjs",
+    "test:edge": "node tests/edge.test.mjs",
+    "sync-shared": "node scripts/sync-shared.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "three": "0.170.0"
+  }
 }

@@ -25,21 +25,25 @@ npx serve -l 5173 .        # o: python -m http.server 5173
 index.html                 HTML de todas las pantallas + importmap
 src/styles.css             estilos (estética papel/cartón/billete de tren)
 src/main.js                todo el juego (módulo ES, ~900 líneas, secciones marcadas con /* ==== */)
-src/sim.js                 física, circuitos, campanas, medallas y codec del fantasma (sin DOM; lo comparte la Edge Function)
+src/sim.js                 física, circuitos, campanas, medallas, codec del fantasma y validateRun (sin DOM; lo comparte la Edge Function)
+config.js                  configuración pública: TAG de Amazon, SITE_URL, SUPABASE_URL/KEY
+supabase/                  migración SQL (tabla runs + RLS) y Edge Function submit-run (handler.js + _shared/sim.js copiado)
+scripts/sync-shared.mjs    copia src/sim.js a supabase/functions/_shared (el e2e falla si difieren)
 m/models.json              modelos Kenney empaquetados en base64 (ver scripts/pack-models.py)
 m/{holiday,train}/Textures/colormap.png   texturas que referencian esos modelos
 m/env.json                 HDRI de interior (Poly Haven "apartment", EXR en base64)
 m/snow_n.webp, m/wood_n.webp   normal maps CC0 (nieve, madera)
 assets-src/kenney/         .glb originales (Kenney Holiday Kit + Train Kit, CC0)
 scripts/pack-models.py     regenera m/models.json desde scripts/models.config.json
-tests/e2e.py, perf.py      prueba end-to-end y banco de rendimiento (harness.py: servidor y Chromium)
+tests/e2e.py, perf.py      prueba end-to-end (con Supabase simulado) y banco de rendimiento (harness.py: servidor y Chromium)
+tests/edge.test.mjs        validación antitrampas y submit-run con Node (npm i para tener three)
 ```
 
 Los modelos van en base64 dentro de JSON porque el primer hosting (artifacts de Claude) no servía `.glb`. En un hosting normal se pueden servir los `.glb` directamente y cambiar `loadModels()` por `GLTFLoader.loadAsync`; si lo cambias, mantén `pack-models.py` o elimínalo a conciencia.
 
 ## Arquitectura de `src/main.js`
 
-Secciones en orden: utilidades → datos (días, temas, productos, física) → portada (SVG ilustrado) → motor (renderer, EffectComposer: RenderPass + UnrealBloom + pase `grade` propio + OutputPass) → texturas procedurales (canvas) → materiales → modelos Kenney (`loadModels`, `toyMat`, `flat`, `inst`, `obj`) → tren (`carFrom`, `buildTrain`, fantasma) → salón fijo (`buildRoom`: suelo, paredes, ventana, chimenea, guirnaldas) → mundo por día (`buildWorld`: vía, manta de nieve, árbol gigante, estaciones decorativas, arcos, farolas, señales de curva, casas, decorado, regalos gigantes, campanas, `batchStatic`) → sonido (efectos + villancicos sintetizados con WebAudio) → clasificación (`Board`) → juego (`race`, `loseGift`/`reloadGift`, `startFinish`, combos, fantasma y reto) → compartir (`shareText`, `renderShare`) → cámara → HUD → pantallas (calendario, billete, llegada) → controles → bucle (`fx`, resolución adaptativa `adapt`).
+Secciones en orden: utilidades → datos (días, temas, productos, física) → portada (SVG ilustrado) → motor (renderer, EffectComposer: RenderPass + UnrealBloom + pase `grade` propio + OutputPass) → texturas procedurales (canvas) → materiales → modelos Kenney (`loadModels`, `toyMat`, `flat`, `inst`, `obj`) → tren (`carFrom`, `buildTrain`, fantasma) → salón fijo (`buildRoom`: suelo, paredes, ventana, chimenea, guirnaldas) → mundo por día (`buildWorld`: vía, manta de nieve, árbol gigante, estaciones decorativas, arcos, farolas, señales de curva, casas, decorado, regalos gigantes, campanas, `batchStatic`) → sonido (efectos + villancicos sintetizados con WebAudio) → clasificación (`Board`: PostgREST + `submit-run`, o `localStorage`) → juego (`race`, `loseGift`/`reloadGift`, `startFinish`, combos, fantasma y reto) → compartir (`shareText`, `renderShare`) → cámara → HUD → pantallas (calendario, billete, llegada) → controles → bucle (`fx`, resolución adaptativa `adapt`).
 
 Convenciones:
 - Unidades: metros y segundos. El tren va de 0 a `VMAX=30` m/s. Coordenadas del suelo en X/Z, Y arriba.
@@ -52,15 +56,15 @@ Convenciones:
 - Turbo: la barra se carga apurando curvas (`turboCharging`: en curva y entre 0,88× y 1,03× de `vs`, 3 s de curva para llenarla). Al activarlo (E, Mayús o botón TURBO): +4 m/s, +9 m/s² con el vapor pisado durante 2,5 s y tope de 35 m/s (`VTURBO`); soltando no empuja. Perder un regalo vacía la barra. `vs` llega hasta `VS_CAP=40` en recta; la conducción normal topa en `VMAX`. `medals()` usa el turbo con `turboGood()` (margen en la envolvente en los próximos 20 m). Al experto le da un 1–4 % por vuelta.
 - Fantasma (codec v1 en `sim.js`): velocidad media cada 0,1 s cuantizada a 0,15 m/s, deltas zigzag, deflate-raw y base64url (~230 caracteres por carrera). Se guarda en `advx-gh-<día>` y viaja en los enlaces `#reto-<código>`, que llevan día y nombre. El fantasma de un amigo es dorado con su nombre.
 - Todo el texto de UI en español de España.
-- `localStorage`: `advx-best-<día>`, `advx-medal-<día>`, `advx-gh-<día>` (fantasma codificado), `advx-lb-<día>` (ranking local), `advx-name`, `advx-cam`, `advx-music`, `advx-sfx`, `advx-dev`.
+- `localStorage`: `advx-best-<día>`, `advx-medal-<día>`, `advx-gh-<día>` (fantasma codificado), `advx-lb-<día>` (ranking local), `advx-name`, `advx-device` (UUID para el ranking), `advx-run-<día>` (id de mi fila en el ranking), `advx-cam`, `advx-music`, `advx-sfx`, `advx-dev`.
 
 ## Pendientes conocidos
 
-- `TAG='TU-TAG-21'` (ID de afiliado de Amazon) y `SITE_URL` son marcadores: hay que poner los reales.
+- `config.js`: `TAG='TU-TAG-21'` (ID de afiliado de Amazon) es un marcador y `SITE_URL` vacío usa la URL actual. Faltan los valores reales.
 - Los enlaces de Amazon son búsquedas genéricas, no productos concretos.
-- La clasificación compartida usa la capacidad `db` de los artifacts de Claude (`window.claude.use('db')`); fuera de Claude cae a `localStorage`. Para producción hay que cambiar el adaptador `Board` por un backend real (propuesta: Supabase).
-- No hay validación de tiempos en servidor (se puede trucar el ranking).
-- No se ha medido el rendimiento en un móvil real; hay resolución dinámica y un modo de baja calidad automático.
+- La clasificación global está preparada (Supabase: `supabase/`), pero falta crear el proyecto y poner `SUPABASE_URL`/`SUPABASE_KEY` (README → «Clasificación global»). Sin ellos, `Board` guarda en `localStorage`.
+- La validación antitrampas (`validateRun` en `sim.js`) acota la física, pero no puede impedir un bot que conduzca de verdad.
+- No se ha medido el rendimiento en un móvil real; hay resolución dinámica, un modo de baja calidad automático y `?debug`.
 
 ## Dirección de arte
 

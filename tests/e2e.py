@@ -57,6 +57,60 @@ CHALLENGE_MID = """(()=>{const A=__adv;for(let i=0;i<400&&A.mode==='count';i++)A
 checks = []
 
 
+def parse_ghost(code):
+    """Cabecera del codec v1 de src/sim.js (deflate-raw + base64url con prefijo 'z')."""
+    import base64, struct, zlib
+    raw = base64.urlsafe_b64decode(code[1:] + '=' * (-len(code[1:]) % 4))
+    b = zlib.decompress(raw, -15) if code[0] == 'z' else raw
+    nl = b[4]
+    name = b[5:5 + nl].decode('utf-8')
+    o = 5 + nl
+    raw_ms, total_ms = struct.unpack_from('<II', b, o)
+    return {'version': b[0], 'season': 2000 + b[1], 'day': b[2], 'name': name, 'raw_ms': raw_ms, 'total_ms': total_ms,
+            'bells': b[o + 8], 'lost': b[o + 9], 'turbos': b[o + 10], 'n': b[o + 11] | b[o + 12] << 8}
+
+
+class FakeSupabase:
+    """PostgREST y submit-run de mentira en http://sb.test, con una fila previa de «Leire»."""
+    URL = 'http://sb.test'
+
+    def __init__(self, seed_ghost):
+        self.rows = [{'id': 7, 'name': 'Leire', 'total_ms': 99000, 'ghost': seed_ghost, 'day': 1}]
+        self.last = {}
+
+    async def attach(self, ctx):
+        cfg = f"export default {{TAG:'TU-TAG-21',SITE_URL:'',SUPABASE_URL:'{self.URL}',SUPABASE_KEY:'clave-de-prueba'}};"
+        await ctx.route('**/config.js', lambda r: r.fulfill(body=cfg, content_type='application/javascript'))
+        await ctx.route(self.URL + '/**', self.handle)
+
+    async def handle(self, route):
+        import json, urllib.parse
+        req = route.request
+        h = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'apikey, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'}
+        if req.method == 'OPTIONS':
+            return await route.fulfill(status=204, headers=h)
+        u = urllib.parse.urlparse(req.url)
+        q = dict(urllib.parse.parse_qsl(u.query))
+        if u.path == '/functions/v1/submit-run':
+            body = json.loads(req.post_data)
+            g = parse_ghost(body['ghost'])
+            self.last = {**g, 'device': body['device']}
+            row = {'id': 1, 'name': g['name'], 'total_ms': g['total_ms'], 'ghost': body['ghost'], 'day': g['day']}
+            self.rows = [r for r in self.rows if r['id'] != 1] + [row]
+            rank = 1 + sum(r['total_ms'] < row['total_ms'] and r['day'] == row['day'] for r in self.rows)
+            return await route.fulfill(json={'id': 1, 'total_ms': row['total_ms'], 'rank': rank, 'mejor': True}, headers=h)
+        if u.path == '/rest/v1/runs':
+            rows = self.rows
+            if 'id' in q:
+                rows = [r for r in rows if str(r['id']) == q['id'][3:]]
+            if 'day' in q:
+                rows = [r for r in rows if str(r['day']) == q['day'][3:]]
+            rows = sorted(rows, key=lambda r: r['total_ms'])
+            cols = q.get('select', '').split(',')
+            return await route.fulfill(json=[{k: r[k] for k in cols if k in r} for r in rows], headers=h)
+        await route.fulfill(status=404, headers=h)
+
+
 def fmt(t):
     """Igual que fmt() de main.js: m:ss.d"""
     m = int(t // 60)
@@ -69,6 +123,12 @@ def check(name, cond, info=''):
 
 
 async def main():
+    import subprocess
+    try:
+        sync = subprocess.run(['node', 'scripts/sync-shared.mjs', '--check'], cwd=str(OUT.parent.parent), capture_output=True, text=True)
+        check('supabase/functions/_shared/sim.js coincide con src/sim.js', sync.returncode == 0, (sync.stdout + sync.stderr).strip())
+    except FileNotFoundError:
+        print('  (sin Node: no se comprueba la copia de sim.js)')
     srv = serve(PORT)
     errors = []
     async with async_playwright() as p:
@@ -173,6 +233,45 @@ async def main():
         end2 = await p2.evaluate("[document.getElementById('eDelta').textContent, __adv.shareText()]")
         check('la llegada compara con el amigo', 'Ane' in end2[0], end2[0])
         check('el texto de compartir menciona el reto', '⚔️' in end2[1] and 'Ane' in end2[1])
+        await p2.close()
+
+        # 4) clasificación global con un Supabase simulado
+        sb = FakeSupabase(seed_ghost=challenge.split('#reto-')[1])
+        ctx = await b.new_context(viewport={'width': 1200, 'height': 760})
+        await sb.attach(ctx)
+        p3 = await ctx.new_page()
+        p3.on('pageerror', lambda e: errors.append(f'pageerror (supabase): {e}'))
+        await route_local_three(p3)
+        await p3.goto(f'http://127.0.0.1:{PORT}/index.html#dia-1', wait_until='domcontentloaded', timeout=120000)
+        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        await p3.wait_for_function("document.querySelector('#pLB [data-beat]')", timeout=15000)
+        check('el billete carga la clasificación compartida con «Bátelo»', 'Leire' in await p3.evaluate("document.getElementById('pLB').textContent"))
+        await p3.evaluate("document.getElementById('bGo').click()")
+        await p3.wait_for_timeout(200)
+        await p3.evaluate(BOT)
+        await p3.wait_for_timeout(800)
+        await p3.fill('#iName', 'Ane')
+        await p3.evaluate("document.getElementById('bSave').click()")
+        await p3.wait_for_function("/Fichado/.test(document.getElementById('bSave').textContent)", timeout=15000)
+        saved = await p3.evaluate("[document.getElementById('bSave').textContent, document.getElementById('eLB').textContent, __adv.shareText()]")
+        print('fichado:', saved[0], '| envío:', sb.last)
+        check('fichar envía el fantasma con el nombre a submit-run', sb.last.get('name') == 'Ane' and sb.last.get('day') == 1 and len(sb.last.get('device', '')) == 36)
+        check('la llegada muestra la posición y la clasificación compartida', 'Fichado · 1º' in saved[0] and 'Clasificación compartida' in saved[1] and 'Leire' in saved[1])
+        check('tras fichar, el enlace de reto es corto', '#reto-i' in saved[2], saved[2].split('\n')[-1])
+        short = saved[2].split('\n')[-1]
+        await p3.evaluate("document.querySelector('#eLB [data-beat]').click()")
+        await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=15000)
+        pre3 = await p3.evaluate("document.getElementById('pGhost').textContent")
+        check('«Bátelo» en la clasificación abre el reto de esa fila', 'Leire' in pre3, pre3)
+        await p3.close()
+        p4 = await ctx.new_page()
+        p4.on('pageerror', lambda e: errors.append(f'pageerror (enlace corto): {e}'))
+        await route_local_three(p4)
+        await p4.goto(short, wait_until='domcontentloaded', timeout=120000)
+        await p4.wait_for_function("document.getElementById('pre').classList.contains('on')", timeout=180000)
+        pre4 = await p4.evaluate("document.getElementById('pGhost').textContent")
+        check('el enlace corto abre el reto de Ane desde el servidor', 'Ane' in pre4, pre4)
+        await ctx.close()
         await b.close()
     srv.shutdown()
     for e in errors:

@@ -134,3 +134,52 @@ export function ghostTime(g, d) {
   const f = c[hi] === c[lo] ? 0 : (d - c[lo]) / (c[hi] - c[lo]), dur = hi === n ? g.raw - (n - 1) * GDT : GDT;
   return lo * GDT + f * dur;
 }
+
+/* ================= validación antitrampas =================
+   Repite la carrera a partir del fantasma: cinemática muestra a muestra, distancia,
+   campanas, regalos perdidos y total. El servidor guarda SU total, no el declarado. */
+/* ¿está abierta la puerta `day` en `now` (hora de Madrid)? La 1 se abre ya en noviembre para calentar. */
+export function dayOpen(day, now = new Date(), season = SEASON) {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit'}).format(now).split('-').map(Number);
+  if (y > season) return true;
+  if (y < season) return false;
+  return m === 12 ? d >= day : day === 1 && m >= 11;
+}
+export function validateRun(g, {now = new Date(), season = SEASON, allowAnyDay = false} = {}) {
+  const errs = [], fail = e => {if (!errs.includes(e)) errs.push(e)};
+  if (g.season !== season) fail('temporada');
+  if (!allowAnyDay && !dayOpen(g.day, now, season)) fail('día cerrado');
+  if (!cleanName(g.name)) fail('nombre');
+  const v = g.v, n = v.length, last = g.raw - (n - 1) * GDT;
+  if (!(n >= 20 && last > 0 && last <= GDT + 0.002)) {fail('duración'); return {ok: false, errs}}
+  const T = trackFor(g.day), bells = bellsFor(T), dur = i => i === n - 1 ? last : GDT;
+  const tolV = 2 * VQ, upN = (ACC + 0.05) * GDT + tolV, upT = (ACC + TURBO_ACC + 0.05) * GDT + tolV, down = (HARD + DRAG + 0.05) * GDT + tolV;
+  let dist = 0, above = 0, boost = 0, kicks = 0, drops = 0, charge = 0, stress = 0, lost = 0, combo = 0, bonus = 0, hits = 0, bi = 0;
+  for (let i = 0; i < n; i++) {
+    const vi = v[i], dt = dur(i), dv = i ? vi - v[i - 1] : Math.max(0, vi - 9); // la salida perfecta arranca a 9 m/s
+    if (vi < 0 || vi > VTURBO + VQ) fail('velocidad');
+    if (vi > VMAX + VQ) above += dt;
+    if (dv > upN) {if (dv <= upT) boost += GDT; else if (dv <= upT + TURBO_KICK) kicks++; else fail('aceleración')}
+    if (dv < -down) drops++;
+    const vs = vsNow(T, dist);
+    if (turboCharging(vs, vi)) charge += dt;
+    const over = vi / vs - 1; if (over > 0.03) stress += over * 3.6 * dt; else stress = Math.max(0, stress - dt);
+    if (stress >= 1) {lost++; stress = 0.4}
+    const d2 = dist + vi * dt;
+    while (bi < bells.length && d2 >= bells[bi].s) {if (vi >= bells[bi].v - VQ) {combo++; hits++; bonus += bellBonus(combo)} else combo = 0; bi++}
+    dist = d2;
+  }
+  const maxTurbos = Math.floor(charge / TURBO_FILL) + 1, slack = TURBO_DUR + (VTURBO - VMAX) / VDECAY;
+  if (g.turbos > maxTurbos) fail('turbos');
+  if (above > g.turbos * slack + 0.5) fail('tiempo con turbo');
+  if (boost > g.turbos * (TURBO_DUR + GDT) + 0.5) fail('aceleración con turbo');
+  if (kicks > 2 * g.turbos + 1) fail('empujones');
+  if (drops > 2 * g.lost + 2) fail('frenazos');
+  if (g.lost < lost - 1) fail('regalos');
+  if (dist < T.L - 1) fail('distancia');
+  if (g.bells > hits + 1) fail('campanas');
+  const total = g.raw + PEN_GIFT * g.lost - bonus, ideal = medals(T, bells).ideal;
+  if (g.total < total - 1) fail('total');
+  if (total < ideal * 0.97) fail('imposible');
+  return {ok: errs.length === 0, errs, total, bells: hits, lost: g.lost, dist, ideal};
+}

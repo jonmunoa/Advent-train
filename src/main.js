@@ -7,7 +7,8 @@ import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
-import {VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medals,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
+import CFG from '../config.js';
+import {SEASON,VTURBO,TURBO_DUR,TURBO_KICK,TURBO_FILL,VDECAY,turboCharging,turboGood,accel,vsNow,STEP,VMAX,ACC,BRAKE,HARD,DRAG,TAIL,PEN_GIFT,SLIP_V,SLIP_T,STFR,GDT,bellBonus,rng,wrapA,seedOf,trackPts,buildTrack,atT,vsAtT,veAtT,bellsFor,curvesOf,medals,encodeGhost,decodeGhost,ghostCum,ghostDist,ghostTime,cleanName} from './sim.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled=true;
 
@@ -26,7 +27,7 @@ const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(ne
 const tick=()=>new Promise(r=>setTimeout(r,0));
 
 /* ================= datos ================= */
-const TAG='TU-TAG-21',SITE_URL='https://tu-dominio.es/';
+const TAG=CFG.TAG||'TU-TAG-21',SITE_URL=CFG.SITE_URL||'';
 const NAMES=['Alrededor del árbol','Bosque de abetos','Lago helado','Pueblo de las luces','Colina del reno','Valle de los muñecos','Estación del Polo','Curvas de turrón','Sendero de bastones','Aldea de los elfos','Paso de la ventisca','Río de chocolate','Plaza del belén','Túnel de estrellas','Granja de renos','Mercadillo navideño','Cumbre nevada','Fábrica de juguetes','Bahía de hielo','Camino de los Reyes','Bosque encantado','Pista del trineo','Noche de luces','Nochebuena Express'];
 const STN=['Polo Norte','Villa Abeto','Taller de Elfos','Pino Alto','Monte Reno','Valle Nevado','Plaza Mayor','Calle Turrón','Cueva de Hielo','Granja Cascabel','Puente Viejo','Mirador'];
 const PRODUCTS=[['Tren navideño para poner alrededor del árbol','tren navidad arbol'],['Tren de vapor navideño con luces y sonido','tren navidad luces sonido'],['Tren eléctrico de juguete con vías','tren electrico juguete vias'],['Pueblo navideño con tren en movimiento','pueblo navideño tren'],['Tren de Navidad a pilas para niños','tren navidad pilas niños'],['Tren navideño de madera','tren navidad madera'],['Tren de Navidad que echa humo','tren navidad humo'],['Tren navideño con mando a distancia','tren navidad mando distancia']];
@@ -541,17 +542,21 @@ $('bMusic').onclick=()=>{music=!music;store.set('advx-music',music?'1':'0');setT
 $('bSfx').onclick=()=>{sfx=!sfx;store.set('advx-sfx',sfx?'1':'0');setTog();au()};
 
 /* ================= clasificación ================= */
-const Board={online:false,db:null,uid:null,failed:false,
-  init(){this.ready=(async()=>{try{if(!window.claude||!window.claude.use)return;const db=await withTimeout(window.claude.use('db'),10000);if(!db)return;const u=await window.claude.use('user');const id=u?await u.id():null;if(!id)return;this.db=db;this.uid=id;this.online=true}catch(e){}})();return this.ready},
+const SB=CFG.SUPABASE_URL&&CFG.SUPABASE_KEY?{url:CFG.SUPABASE_URL.replace(/\/$/,''),key:CFG.SUPABASE_KEY}:null;
+function deviceId(){let d=store.get('advx-device');if(!d||!/^[0-9a-f-]{36}$/i.test(d)){const b=crypto.getRandomValues(new Uint8Array(16));b[6]=b[6]&15|64;b[8]=b[8]&63|128;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');d=`${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;store.set('advx-device',d)}return d}
+const Board={online:!!SB,
+  async rest(q){const r=await withTimeout(fetch(`${SB.url}/rest/v1/${q}`,{headers:{apikey:SB.key}}),9000);if(!r.ok)throw new Error('db '+r.status);return r.json()},
   local(d){try{return JSON.parse(store.get('advx-lb-'+d)||'[]')}catch(e){return[]}},
-  async top(d,n){await this.ready;const me=(store.get('advx-name')||'').trim();
-    if(this.online){try{const f='d'+d,snap=await withTimeout(this.db.collection('runs').where(f,'>',0).orderBy(f).limit(n).get(),9000);
-      return {src:'online',rows:snap.docs.map(x=>{const v=x.data()||{};return {name:String(v.alias||'Anónimo').slice(0,16),t:+v[f],me:x.id===this.uid}})}}catch(e){}}
+  async top(d,n){const me=(store.get('advx-name')||'').trim(),mine=+store.get('advx-run-'+d)||0;
+    if(SB){try{const rows=await this.rest(`runs?select=id,name,total_ms&season=eq.${SEASON}&day=eq.${d}&order=total_ms.asc,id.asc&limit=${n}`);
+      return {src:'online',rows:rows.map(r=>({id:r.id,name:String(r.name).slice(0,16),t:r.total_ms/1000,me:r.id===mine}))}}catch(e){}}
     return {src:'local',rows:this.local(d).sort((a,b)=>a.t-b.t).slice(0,n).map(r=>({...r,me:!!me&&r.name===me}))}},
-  async submit(d,name,t){t=Math.round(t*10)/10;const L=this.local(d),ex=L.find(r=>r.name===name);if(ex){ex.t=Math.min(ex.t,t)}else L.push({name,t});store.set('advx-lb-'+d,JSON.stringify(L.sort((a,b)=>a.t-b.t).slice(0,50)));
-    if(this.online&&!this.failed){try{const ref=this.db.collection('runs').doc(this.uid),s=await withTimeout(ref.get(),8000),cur=s.exists?{...s.data()}:{},f='d'+d;cur.alias=name;if(!(cur[f]>0)||t<cur[f])cur[f]=t;await withTimeout(ref.set(cur),8000);return true}catch(e){this.failed=true}}return false}
+  async submit(d,name,t,code){t=Math.round(t*10)/10;const L=this.local(d),ex=L.find(r=>r.name===name);if(ex){ex.t=Math.min(ex.t,t)}else L.push({name,t});store.set('advx-lb-'+d,JSON.stringify(L.sort((a,b)=>a.t-b.t).slice(0,50)));
+    if(!SB||!code)return {ok:false,local:true};
+    try{const r=await withTimeout(fetch(`${SB.url}/functions/v1/submit-run`,{method:'POST',headers:{apikey:SB.key,'Content-Type':'application/json'},body:JSON.stringify({ghost:code,device:deviceId()})}),12000),j=await r.json().catch(()=>({}));
+      if(r.ok&&j.id){store.set('advx-run-'+d,j.id);return {ok:true,...j}}return {ok:false,status:r.status,...j}}catch(e){return {ok:false}}},
+  async ghost(id){if(!SB)throw new Error('sin servidor');const [r]=await this.rest(`runs?select=name,ghost&id=eq.${id}&season=eq.${SEASON}`);if(!r)throw new Error('no existe');const g=await decodeGhost(r.ghost);return {...g,name:r.name,code:'i'+id.toString(36)}}
 };
-Board.init();
 
 /* ================= juego ================= */
 let mode='home',camMode=store.get('advx-cam')||'tp',G=null,flashT=0,timeScale=1,GH=null;
@@ -742,7 +747,7 @@ async function fillPre(){mode='pre';
   $('pMed').innerHTML=[['m1','Oro',MED.g],['m2','Plata',MED.s],['m3','Bronce',MED.b]].map(([c,n,t],i)=>`<div class="${md&&md<=i+1?'got':''}"><i class="med ${c}"></i><span>${n}</span><b>${fmt(t)}</b></div>`).join('');
   $('pGhost').innerHTML=GH?(GH.src==='amigo'?`<b>Reto de ${esc(GH.name||'un amigo')}: ${fmt(GH.total)}</b>. Su fantasma dorado irá contigo.`:`Competirás contra tu fantasma: ${fmt(GH.total)}`):'Tu primer viaje dejará un fantasma para batirlo después.';
   document.querySelectorAll('#punch button').forEach(b=>b.classList.toggle('on',b.dataset.cam===camMode));
-  $('pLB').innerHTML='<li><span>Cargando…</span></li>';const res=await Board.top(DAY.d,5);if(mode==='pre')$('pLB').innerHTML=res.rows.length?res.rows.map((r,i)=>`<li><span>${i+1}. ${esc(r.name)}</span><b>${fmt(r.t)}</b></li>`).join(''):'<li><span>Nadie ha viajado aún. ¡Estrénalo!</span></li>'}
+  $('pLB').innerHTML='<li><span>Cargando…</span></li>';const res=await Board.top(DAY.d,5);if(mode==='pre')$('pLB').innerHTML=res.rows.length?res.rows.map((r,i)=>`<li><span>${i+1}. ${esc(r.name)}</span><b>${fmt(r.t)}</b>${r.id&&!r.me?`<button class="beat" type="button" data-beat="${r.id}" aria-label="Retar el fantasma de ${esc(r.name)}">Bátelo</button>`:''}</li>`).join(''):'<li><span>Nadie ha viajado aún. ¡Estrénalo!</span></li>'}
 document.querySelectorAll('#punch button').forEach(b=>b.onclick=()=>{camMode=b.dataset.cam;store.set('advx-cam',camMode);document.querySelectorAll('#punch button').forEach(x=>x.classList.toggle('on',x===b))});
 function goHome(){mode='home';input.thr=false;windSet(0);show('home');renderHome();try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
 function startRace(quick){au();windOn();newRun();poseTrain(0,0);lastKey='';show('hud');mode='count';G.cd=quick?2.6:3.6;cdShown=4;$('hLap').textContent=`DÍA ${DAY.d} · ${DAY.name.toUpperCase()}`;
@@ -785,7 +790,7 @@ function showEnd(){
 /* compartir al estilo Wordle: sin nombre ni forma del circuito */
 const siteUrl=()=>SITE_URL&&!/tu-dominio/.test(SITE_URL)?SITE_URL:location.origin+location.pathname;
 let lastMedal=0;
-function shareUrl(){return siteUrl()+(G&&G.code?'#reto-'+G.code:'#dia-'+DAY.d)}
+function shareUrl(){return siteUrl()+(G&&G.short?'#reto-'+G.short:G&&G.code?'#reto-'+G.code:'#dia-'+DAY.d)}
 function shareText(){const sq=BELLS.map(b=>b.st===1?'🟨':'⬛').join('');
   return [`🚂 Adviento Express · Día ${DAY.d}`,`${['🎟️','🥇','🥈','🥉'][lastMedal]} ${fmt(G.total)}`,`🔔 ${sq} ${G.bells}/${BELLS.length}`,`🎁 ${giftsOn()}/3`+(G.turbos?` · 🚀×${G.turbos}`:'')+(G.bestCombo>1?` · combo ×${G.bestCombo}`:''),...(GH&&GH.src==='amigo'?[G.total<GH.total?`⚔️ Le he ganado a ${GH.name||'mi amigo'} por ${(GH.total-G.total).toFixed(1).replace('.',',')} s`:`⚔️ ${GH.name||'Mi amigo'} me gana por ${(G.total-GH.total).toFixed(1).replace('.',',')} s`]:[]),'¿Me ganas? Bate a mi fantasma:'].join('\n')}
 let shareSeq=0;
@@ -795,12 +800,18 @@ function renderShare(medal){lastMedal=medal;const txt=shareText(),url=shareUrl()
   $('share').innerHTML=(navigator.share?`<button class="s-sh" id="bShare" type="button">Compartir</button>`:'')+`<a class="s-wa" href="https://wa.me/?text=${encodeURIComponent(all)}" target="_blank" rel="noopener">WhatsApp</a><a class="s-x" href="https://twitter.com/intent/tweet?text=${t}&url=${u}" target="_blank" rel="noopener">X</a><a class="s-tg" href="https://t.me/share/url?url=${u}&text=${t}" target="_blank" rel="noopener">Telegram</a><button class="s-cp" id="bCopy" type="button">Copiar</button>`;
   if(navigator.share)$('bShare').onclick=()=>navigator.share({title:'Adviento Express',text:txt,url}).catch(()=>{});
   $('bCopy').onclick=async()=>{try{await navigator.clipboard.writeText(all);$('bCopy').textContent='¡Copiado!'}catch(e){$('bCopy').textContent='No se pudo'}}}
-function renderDep(res,hl){$('eLB').innerHTML=(res.rows.length?res.rows.map((r,i)=>`<div class="r ${r.me||(hl&&r.name===hl)?'me':''}" style="animation-delay:${i*70}ms"><span>${String(i+1).padStart(2,'0')}</span><span>${esc(r.name)}</span><span>${fmt(r.t)}</span></div>`).join(''):'<div class="r"><span>--</span><span>SIN LLEGADAS TODAVÍA</span><span>-:--.-</span></div>')+`<p class="src">${res.src==='online'?'Clasificación compartida':'Clasificación de este dispositivo'}</p>`}
+function renderDep(res,hl){$('eLB').innerHTML=(res.rows.length?res.rows.map((r,i)=>`<div class="r ${r.me||(hl&&r.name===hl)?'me':''}" style="animation-delay:${i*70}ms"><span>${String(i+1).padStart(2,'0')}</span><span>${esc(r.name)}</span><span>${fmt(r.t)}</span><span>${r.id&&!r.me?`<button class="beat" type="button" data-beat="${r.id}" aria-label="Retar el fantasma de ${esc(r.name)}">Bátelo</button>`:''}</span></div>`).join(''):'<div class="r"><span>--</span><span>SIN LLEGADAS TODAVÍA</span><span>-:--.-</span><span></span></div>')+`<p class="src">${res.src==='online'?'Clasificación compartida':'Clasificación de este dispositivo'}</p>`}
 $('iName').addEventListener('input',()=>{clearTimeout(refreshCode.h);refreshCode.h=setTimeout(refreshCode,300)});
 $('fName').addEventListener('submit',async e=>{e.preventDefault();const n=$('iName').value.trim().replace(/\s+/g,' ').slice(0,16);if(!n||!G||!G.total)return;
   store.set('advx-name',n);$('bSave').disabled=true;$('bSave').textContent='Fichando…';
-  const ok=await Board.submit(DAY.d,n,G.total);$('bSave').textContent=ok||!Board.online?'Fichado':'Fichado aquí';
+  const code=await encodeGhost({...G.run,name:n}).catch(()=>null),r=await Board.submit(DAY.d,n,G.total,code);
+  $('bSave').textContent=r.ok?(r.mejor?`Fichado · ${r.rank}º`:'Fichado'):r.status===422?'Tiempo no válido':r.status===429?'Espera un momento':Board.online?'Fichado aquí':'Fichado';
+  if(r.ok&&r.mejor){G.short='i'+r.id.toString(36);renderShare(lastMedal)}
   renderDep(await Board.top(DAY.d,10),n)});
+/* «Bátelo»: corre contra el fantasma de cualquiera de la clasificación */
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-beat]');if(!b||busy)return;busy=true;b.disabled=true;b.textContent='…';
+  try{CH=await Board.ghost(+b.dataset.beat);if(CH.day!==DAY.d)throw new Error('día');await loadGhost();newRun();poseTrain(0,0);try{history.replaceState(null,'','#reto-'+CH.code)}catch(_){}show('pre');fillPre()}
+  catch(err){CH=null;b.textContent='No disponible'}busy=false});
 
 /* ================= controles ================= */
 const racing=()=>mode==='race'||mode==='count';
@@ -896,7 +907,7 @@ window.__adv={turbo,turboGood:()=>!!G&&G.tb>=1&&G.turbo<=0&&turboGood(T,G.dist,G
 drawArt();renderHome();
 async function boot(){let hd=0;const h=location.hash,m=/^#dia-(\d+)$/.exec(h);
   if(m)hd=+m[1];
-  else if(h.startsWith('#reto-')){try{const code=h.slice(6),g=await decodeGhost(code);CH={...g,code};hd=g.day}catch(e){$('tTxt').innerHTML='Este enlace de reto está roto o es de una versión antigua. ¡Abre la puerta de hoy y crea el tuyo!'}}
+  else if(h.startsWith('#reto-')){try{const code=h.slice(6),g=code[0]==='i'?await Board.ghost(parseInt(code.slice(1),36)):{...await decodeGhost(code),code};CH=g;hd=g.day}catch(e){$('tTxt').innerHTML='Este enlace de reto está roto o es de una versión antigua. ¡Abre la puerta de hoy y crea el tuyo!'}}
   if(hd<1||hd>24)return;
   if(!isOpen(hd)){$('tTxt').innerHTML=`<b>${esc(CH?CH.name||'Tu amigo':'Este enlace')}</b> te reta en la puerta <b>${hd}</b>, que se abre el ${hd} de diciembre. ¡Vuelve ese día!`;CH=null;return}
   setTimeout(()=>{const el=document.querySelector(`.door[data-d="${hd}"]`);if(el)openDoor(el,hd)},300)}
