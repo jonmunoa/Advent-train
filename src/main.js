@@ -40,7 +40,7 @@ const DAYS=Array.from({length:24},(_,i)=>({d:i+1,name:NAMES[i],laps:1,th:THEMES[
 const DAY1=[[180,300],[500,190],[820,300],[870,600],[770,900],[580,870],[470,1020],[220,970],[130,640]].map(([x,y])=>[(x-500)*0.32,(y-600)*0.32]);
 const ORDER=[7,19,1,12,24,3,15,9,22,5,17,11,2,20,8,14,23,6,10,18,4,21,13,16];
 const SPAN={24:'w h',1:'w',6:'h',13:'w',18:'h',9:'w',20:'h',3:'w',15:'w',11:'h'};
-const STEP=0.5,VMAX=30,ACC=6.4,BRAKE=9,HARD=13,ALAT=6.6,PEN_DER=3,BELL_BONUS=0.5;
+const TAIL=16,STEP=0.5,VMAX=30,ACC=6.4,BRAKE=9,HARD=13,ALAT=6.6,PEN_GIFT=2,SLIP_V=0.75,SLIP_T=0.7,BELL_BONUS=0.5;
 const bellBonus=c=>BELL_BONUS*Math.min(2,1+0.25*(c-1));
 const STFR=[0.2,0.52,0.8];
 let OFFS=[0,-8.6,-16.2,-23.8],GAUGE=1.24;const RAILY=0.72;
@@ -306,7 +306,10 @@ function buildTrack(pts){
   for(let i=0;i<N;i++){const p=(i-1+N)%N,q=(i+1)%N;a[i]=Math.atan2(z[q]-z[p],x[q]-x[p])}
   const w=Math.round(6/ds);for(let i=0;i<N;i++){const k=Math.abs(wrapA(a[(i+w)%N]-a[(i-w+N)%N]))/(2*w*ds);vs0[i]=Math.min(VMAX,Math.sqrt(ALAT/Math.max(k,1e-5)))}
   const m=Math.round(8/ds);for(let i=0;i<N;i++){let v=VMAX;for(let j=-m;j<=m;j+=2)v=Math.min(v,vs0[(i+j+N)%N]);vs[i]=v}
-  return {x,z,a,vs,N,L,ds};
+  // envolvente: velocidad máxima en cada punto para que morro y cola estén por debajo de vs y dé tiempo a frenar (soltando) antes de la siguiente curva
+  const tl=Math.round(TAIL/ds),ve=new Float32Array(N);for(let i=0;i<N;i++)ve[i]=Math.min(vs[i],vs[(i-tl+N)%N]);
+  for(let pass=0;pass<2;pass++)for(let i=N-1;i>=0;i--){const j=(i+1)%N;ve[i]=Math.min(ve[i],Math.sqrt(ve[j]*ve[j]+2*BRAKE*ds))}
+  return {x,z,a,vs,ve,N,L,ds};
 }
 const at=s=>{s=((s%T.L)+T.L)%T.L;const f=s/T.ds,i=Math.floor(f)%T.N,j=(i+1)%T.N,t=f-Math.floor(f);return {x:lerp(T.x[i],T.x[j],t),z:lerp(T.z[i],T.z[j],t),a:T.a[i]+wrapA(T.a[j]-T.a[i])*t}};
 const vsAt=s=>T.vs[Math.floor((((s%T.L)+T.L)%T.L)/T.ds)%T.N];
@@ -503,9 +506,9 @@ function buildMini(){
   mini={P,tr:$('mtr'),gh:$('mgh')};
 }
 /* simulación de un maquinista perfecto para fijar medallas */
-function vsAhead(dist,v){const span=Math.max(20,v*v/16+12);let m=VMAX;for(let s=0;s<=span;s+=2)m=Math.min(m,vsAt(dist+s));return m}
-function medals(){let v=0,dist=0,t=0,bonus=0,combo=0,bi=0;const dt=1/30;
-  for(let k=0;k<30000&&dist<T.L;k++){const va=vsAhead(dist,v);const thr=v<va*0.97;
+function vsAhead(dist){return T.ve[Math.floor((((dist%T.L)+T.L)%T.L)/T.ds)%T.N]}
+function medals(){let v=9,dist=0,t=0,bonus=0,combo=0,bi=0;const dt=1/60;// sale con «salida perfecta» y va justo a la velocidad de la envolvente
+  for(let k=0;k<60000&&dist<T.L;k++){const thr=v<vsAhead(dist);
     if(thr)v+=ACC*(1-0.5*v/VMAX)*dt;else v-=BRAKE*dt;v=Math.max(0,Math.min(VMAX,v-0.25*dt));dist+=v*dt;t+=dt;
     while(bi<BELLS.length&&dist>=BELLS[bi].s){if(v>=BELLS[bi].v){combo++;bonus+=bellBonus(combo)}else combo=0;bi++}}
   const ideal=t-bonus;const r1=x=>Math.round(x*10)/10;
@@ -522,13 +525,12 @@ const ding=()=>{tone(2093,0.9,'sine',0.09);tone(3136,0.6,'sine',0.04,0.02);tone(
 const dull=()=>{tone(220,0.25,'triangle',0.06);noise(0.12,0.05,600)};
 const perfectS=()=>[1568,2093,2637,3136].forEach((f,i)=>tone(f,0.5,'triangle',0.06,i*0.06));
 const whistle=()=>{tone(740,1.1,'triangle',0.07);tone(932,1.1,'triangle',0.05);tone(1109,1.1,'triangle',0.03)};
-const crash=()=>{noise(0.9,0.5,1200);tone(90,0.6,'sawtooth',0.08)};
 const beep=hi=>tone(hi?1046:523,hi?0.6:0.22,'square',0.06);
 const creak=()=>{noise(0.5,0.08,900,'bandpass');tone(180,0.35,'sawtooth',0.02)};
 const hiss=()=>noise(0.45,0.07,3500,'highpass');
 let wind=null;
 function windOn(){if(!ac||wind)return;const s=ac.createBufferSource();s.buffer=nb();s.loop=true;const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=600;const g=ac.createGain();g.gain.value=0;s.connect(f);f.connect(g);g.connect(ac.destination);s.start();wind={s,f,g}}
-function windSet(v){if(!wind)return;const x=sfx&&(mode==='race'||mode==='derail')?Math.pow(v/VMAX,2)*0.11:0;wind.g.gain.setTargetAtTime(x,ac.currentTime,0.15);wind.f.frequency.setTargetAtTime(400+v*45,ac.currentTime,0.2)}
+function windSet(v){if(!wind)return;const x=sfx&&mode==='race'?Math.pow(v/VMAX,2)*0.11:0;wind.g.gain.setTargetAtTime(x,ac.currentTime,0.15);wind.f.frequency.setTargetAtTime(400+v*45,ac.currentTime,0.2)}
 // Villancicos de dominio público: Jingle Bells (1857), We Wish You a Merry Christmas y Deck the Halls (tradicionales)
 const m2f=m=>440*Math.pow(2,(m-69)/12);
 const cG=[43,'M'],cC=[48,'M'],cD=[50,'M'],cD7=[50,'7'],cA7=[45,'7'],cB7=[47,'7'],cEm=[40,'m'];
@@ -558,7 +560,7 @@ function vSleigh(t,acc,v){const s=ac.createBufferSource(),f=ac.createBiquadFilte
   tr.frequency.value=34;tg.gain.value=0.5;tr.connect(tg);const amp=ac.createGain();amp.gain.value=0.5;tg.connect(amp.gain);
   g.gain.setValueAtTime((acc?0.09:0.05)*v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);s.connect(f);f.connect(amp);amp.connect(g);g.connect(mus.out);s.start(t,Math.random()*.5,0.18);tr.start(t);tr.stop(t+0.2)}
 function musicTick(){if(!ac)return;if(!mus){if(!music)return;musInit();if(!mus)return}
-  const target=music?(mode==='race'||mode==='count'||mode==='derail'?0.42:0.95):0;mus.out.gain.setTargetAtTime(target,ac.currentTime,0.4);
+  const target=music?(mode==='race'||mode==='count'?0.42:0.95):0;mus.out.gain.setTargetAtTime(target,ac.currentTime,0.4);
   if(!music){mus.start=ac.currentTime+0.5;mus.i=0;return}
   if(mus.start<ac.currentTime-0.5&&mus.i===0)mus.start=ac.currentTime+0.1;
   const hor=ac.currentTime+0.3;
@@ -586,14 +588,18 @@ Board.init();
 let mode='home',camMode=store.get('advx-cam')||'tp',G=null,flashT=0,timeScale=1,GH=null;
 const input={thr:false,brk:false};
 function loadGhost(){try{GH=JSON.parse(store.get('advx-gh-'+DAY.d)||'null')}catch(e){GH=null}}
-function newRun(){G={dist:0,v:0,stress:0,time:0,pen:0,der:0,bells:0,combo:0,bestCombo:0,bonus:0,vmax:0,ci:0,bi:0,debris:null,dT:0,chuff:0,cd:0,smokeAcc:0,tr:[],trT:0,heldAtGo:false,ps:false,fin:0,splits:[]};
-  cars.forEach((c,i)=>{if(i){const g=c.userData.gift;g.visible=true;g.scale.setScalar(g.userData.s0)}});BELLS.forEach(b=>{b.st=0;b.g.visible=true;b.g.scale.setScalar(1);b.rg.visible=true});loadGhost();ghost.visible=!!GH;
+function newRun(){G={dist:0,v:0,stress:0,time:0,pen:0,lost:0,slip:0,reload:0,bells:0,combo:0,bestCombo:0,bonus:0,vmax:0,ci:0,bi:0,chuff:0,cd:0,smokeAcc:0,tr:[],trT:0,heldAtGo:false,ps:false,fin:0,splits:[]};
+  cars.forEach((c,i)=>{if(i){const g=c.userData.gift;g.visible=true;g.scale.setScalar(g.userData.s0);g.position.z=0;g.rotation.set(0,i,0);delete c.userData.pop}});
+  loose.forEach(L=>scene.remove(L.o));loose.length=0;fly=null;if(flyer)flyer.visible=false;BELLS.forEach(b=>{b.st=0;b.g.visible=true;b.g.scale.setScalar(1);b.rg.visible=true});loadGhost();ghost.visible=!!GH;
   BELLS.forEach((b,i)=>{const el=$('mb'+i);if(el)el.setAttribute('fill','#6fe39a')})}
 const tmpV=new THREE.Vector3(),tmpV2=new THREE.Vector3();
 let wheelAng=0;
 function poseCar(c,s,j,roll){const p=at(s),q=at(s+2),b=at(s-2),yaw=Math.atan2(q.z-b.z,q.x-b.x);c.position.set(p.x-Math.sin(yaw)*j,0,p.z+Math.cos(yaw)*j);c.rotation.set(roll,-yaw,0,'YXZ')}
-function poseTrain(dist,stress){
-  cars.forEach((c,i)=>{const j=stress>0.25?Math.sin(performance.now()/30+i*1.7)*stress*0.12:0;poseCar(c,dist+OFFS[i],j,stress>0.25?Math.sin(performance.now()/45+i)*stress*0.05:0)});
+const turnSign=s=>Math.sign(wrapA(at(s+4).a-at(s-4).a))||1;
+function poseTrain(dist,stress){const tt=performance.now();
+  cars.forEach((c,i)=>{const s=dist+OFFS[i],sg=stress>0.05?turnSign(s):0,j=stress>0.25?Math.sin(tt/30+i*1.7)*stress*0.08:0;
+    poseCar(c,s,j,-sg*stress*0.16+(stress>0.25?Math.sin(tt/45+i)*stress*0.03:0));
+    const g=c.userData.gift;if(g&&g.visible&&!(c.userData.pop<1)){g.position.z=-sg*stress*0.55;g.rotation.x=Math.sin(tt/55+i*2.3)*stress*0.22;g.rotation.z=Math.sin(tt/70+i)*stress*0.12}});
   train.updateMatrixWorld(true);
 }
 function spinWheels(ds){cars.forEach(c=>c.userData.wheels.forEach(w=>{w.rotation.x+=ds/Math.max(0.6,c.userData.wr)}))}
@@ -601,30 +607,40 @@ function ghostDistAt(t){if(!GH)return 0;const tr=GH.tr,f=t*20,i=Math.floor(f);if
 function ghostTimeAt(d){if(!GH)return null;const tr=GH.tr;let lo=0,hi=tr.length-1;if(d>=tr[hi])return hi/20;while(hi-lo>1){const m=(lo+hi)>>1;if(tr[m]<d)lo=m;else hi=m}const f=tr[hi]===tr[lo]?0:(d-tr[lo])/(tr[hi]-tr[lo]);return (lo+f)/20}
 function flash(t,d,cls){const m=$('msg');m.textContent=t;m.className='msg on'+(cls?' '+cls:'');flashT=d}
 function toast(t,cls){const el=$('split');el.innerHTML=t;el.className='split on '+(cls||'');clearTimeout(toast.h);toast.h=setTimeout(()=>el.className='split',2600)}
-function derail(){G.der++;G.pen+=PEN_DER;G.dT=2.2;mode='derail';
-  G.debris=cars.map((c,i)=>{const fw2=new THREE.Vector3(1,0,0).applyEuler(c.rotation);return {v:fw2.multiplyScalar(G.v*(0.7-i*0.08)).add(new THREE.Vector3((Math.random()-.5)*8,4+Math.random()*5,(Math.random()-.5)*8)),w:new THREE.Vector3((Math.random()-.5)*3,(Math.random()-.5)*4,(Math.random()-.5)*3)}});
-  spark(cars[0].position.clone().setY(1),50,14);crash();flash('¡Descarrilado! +3 s',1.6,'bad');G.v=0;G.stress=0;grade.uniforms.flash.value=0.25}
+/* regalos que se caen: castigo por pasarse de velocidad en curva */
+const loose=[];
+const groundY=(x,z)=>{const d=dTrack(x,z);return d<GAUGE+1.4?0.3:d<GAUGE+1.6?0:matH(x,z,d)};
+const giftsOn=()=>cars.reduce((n,c,i)=>n+(i&&(c.userData.gift.visible||(fly&&fly.car===c))?1:0),0);
+function loseGift(vs){G.pen+=PEN_GIFT;G.lost++;G.slip=SLIP_T;G.stress=0.4;G.v=Math.min(G.v,vs*SLIP_V);
+  let car=null;for(let i=1;i<cars.length;i++){const c=cars[i];if(c.userData.gift.visible&&!(c.userData.pop<1)&&!(fly&&fly.car===c)){car=c;break}}
+  if(car){const g=car.userData.gift,o=g.clone(),p=at(G.dist+OFFS[cars.indexOf(car)]),sg=turnSign(G.dist),nx=-Math.sin(p.a),nz=Math.cos(p.a);
+    g.getWorldPosition(o.position);g.getWorldQuaternion(o.quaternion);g.getWorldScale(o.scale);o.rotation.setFromQuaternion(o.quaternion);scene.add(o);g.visible=false;
+    const out=-sg*(5+G.v*0.25);loose.push({o,v:new THREE.Vector3(Math.cos(p.a)*G.v*0.8+nx*out,7+Math.random()*2,Math.sin(p.a)*G.v*0.8+nz*out),w:new THREE.Vector3((Math.random()-.5)*8,(Math.random()-.5)*6,(Math.random()-.5)*8),rest:false,b:0});
+    flash(`¡Regalo perdido! +${PEN_GIFT} s`,1.3,'bad');tone(140,0.3,'triangle',0.08);noise(0.25,0.12,900)}
+  else{flash(`¡Patinazo! +${PEN_GIFT} s`,1.1,'bad')}
+  noise(0.5,0.1,3200,'bandpass');tone(2400,0.4,'sawtooth',0.015);spark(cars[0].position.clone().setY(0.6),24,9);grade.uniforms.flash.value=0.12}
+function looseStep(dt){for(const L of loose){if(L.rest)continue;const o=L.o;L.v.y-=22*dt;o.position.addScaledVector(L.v,dt);o.rotation.x+=L.w.x*dt;o.rotation.y+=L.w.y*dt;o.rotation.z+=L.w.z*dt;
+  const gy=groundY(o.position.x,o.position.z);if(o.position.y<gy){o.position.y=gy;if(L.b++===0)puff(o.position.clone().setY(gy+0.5),new THREE.Vector3(0,1.5,0),2.2,.4,1.2);
+    L.v.y*=-0.28;L.v.x*=0.55;L.v.z*=0.55;L.w.multiplyScalar(0.5);o.rotation.x*=0.4;o.rotation.z*=0.4;if(L.v.lengthSq()<1.5||L.b>4){L.rest=true;o.rotation.x=0;o.rotation.z=0}}}}
+function reloadGift(st){const c=cars.find((c,i)=>i&&!c.userData.gift.visible);if(!c||fly||!flyer)return;fly={car:c,from:st.pileWorld.clone(),t:0};flyer.position.copy(fly.from);flyer.visible=true;G.reload++;tone(1568,0.25,'triangle',0.05);tone(2093,0.3,'triangle',0.04,0.1)}
 function race(dt){
   G.time+=dt;G.trT+=dt;while(G.trT>=0.05){G.trT-=0.05;G.tr.push(Math.round(G.dist*10)/10)}
-  if(input.thr)G.v+=ACC*(1-0.5*G.v/VMAX)*dt;else G.v-=(input.brk?HARD:BRAKE)*dt;
+  if(G.slip>0){G.slip-=dt;if(Math.random()<0.5)spark(tmpV.set(cars[0].position.x,0.5,cars[0].position.z),2,6)}
+  if(input.thr){if(G.slip<=0)G.v+=ACC*(1-0.5*G.v/VMAX)*dt}else G.v-=(input.brk?HARD:BRAKE)*dt;
   G.v=Math.max(0,Math.min(VMAX,G.v-0.25*dt));
   const ds=G.v*dt;G.dist+=ds;G.chuff+=ds;spinWheels(ds);
   if(G.chuff>3.2){G.chuff=0;if(G.v>0.5)noise(0.09,0.06+0.12*G.v/VMAX,600+G.v*25)}
-  const vs=Math.min(vsAt(G.dist),vsAt(G.dist-16)),over=G.v/vs-1;
+  const vs=Math.min(vsAt(G.dist),vsAt(G.dist-TAIL)),over=G.v/vs-1;
   if(over>0.03)G.stress+=over*3.6*dt;else G.stress=Math.max(0,G.stress-1.0*dt);
   if(G.stress>0.3&&Math.random()<0.6){spark(tmpV.set(cars[2].position.x,0.6,cars[2].position.z),2,5);if(Math.random()<0.12)tone(2600+Math.random()*600,0.12,'sawtooth',0.012)}
-  if(G.stress>=1){derail();return}
+  if(G.stress>=1)loseGift(vs);
   G.vmax=Math.max(G.vmax,G.v);
-  const CK=ST.slice().sort((a,b)=>a.s-b.s);if(G.ci<CK.length&&G.dist>=CK[G.ci].s){const o=CK[G.ci++];o.hop=1;split()}
+  const CK=ST.slice().sort((a,b)=>a.s-b.s);if(G.ci<CK.length&&G.dist>=CK[G.ci].s){const o=CK[G.ci++];o.hop=1;split();reloadGift(o)}
   while(G.bi<BELLS.length&&G.dist>=BELLS[G.bi].s){const b=BELLS[G.bi++],el=$('mb'+(G.bi-1));if(G.v>=b.v){b.st=1;G.bells++;G.combo++;G.bestCombo=Math.max(G.bestCombo,G.combo);const bb=bellBonus(G.combo);G.bonus+=bb;ding();if(G.combo>1)tone(1568+G.combo*120,0.4,'triangle',0.04,0.08);burst(b.g.position,60+G.combo*10,9,[4,3,.8]);flash(`¡Campana! −${bb.toFixed(2).replace(/0$/,'').replace('.',',')} s${G.combo>1?' · combo x'+G.combo:''}`,0.9,'good');if(el)el.setAttribute('fill','#f6c64e')}else{b.st=2;G.combo=0;dull();flash(`Muy lento para la campana (${b.kmh} km/h)`,1.1,'bad');if(el)el.setAttribute('fill','rgba(255,255,255,.25)')}}
   poseTrain(G.dist,G.stress);
   if(G.dist>=DAY.laps*T.L)startFinish();
 }
 function split(){const n=G.splits.length+1;G.splits.push(G.time);if(GH&&GH.sp&&GH.sp[n-1]!==undefined){const d=G.time-GH.sp[n-1];toast(`Estación ${n} · <b>${fmtD(d)} s</b>`,d<=0?'good':'bad')}else toast(`Estación ${n} · ${fmt(G.time)}`)}
-function derailStep(dt){G.time+=dt;G.dT-=dt;G.trT+=dt;while(G.trT>=0.05){G.trT-=0.05;G.tr.push(Math.round(G.dist*10)/10)}
-  cars.forEach((c,i)=>{const d=G.debris[i];d.v.y-=22*dt;c.position.addScaledVector(d.v,dt);if(c.position.y<0.2){c.position.y=0.2;d.v.y*=-0.25;d.v.x*=0.7;d.v.z*=0.7;d.w.multiplyScalar(0.6)}d.v.multiplyScalar(Math.exp(-0.8*dt));c.rotation.x+=d.w.x*dt;c.rotation.y+=d.w.y*dt;c.rotation.z+=d.w.z*dt});
-  train.updateMatrixWorld(true);
-  if(G.dT<=0){mode='race';poseTrain(G.dist,0);flash('¡Arriba! A seguir',0.9)}}
 function startFinish(){mode='finish';$('warn').className='warn';lastWarn='';$('edge').style.opacity=0;G.fin=0;input.thr=false;$('pedal').classList.remove('on');whistle();confettiBurst(cars[0].position.clone().setY(8));grade.uniforms.flash.value=0.35;
   const now=performance.now()/1000;for(let k=0;k<10;k++)fwQ.push({at:now+0.2+k*0.38,p:new THREE.Vector3(TC[0]+(Math.random()-.5)*60,treeR*2.6+10+Math.random()*30,TC[1]+(Math.random()-.5)*60)});
   G.total=Math.max(0,G.time+G.pen-G.bonus);$('cd').textContent='¡META!';const el=$('cd');el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop')}
@@ -645,7 +661,7 @@ function camTarget(kind,dt,outP,outL){
 const bez=(a,b,c,t,o)=>o.set((1-t)*(1-t)*a.x+2*(1-t)*t*b.x+t*t*c.x,(1-t)*(1-t)*a.y+2*(1-t)*t*b.y+t*t*c.y,(1-t)*(1-t)*a.z+2*(1-t)*t*b.z+t*t*c.z);
 const cinMid=new THREE.Vector3();
 function updateCam(dt){
-  const kind=(mode==='pre'||mode==='end')?'orbit':mode==='finish'?'finish':(mode==='derail'?'tp':camMode);
+  const kind=(mode==='pre'||mode==='end')?'orbit':mode==='finish'?'finish':camMode;
   camTarget(kind,dt,wantP,wantL);
   if(kind==='fp'&&camBlend>=1){camPos.copy(wantP);camLook.lerp(wantL,1-Math.exp(-7*dt))}
   else{const k=kind==='orbit'?2:kind==='finish'?3:5;camPos.lerp(wantP,1-Math.exp(-k*dt));camLook.lerp(wantL,1-Math.exp(-k*1.3*dt))}
@@ -653,9 +669,9 @@ function updateCam(dt){
     if(mode==='count'&&G&&G.cin){bez(camFromP,cinMid,wantP,e,camera.position)}else camera.position.lerpVectors(camFromP,wantP,e);
     camera.lookAt(tmpV.lerpVectors(camFromL,wantL,e));if(camBlend>=1){camPos.copy(wantP);camLook.copy(wantL)}}
   else{camera.position.copy(camPos);camera.lookAt(camLook)}
-  const v=G&&(mode==='race'||mode==='derail'||mode==='count')?G.v:0,vr=v/VMAX;
+  const v=G&&(mode==='race'||mode==='count')?G.v:0,vr=v/VMAX;
   if(mode==='race'&&v>2){const a=(camMode==='fp'?0.022:0.035)*vr,tt=performance.now()/1000;camera.position.x+=Math.sin(tt*37)*a;camera.position.y+=Math.sin(tt*53+1)*a}
-  if(G&&(mode==='race'||mode==='derail')&&G.stress>0.2){const s=G.stress*(camMode==='fp'?0.05:0.18);camera.position.x+=(Math.random()-.5)*s;camera.position.y+=(Math.random()-.5)*s}
+  if(G&&mode==='race'&&G.stress>0.2){const s=G.stress*(camMode==='fp'?0.05:0.18);camera.position.x+=(Math.random()-.5)*s;camera.position.y+=(Math.random()-.5)*s}
   const fov=(kind==='fp'?70:kind==='finish'?50:58)+vr*16;if(Math.abs(camera.fov-fov)>0.05){camera.fov=lerp(camera.fov,fov,1-Math.exp(-3*dt));camera.updateProjectionMatrix()}
   grade.uniforms.blur.value=coarse?0:(mode==='race'?Math.pow(Math.max(0,vr-0.45)/0.55,2)*(camMode==='fp'?0.007:0.005):0);
   grade.uniforms.tilt.value=coarse?0:lerp(grade.uniforms.tilt.value,(mode==='pre'||mode==='end'||mode==='finish')?1:0,1-Math.exp(-3*dt));
@@ -678,8 +694,7 @@ function hud(){
   sat('safeArc','d',arcP(-225,-225+Math.max(2,Math.round(va*3.6/120*270))));
   const nb=BELLS[G.bi];const ba=$('bellArc');if(nb&&nb.s-G.dist<90){const a=-225+nb.kmh/120*270;ba.setAttribute('d',arcP(a-2,a+2,78));ba.setAttribute('opacity','1')}else ba.setAttribute('opacity','0');
   let w='',c='';
-  if(mode==='derail'){w='RECOLOCANDO VAGONES';c='hot'}
-  else if(G.v>va*1.03){w='¡CURVA! FRENA';c='hot'}
+  if(G.v>va*1.03){w=giftsOn()?'¡CURVA! FRENA O PIERDES REGALOS':'¡CURVA! FRENA';c='hot'}
   else if(nb&&nb.s-G.dist<70&&nb.s-G.dist>0){const ok=G.v>=nb.v;w=`CAMPANA · ${nb.kmh} km/h ${ok?'✓':'¡MÁS VAPOR!'}`;c=ok?'ok':'st'}
   const k=w+c;if(k!==lastWarn){lastWarn=k;const el=$('warn');el.textContent=w;el.className='warn'+(w?' on '+c:'')}
   sst('edge','opacity',Math.min(1,G.stress*1.2).toFixed(2));
@@ -750,7 +765,7 @@ $('bAgain').onclick=()=>startRace(true);
 $('bPause').onclick=pause;$('bResume').onclick=resume;$('bRestart').onclick=()=>startRace(true);$('bQuit').onclick=goHome;
 $('bCam').onclick=toggleCam;
 let pausedFrom=null;
-function pause(){if(mode!=='race'&&mode!=='count'&&mode!=='derail')return;pausedFrom=mode;mode='paused';input.thr=false;windSet(0);$('pedal').classList.remove('on');show('pause');$('bResume').focus()}
+function pause(){if(mode!=='race'&&mode!=='count')return;pausedFrom=mode;mode='paused';input.thr=false;windSet(0);$('pedal').classList.remove('on');show('pause');$('bResume').focus()}
 function resume(){if(mode!=='paused')return;mode=pausedFrom;show('hud')}
 function toggleCam(){camMode=camMode==='tp'?'fp':'tp';store.set('advx-cam',camMode);camFromP.copy(camera.position);camFromL.copy(camLook);camBlend=0.55;if(G)G.cin=false}
 function showEnd(){
@@ -763,8 +778,8 @@ function showEnd(){
   $('eDelta').innerHTML=prev?(dPrev<0?`<b class="good">${fmtD(dPrev)} s</b> mejor que tu récord`:`<b class="bad">${fmtD(dPrev)} s</b> respecto a tu récord (${fmt(prev)})`):'Primer viaje: ya tienes fantasma para la próxima.';
   const nxt=[[1,'oro',MED.g],[2,'plata',MED.s],[3,'bronce',MED.b]].filter(([m])=>!medal||m<medal).pop();
   $('eHint').textContent=nxt?`Te faltan ${(total-nxt[2]).toFixed(1).replace('.',',')} s para la medalla de ${nxt[1]}.`:'¡Medalla de oro! Ahora a por el primer puesto.';
-  $('eFields').innerHTML=[['Campanas',`${G.bells}/${BELLS.length}`],['Mejor combo','×'+G.bestCombo],['Vel. máxima',Math.round(G.vmax*3.6)+' km/h'],['Descarriles',G.der]].map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join('');
-  $('eSum').innerHTML=`<li><span>Recorrido</span><b>${fmt(G.time)}</b></li>${G.der?`<li><span>Descarriles</span><b>+${G.pen} s</b></li>`:''}<li><span>Campanas</span><b>−${G.bonus.toFixed(1)} s</b></li><li><span>Total</span><b>${fmt(total)}</b></li>`;
+  $('eFields').innerHTML=[['Campanas',`${G.bells}/${BELLS.length}`],['Mejor combo','×'+G.bestCombo],['Vel. máxima',Math.round(G.vmax*3.6)+' km/h'],['Regalos',`${giftsOn()}/3`]].map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join('');
+  $('eSum').innerHTML=`<li><span>Recorrido</span><b>${fmt(G.time)}</b></li>${G.lost?`<li><span>Regalos perdidos (${G.lost})</span><b>+${G.pen} s</b></li>`:''}<li><span>Campanas</span><b>−${G.bonus.toFixed(1)} s</b></li><li><span>Total</span><b>${fmt(total)}</b></li>`;
   const st=$('eStamp');st.hidden=false;st.className='stampbig '+(medal?'m'+medal:'');st.textContent=medal?['','¡ORO!','PLATA','BRONCE'][medal]:(isBest?'¡RÉCORD!':'SIN MEDALLA');
   $('iName').value=store.get('advx-name')||'';$('bSave').disabled=false;$('bSave').textContent='Fichar tiempo';
   const url=SITE_URL+'#dia-'+DAY.d,mtx=medal?['','🥇','🥈','🥉'][medal]+' ':'',txt=`🚂 Adviento Express · Día ${DAY.d} «${DAY.name}»\n${mtx}⏱ ${fmt(total)} · 🔔${G.bells}/${BELLS.length} · combo ×${G.bestCombo}\n¿Me ganas?`;
@@ -782,7 +797,7 @@ $('fName').addEventListener('submit',async e=>{e.preventDefault();const n=$('iNa
   renderDep(await Board.top(DAY.d,10),n)});
 
 /* ================= controles ================= */
-const racing=()=>mode==='race'||mode==='count'||mode==='derail';
+const racing=()=>mode==='race'||mode==='count';
 function press(on){if(!racing()){input.thr=false;return}
   if(on&&!input.thr&&mode==='race'&&G.time<0.35&&!G.heldAtGo&&!G.ps){G.ps=true;G.v=Math.max(G.v,9);flash('¡Salida perfecta!',1.1,'good');perfectS();puff(cars[0].localToWorld(tmpV.set(-1,1,2)),new THREE.Vector3(0,1,3),2,.35,1.2);puff(cars[0].localToWorld(tmpV.set(-1,1,-2)),new THREE.Vector3(0,1,-3),2,.35,1.2)}
   if(!on&&input.thr&&mode==='race'&&G.v>8){hiss();const L=cars[0];[-1,1].forEach(sd=>puff(L.localToWorld(tmpV.set(1.5,0.8,sd*2.2)),new THREE.Vector3(0,1.4,sd*2.5).applyEuler(L.rotation),1.6,.3,0.9))}
@@ -806,7 +821,7 @@ let last=performance.now(),fA=0,fN=0,lastAdj=0;
 function fx(dt,t){
   const L=cars[0],v=G?G.v:0;
   const ch=L.localToWorld(tmpV.copy(L.userData.chimney));
-  const rate=mode==='derail'?0:2+v*0.6;G.smokeAcc=(G.smokeAcc||0)+dt*rate;
+  const rate=2+v*0.6;G.smokeAcc=(G.smokeAcc||0)+dt*rate;
   const so=camMode==='fp'&&racing()?0.12:0.26;
   while(G.smokeAcc>1){G.smokeAcc-=1;puff(ch,tmpV2.set((Math.random()-.5)*0.8,4.2+Math.random(),(Math.random()-.5)*0.8),1,so,1.7)}
   smoke.forEach(p=>{if(p.life<=0)return;p.life-=dt/(p.ml||1.7);if(p.life<=0){p.s.visible=false;return}p.s.position.addScaledVector(p.v,dt);p.v.multiplyScalar(Math.exp(-0.6*dt));p.sz+=dt*1.7;p.s.scale.setScalar(p.sz);p.s.material.opacity=p.life*p.op});
@@ -838,7 +853,8 @@ function fx(dt,t){
   if(fly){fly.t+=dt/0.75;const c=fly.car,to=c.localToWorld(tmpV2.set(0,c.userData.top+1,0)),e=Math.min(1,fly.t);flyer.position.lerpVectors(fly.from,to,e);flyer.position.y+=Math.sin(e*Math.PI)*5;flyer.rotation.y+=dt*8;
     if(fly.t>=1){flyer.visible=false;if(c.userData.gift){c.userData.gift.visible=true;c.userData.gift.scale.setScalar(0.01);c.userData.pop=0}fly=null}}
   cars.forEach(c=>{const g=c.userData.gift;if(g&&g.visible&&c.userData.pop!==undefined&&c.userData.pop<1){c.userData.pop=Math.min(1,c.userData.pop+dt*3);const p=c.userData.pop,el=1+Math.sin(p*Math.PI*2.5)*(1-p)*0.6;g.scale.setScalar(g.userData.s0*Math.max(0.01,p*el))}});
-  if(GH&&G&&(mode==='race'||mode==='derail'||mode==='count'||mode==='finish')){const gd=ghostDistAt(G.time);poseCar(ghost,gd,0,0);ghost.visible=camMode!=='fp'||Math.abs(gd-G.dist)>9}else ghost.visible=false;
+  if(GH&&G&&(mode==='race'||mode==='count'||mode==='finish')){const gd=ghostDistAt(G.time);poseCar(ghost,gd,0,0);ghost.visible=camMode!=='fp'||Math.abs(gd-G.dist)>9}else ghost.visible=false;
+  if(loose.length)looseStep(dt);
   grade.uniforms.flash.value*=Math.exp(-5*dt);if(beam)beam.visible=camMode!=='fp'||!racing();
 }
 function adapt(raw,now){fA+=raw;fN++;if(now-lastAdj<1500||fN<40)return;const avg=fA/fN;fA=0;fN=0;lastAdj=now;
@@ -850,7 +866,6 @@ function loop(now){
   if(world&&mode!=='home'&&G){
     if(mode==='count'){countdown(dt);poseTrain(0,0)}
     else if(mode==='race')race(dt);
-    else if(mode==='derail')derailStep(dt);
     else if(mode==='finish')finishStep(dt);
     else if(mode==='end'){G.v=Math.max(0,G.v-6*dt);const ds=G.v*dt;G.dist+=ds;spinWheels(ds);poseTrain(G.dist,0)}
     if(mode!=='paused'){fx(dt*timeScale,t);updateCam(dt)}
@@ -869,7 +884,7 @@ function perf(n=120,pr=1){const ip=dynPR,ar=renderer.info.autoReset;dynPR=pr;res
   renderer.info.autoReset=ar;dynPR=ip;resize();return {ms:+ms.toFixed(2),calls,tris,tex:renderer.info.memory.textures,geo:renderer.info.memory.geometries,pr,w:innerWidth,h:innerHeight}}
 function pose(kind,f=0.25){const d=f*T.L;if(G)G.dist=d;poseTrain(d,0);camTarget(kind,0,wantP,wantL);camPos.copy(wantP);camLook.copy(wantL);camBlend=1;camera.position.copy(wantP);camera.lookAt(wantL);camera.fov=kind==='fp'?70:58;camera.updateProjectionMatrix();
   key.position.set(cars[0].position.x-60,120,cars[0].position.z-40);key.target.position.set(cars[0].position.x,0,cars[0].position.z);grade.uniforms.blur.value=0;grade.uniforms.tilt.value=kind==='orbit'?1:0}
-window.__adv={perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='derail')derailStep(dt);else if(mode==='finish')finishStep(dt)}};
+window.__adv={newRun:()=>{newRun();poseTrain(0,0);mode='race'},perf,pose,settle:()=>{camBlend=1;if(G)G.cin=false;for(let i=0;i<80;i++)updateCam(0.05)},get G(){return G},get mode(){return mode},vsAhead:(d,v)=>vsAhead(d,v),ST:()=>ST,BELLS:()=>BELLS,get MED(){return MED},get pr(){return dynPR},step:(dt,thr)=>{if(thr!==undefined&&thr!==input.thr)press(thr);if(mode==='count')countdown(dt);else if(mode==='race')race(dt);else if(mode==='finish')finishStep(dt)},giftsOn};
 drawArt();renderHome();
 {const m=/^#dia-(\d+)$/.exec(location.hash),hd=m?+m[1]:0;if(hd>=1&&hd<=24&&isOpen(hd)){setTimeout(()=>{const el=document.querySelector(`.door[data-d="${hd}"]`);if(el)openDoor(el,hd)},300)}}
 requestAnimationFrame(loop);

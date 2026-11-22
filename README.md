@@ -1,6 +1,6 @@
 # Adviento Express 🚂🎄
 
-Calendario de Adviento jugable: cada día del 1 al 24 de diciembre se abre una puerta con un circuito nuevo de tren de juguete en 3D. Conduce, haz sonar las campanas encadenando combos, no descarriles en las curvas, bate a tu fantasma y consigue la medalla de oro.
+Calendario de Adviento jugable: cada día del 1 al 24 de diciembre se abre una puerta con un circuito nuevo de tren de juguete en 3D. Conduce, haz sonar las campanas encadenando combos, no pierdas los regalos en las curvas, bate a tu fantasma y consigue la medalla de oro.
 
 ## Probar en local
 
