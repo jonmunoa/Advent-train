@@ -1,6 +1,7 @@
 """Prueba end-to-end de los escaparates (escaparates.html, prototipo) con Playwright.
 
-Portada, paseo con la cámara detrás del niño, llegada al cristal, los tres escaparates, vuelta a la calle (da la vuelta),
+Calendario (papel con agujero, horario y vista previa), las 24 escenas de la historia y las 3 del final, portada, paseo con la
+cámara detrás del niño, llegada al cristal,
 mirar alrededor, entrar al pinchar, navegación de dentro con el ratón y con los dedos al píxel (mover, acercar, girar,
 seguir un vagón), el niño visto desde dentro, pasar de un escaparate a otro, salir, seguir solo al cabo de un rato,
 marcas (vagón y rótulo), editor y petición, compartir, sonido, que no se hable con ningún servidor y versión móvil.
@@ -23,11 +24,11 @@ def check(name, cond, info=''):
     print(('  ok   ' if cond else '  FALLO ') + name + (f'  {info}' if info else ''))
 
 
-async def abrir(pg, errors, quien=''):
+async def abrir(pg, errors, quien='', q='?dia=9'):
     pg.on('pageerror', lambda e: errors.append(f'pageerror {quien}: {e}'))
     pg.on('response', lambda r: errors.append(f'HTTP {r.status} {r.url}') if r.status >= 400 and 'favicon' not in r.url else None)
     await route_local_three(pg)
-    await pg.goto(f'http://127.0.0.1:{PORT}/escaparates.html', wait_until='commit')
+    await pg.goto(f'http://127.0.0.1:{PORT}/escaparates.html{q}', wait_until='commit')
     await pg.wait_for_function(READY, polling=500, timeout=420000)
     await pg.evaluate('window.__noAdapt=true')
 
@@ -74,19 +75,23 @@ async def main():
         head = lambda q: math.atan2(q['l'][2] - q['p'][2], q['l'][0] - q['p'][0])
         check('arrastrar en la calle gira la vista alrededor del niño', abs(head(b1) - head(a)) > 0.2, f'{head(a):.2f} → {head(b1):.2f}')
 
-        # 2) los tres escaparates
+        # 2) escena del día y tres escaparates
+        await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30)})()")
+        r = await pg.evaluate("({st:__esc.st,id:__esc.ESCN.id,c:document.body.classList.contains('escena'),pap:__esc.tapado(8),sal:getComputedStyle(document.getElementById('foot')).pointerEvents})")
+        check('al llegar al escaparate de hoy cae el papel y empieza su escena, sin controles', r['st'] == 'escena' and r['id'] == 9 and r['c'] and not r['pap'] and r['sal'] == 'none', str(r))
         nombres = []
-        for k in range(3):
-            if k:
+        for k in (8, 6, 7):
+            if k != 8:
                 await pg.evaluate(f'__esc.ir({k})')
                 r = await pg.evaluate("(()=>{let w=0,v=0,prev=__esc.cam().p;for(let i=0;i<900&&!(__esc.st==='mira'&&__esc.n===%d);i++){__esc.step(1/30);const q=__esc.cam().p;w=Math.max(w,0);prev=q}return __esc.st})()" % k)
             else:
-                await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st!=='mira';i++)__esc.step(1/30)})()")
+                await pg.evaluate("(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30)})()")
+            await pg.wait_for_timeout(400)
             await pg.evaluate('__esc.step(16)')
-            r = await pg.evaluate("({st:__esc.st,n:__esc.n,p:__esc.pos(),u:__esc.E.u,cap:document.getElementById('capN').textContent,cs:document.getElementById('capS').textContent,vis:__esc.mundos.map(m=>m.g.visible),cam:__esc.cam()})")
+            r = await pg.evaluate("({st:__esc.st,n:__esc.n,p:__esc.pos(),u:__esc.E.u,cap:document.getElementById('capN').textContent,cs:document.getElementById('capS').textContent,vis:[...__esc.MU].filter(([n,m])=>m.g.visible).map(([n])=>n),cam:__esc.cam()})")
             nombres.append(r['cap'])
             X = 340 * k
-            check(f'escaparate {k + 1}: el niño llega al cristal, la madre espera detrás y la cámara se acerca a la maqueta', r['st'] == 'mira' and r['n'] == k and abs(r['p']['n'][0] - X) < 4 and r['p']['n'][2] < 12 and r['p']['m'][2] > 20 and abs(r['p']['yn'] - math.pi / 2) < 0.2 and r['u'] > 0.4 and r['vis'][k] and abs(r['cam']['p'][0] - X) < 75 and str(k + 1) in r['cs'], str({q: r[q] for q in ('st', 'n', 'u', 'cap')}))
+            check(f'escaparate {k + 1}: el niño llega al cristal, la madre espera detrás y la cámara se acerca a la maqueta', r['st'] == 'mira' and r['n'] == k and abs(r['p']['n'][0] - X) < 4 and r['p']['n'][2] < 12 and r['p']['m'][2] > 20 and abs(r['p']['yn'] - math.pi / 2) < 0.2 and r['u'] > 0.4 and r['vis'] == [k] and abs(r['cam']['p'][0] - X) < 75 and str(k + 1) in r['cs'], str({q: r[q] for q in ('st', 'n', 'u', 'cap')}))
             if SHOTS:
                 await pg.evaluate('__esc.hold(false);document.body.classList.remove("quieto")')
                 await pg.wait_for_timeout(700)
@@ -95,18 +100,10 @@ async def main():
         check('cada escaparate tiene su circuito', len(set(nombres)) == 3, str(nombres))
         r = await pg.evaluate("(()=>{const a=[];for(let i=0;i<200;i++){__esc.step(.2);a.push(__esc.pos().hn)}return [Math.min(...a),Math.max(...a)]})()")
         check('el niño sigue el tren con la cabeza', r[1] - r[0] > 0.6, str(r))
-        r = await pg.evaluate("(()=>{const m=__esc.mundos[2],s0=m.tren.s;__esc.step(2);return (m.tren.s-s0+m.T.L)%m.T.L/2})()")
+        r = await pg.evaluate("(()=>{const m=__esc.mundo(__esc.n),s0=m.tren.s;__esc.step(2);return (m.tren.s-s0+m.T.L)%m.T.L/2})()")
         check('el tren da vueltas despacio', 5.5 < r < 7, f'{r:.2f} u/s')
-        r = await pg.evaluate("(()=>{const T=__esc.mundos[2].tren;let w=0,prev=T.cars.map(c=>c.position.toArray());for(let i=0;i<1600;i++){__esc.mundos[2].update(.05,i*.05);const q=T.cars.map(c=>c.position.toArray());q.forEach((a,j)=>{w=Math.max(w,Math.hypot(a[0]-prev[j][0],a[1]-prev[j][1],a[2]-prev[j][2]))});prev=q}return w})()")
+        r = await pg.evaluate("(()=>{const T=__esc.mundo(__esc.n).tren;let w=0,prev=T.cars.map(c=>c.position.toArray());for(let i=0;i<1600;i++){__esc.mundo(__esc.n).update(.05,i*.05);const q=T.cars.map(c=>c.position.toArray());q.forEach((a,j)=>{w=Math.max(w,Math.hypot(a[0]-prev[j][0],a[1]-prev[j][1],a[2]-prev[j][2]))});prev=q}return w})()")
         check('una vuelta entera sin saltos', r < 0.6, f'mayor paso {r:.2f}')
-        # la calle da la vuelta
-        await pg.evaluate("__esc.ir(3);(()=>{for(let i=0;i<900&&!(__esc.st==='mira'&&__esc.n===3);i++)__esc.step(1/30)})()")
-        r = await pg.evaluate("({st:__esc.st,n:__esc.n,cap:document.getElementById('capN').textContent,vis:__esc.mundos.map(m=>m.g.visible)})")
-        check('después del tercero se vuelve al primero: la calle da la vuelta', r['st'] == 'mira' and r['n'] == 3 and r['cap'] == nombres[0] and r['vis'][0], str(r))
-        await pg.evaluate("__esc.ir(2);(()=>{for(let i=0;i<900&&!(__esc.st==='mira'&&__esc.n===2);i++)__esc.step(1/30)})()")
-        r = await pg.evaluate('({st:__esc.st,n:__esc.n})')
-        check('también se puede volver hacia atrás', r['st'] == 'mira' and r['n'] == 2, str(r))
-
         # 3) mirar alrededor y acercarse
         await pg.evaluate('__esc.step(3);__esc.hold(false)')
         a = await pg.evaluate('({c:__esc.cam(),u:__esc.E.uT})')
@@ -117,7 +114,8 @@ async def main():
         await pg.evaluate('__esc.step(3)')
         c = await pg.evaluate('({c:__esc.cam(),az:__esc.E.az})')
         check('arrastrar mira alrededor', c['az'] > 0.1 and math.dist(a['c']['p'], c['c']['p']) > 6, str(c))
-        for _ in range(4):
+        await pg.evaluate('__esc.mirar(.5)')
+        for _ in range(3):
             await pg.mouse.wheel(0, -160)
         await pg.wait_for_timeout(250)
         await pg.evaluate('__esc.step(4)')
@@ -178,7 +176,7 @@ async def main():
         check('«Ver toda la maqueta» la encuadra entera', r['a']['x'] > -40 and r['b']['x'] < r['w'] + 40, str(r['a']))
         if SHOTS:
             await shot('5-dentro')
-        await pg.evaluate("(()=>{__esc.hold(true);const m=__esc.mundos[__esc.E.k];for(let i=0;i<400&&[0,1,2,3,4].some(c=>m.tren.inTunnel(c));i++)__esc.step(.2)})()")
+        await pg.evaluate("(()=>{__esc.hold(true);const m=__esc.mundo(__esc.E.k);for(let i=0;i<400&&[0,1,2,3,4].some(c=>m.tren.inTunnel(c));i++)__esc.step(.2)})()")
         v = await pg.evaluate('__esc.vagon(__esc.E.k,0)')
         await pg.mouse.click(v['x'], v['y'])
         await pg.evaluate('__esc.step(2)')
@@ -189,7 +187,7 @@ async def main():
             await pg.wait_for_timeout(600)
             await shot('6-vagon')
             await pg.evaluate('__esc.hold(true)')
-        r = await pg.evaluate("(()=>{const m=__esc.mundos[__esc.E.k];let inT=0,bad=0;for(let i=0;i<1500;i++){__esc.step(.1,.1);if(__esc.vista.inT)inT++;const p=__esc.vista.info().p;if(p.some(v=>!isFinite(v)))bad++}return {inT,bad}})()")
+        r = await pg.evaluate("(()=>{const m=__esc.mundo(__esc.E.k);let inT=0,bad=0;for(let i=0;i<1500;i++){__esc.step(.1,.1);if(__esc.vista.inT)inT++;const p=__esc.vista.info().p;if(p.some(v=>!isFinite(v)))bad++}return {inT,bad}})()")
         check('siguiendo un vagón la vuelta entera se pasa por el túnel y la cámara no se pierde', r['inT'] > 5 and r['bad'] == 0, str(r))
         await pg.keyboard.press('Escape')
         check('Escape suelta el vagón', await pg.evaluate('!__esc.vista.cam.focus&&__esc.st==="dentro"'))
@@ -206,8 +204,8 @@ async def main():
         await pg.click('#bNext')
         await pg.wait_for_timeout(500)
         await pg.evaluate('__esc.step(3)')
-        r = await pg.evaluate("({n:__esc.n,st:__esc.st,vis:__esc.mundos.map(m=>m.g.visible),k:__esc.E.k})")
-        check('las flechas pasan de un escaparate a otro sin salir', r['st'] == 'dentro' and r['n'] == n0 + 1 and r['vis'][r['k']] and sum(r['vis']) == 1, str(r))
+        r = await pg.evaluate("({n:__esc.n,st:__esc.st,vis:[...__esc.MU].filter(([n,m])=>m.g.visible).map(([n])=>n),k:__esc.E.k})")
+        check('las flechas pasan de un escaparate a otro sin salir', r['st'] == 'dentro' and r['n'] == n0 + 1 and r['vis'] == [r['k']], str(r))
         await pg.click('#bVolver')
         await pg.wait_for_timeout(600)
         await pg.evaluate('__esc.step(3)')
@@ -217,18 +215,34 @@ async def main():
         # 5) al cabo de un rato siguen paseando solos
         r = await pg.evaluate("(()=>{__esc.hold(true);const n=__esc.n;__esc.step(60);const a=__esc.n;__esc.step(40);return {n,a,b:__esc.n}})()")
         check('si nadie toca nada, al rato siguen paseando al siguiente', r['a'] == r['n'] and r['b'] == r['n'] + 1, str(r))
-        await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(6)})()")
+        await pg.evaluate("(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(6)})()")
+
+        # 5b) el de mañana, tapado con papel y un agujero
+        await pg.evaluate("(()=>{for(let i=0;i<1200&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(3)})()")
+        r = await pg.evaluate("({n:__esc.n,t:__esc.tapado(9),l:__esc.locs.find(l=>l.n===9).papel.visible,cap:document.getElementById('capN').textContent,s:document.getElementById('capS').textContent,next:document.getElementById('bNext').disabled,x:__esc.pos().n[0],vis:[...__esc.MU].filter(([n,m])=>m.g.visible).map(([n])=>n)})")
+        check('el de mañana está tapado con papel, con su fecha, y no se puede pasar de ahí', r['n'] == 9 and r['t'] and r['l'] and r['cap'] == '10 de diciembre' and 'Se enciende' in r['s'] and r['next'] and r['vis'] == [9], str(r))
+        await pg.evaluate('__esc.ir(12)')
+        r = await pg.evaluate('({n:__esc.n,st:__esc.st})')
+        check('ni andando más allá', r['n'] == 9, str(r))
+        await pg.evaluate('__esc.entrar(9);__esc.step(4)')
+        r = await pg.evaluate("({st:__esc.st,u:__esc.E.u,c:__esc.cam()})")
+        check('pinchar el papel asoma al agujero, sin entrar', r['st'] == 'mira' and r['u'] > 0.8 and r['c']['p'][2] < 60 and abs(r['c']['p'][0] - 340 * 9) < 30, str(r))
+        if SHOTS:
+            await pg.evaluate('__esc.hold(false)')
+            await pg.wait_for_timeout(500)
+            await shot('10-agujero')
+            await pg.evaluate('__esc.hold(true)')
 
         # 6) marcas
-        await pg.evaluate("__esc.ir(__esc.n+1);(()=>{for(let i=0;i<900&&!(__esc.st==='mira');i++)__esc.step(1/30);const m=__esc.mundos[((__esc.n%3)+3)%3];__esc.mirar(.45);m.tren.s=m.T.L*.14;__esc.step(5)})()")
-        k = await pg.evaluate('((__esc.n%3)+3)%3')
+        await pg.evaluate("__esc.ir(7);(()=>{for(let i=0;i<2400&&!(__esc.st==='mira'&&__esc.n===7);i++)__esc.step(1/30);const m=__esc.mundo(7);__esc.mirar(.45);m.tren.s=m.T.L*.14;__esc.step(5)})()")
+        k = await pg.evaluate('__esc.n')
         r = await pg.evaluate(f"({{v:__esc.vagon({k},0),q:null}})")
         q = await pg.evaluate(f"__esc.queHay({r['v']['x']},{r['v']['y']})")
         await pg.mouse.click(r['v']['x'], r['v']['y'])
         c = await pg.evaluate("({h:document.getElementById('card').hidden,n:document.getElementById('caName').textContent,t:document.getElementById('caTag').textContent,a:document.getElementById('caGo').href,rel:document.getElementById('caGo').rel,tg:document.getElementById('caGo').target,go:!document.getElementById('caGo').hidden,free:!document.getElementById('caFree').hidden,s:__esc.sitios()})")
         ad = c['s'][str(k + 1)].get('1')
         await pg.evaluate('__esc.step(2)')
-        check('tocar un vagón desde la calle entra, lo sigue y enseña su marca', await pg.evaluate('__esc.st==="dentro"&&__esc.vista.cam.focus&&__esc.vista.cam.focus.car===2') and not c['h'] and q and q['k'] == k and ad and c['n'] == ad['text'] and 'Vagón 1' in c['t'], str({x: c[x] for x in ('h', 'n', 't')}))
+        check('tocar un vagón desde la calle entra, lo sigue y enseña su marca', await pg.evaluate('__esc.st==="dentro"&&__esc.vista.cam.focus&&__esc.vista.cam.focus.car===2') and not c['h'] and q and q['n'] == k and ad and c['n'] == ad['text'] and 'Vagón 1' in c['t'], str({x: c[x] for x in ('h', 'n', 't')}))
         check('si la marca tiene web, «Visitar» la abre en otra pestaña y marcada como patrocinada', (not ad.get('url')) or (c['go'] and c['a'].startswith('https://www.example.com') and c['tg'] == '_blank' and 'sponsored' in c['rel'] and 'noopener' in c['rel']), str({x: c[x] for x in ('a', 'rel', 'go')}))
         await pg.click('#caX')
         await pg.evaluate('__esc.vista.setFocus(null);__esc.salir()')
@@ -251,14 +265,46 @@ async def main():
         check('pedir el sitio copia los datos (no se envía nada)', all(x in r for x in ('rótulo', f'escaparate {k + 1}', 'Vivero Abeto Verde', 'https://vivero-abeto.es/', '€')), r[:120])
         if SHOTS:
             await shot('8-marca')
+        antes = await pg.evaluate(f'__esc.locs.find(l=>l.n==={k}).rot.material.map.uuid')
         await pg.click('#adSee')
         await pg.wait_for_timeout(300)
-        r = await pg.evaluate(f"({{ad:__esc.tiendas[{k}].ad&&__esc.tiendas[{k}].ad.text,b:!document.getElementById('prevBack').hidden}})")
+        await pg.evaluate('__esc.step(.2)')
+        r = await pg.evaluate(f"({{ad:__esc.locs.find(l=>l.n==={k}).rot.material.map.uuid,b:!document.getElementById('prevBack').hidden}})")
+        r['antes'] = antes
         await pg.click('#prevBack')
         await pg.wait_for_timeout(300)
-        r['after'] = await pg.evaluate(f'__esc.tiendas[{k}].ad')
-        check('«Ver cómo queda» la pone en el letrero y al volver se quita', r['ad'] == 'Vivero Abeto Verde' and r['b'] and r['after'] is None, str(r))
+        await pg.evaluate('__esc.step(.2)')
+        r['after'] = await pg.evaluate(f'__esc.locs.find(l=>l.n==={k}).rot.material.map.uuid')
+        check('«Ver cómo queda» la pone en el letrero y al volver se quita', r['ad'] != r['antes'] and r['b'] and r['after'] != r['ad'], str(r))
         await pg.click('#adX')
+
+        # 6b) la historia entera
+        await pg.evaluate("__esc.hold(true);window.ESCENAS=async()=>{const out=[];for(let d=1;d<=27;d++){__esc.ponDia(d);await new Promise(r=>setTimeout(r,420));const e=__esc.ESCN;for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);const ini=__esc.st,id=e.id,c0=__esc.scene.calle.children.length;let t=0,bad=0,casa=0;while(__esc.st==='escena'&&t<120){__esc.step(1/30);t+=1/30;if(__esc.casa)casa=1;const c=__esc.cam();if([...c.p,...c.l].some(v=>!isFinite(v)))bad++}await new Promise(r=>setTimeout(r,300));__esc.step(.2);out.push({d,ini,id,t:+t.toFixed(1),bad,casa,fin:__esc.st,props:e.props.length+e.ext.length,ropa:__esc.ropa,vis:__esc.pos().n.every(isFinite),fin2:document.getElementById('fin').classList.contains('on')})}return out}")
+        r = await pg.evaluate('ESCENAS()')
+        malas = [x for x in r if x['ini'] != 'escena' or not 7 < x['t'] < 100 or x['bad'] or x['fin'] not in ('mira', 'paseo', 'sale') or x['props'] or not x['vis']]
+        check('las 24 escenas y las 3 del final se ven enteras y no dejan nada puesto', len(r) == 27 and not malas, str(malas[:3]) + f" · duran de {min(x['t'] for x in r)} a {max(x['t'] for x in r)} s")
+        check('cada escena es la de su día', [x['id'] for x in r] == [*range(1, 25), 'campanadas', 'cabalgata', 'reyes'])
+        check('la casa sale el 10 (de noche) y el 6 de enero', [x['d'] for x in r if x['casa']] == [10, 27])
+        ab = {x['d']: x['ropa'] for x in r}
+        check('desde el 16 la madre va sin el abrigo rojo, y desde el 17 con la bufanda del niño', ab[15]['abrigo'] and not ab[16]['abrigo'] and not ab[17]['abrigo'] and ab[17]['bufandaRoja'] and not ab[17]['bufandaNino'] and not ab[24]['abrigo'] and ab[5]['guantes'] and not ab[6]['guantes'])
+        check('el final acaba con «Llámala» y el botón para mandárselo', r[-1]['fin2'] and not any(x['fin2'] for x in r[:-1]))
+        await pg.evaluate("document.getElementById('fin').classList.remove('on');__esc.ponDia(18)")
+        await pg.wait_for_timeout(500)
+        await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);__esc.step(2)})()")
+        r = await pg.evaluate("({st:__esc.st,p:__esc.mundo(17).tren.g.visible})")
+        check('el 18 el tren ya no está', r['st'] == 'escena' and not r['p'])
+        await pg.click('#bSaltar')
+        await pg.wait_for_timeout(700)
+        await pg.evaluate('__esc.step(1)')
+        r = await pg.evaluate("({st:__esc.st,pv:document.getElementById('pvT').textContent,v:getComputedStyle(document.getElementById('bEsc')).display})")
+        check('la escena se puede saltar y volver a ver', r['st'] == 'mira' and r['pv'] == '18 de diciembre' and r['v'] == 'block', str(r))
+        await pg.click('#pvA')
+        await pg.wait_for_timeout(700)
+        check('en la vista previa se cambia de día', await pg.evaluate("__esc.cal.previa===17&&__esc.n===16"))
+        await pg.evaluate("__esc.ponDia(9)")
+        await pg.wait_for_timeout(500)
+        await pg.evaluate("(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30)})()")
+        await pg.wait_for_timeout(400)
 
         # 7) compartir, sonido y red
         await pg.evaluate("Object.defineProperty(navigator,'share',{value:undefined,configurable:true})")
@@ -270,7 +316,7 @@ async def main():
         check('el sonido se puede quitar y se recuerda', await pg.evaluate("document.getElementById('bSon').classList.contains('off')&&localStorage.getItem('advx-sonido')==='0'"))
         bad = [u for m, u in reqs if m != 'GET' or not u.startswith((f'http://127.0.0.1:{PORT}/', 'https://cdn.jsdelivr.net/npm/three@', 'https://fonts.', 'data:', 'blob:'))]
         check('no habla con ningún servidor: solo descarga la página, three.js y las letras', not bad, str(bad[:4]))
-        for q, (n, js) in enumerate([('paseo', "__esc.ir(__esc.n+1);__esc.step(4.5)"), ('mirando', "(()=>{for(let i=0;i<900&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.mirar(.6);__esc.step(6)})()"), ('dentro', '__esc.entrar(__esc.n);__esc.step(4)')]):
+        for q, (n, js) in enumerate([('paseo', "__esc.ir(__esc.n-1);__esc.step(4.5)"), ('mirando', "(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.mirar(.6);__esc.step(6)})()"), ('dentro', '__esc.entrar(__esc.n);__esc.step(4)')]):
             await pg.evaluate(js)
             m = await pg.evaluate('__esc.perf(60,1)')
             print(f"rendimiento {n}: {m['ms']} ms a 1×, {m['calls']} draw calls, {m['tris'] // 1000}k triángulos")
@@ -279,12 +325,12 @@ async def main():
         # 8) móvil
         mob = await b.new_context(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
         mp = await mob.new_page()
-        await abrir(mp, errors, '(móvil)')
+        await abrir(mp, errors, '(móvil)', '')
         if SHOTS:
             await mp.wait_for_timeout(900)
             await mp.screenshot(path=str(OUT / 'esc-9-movil-portada.png'), timeout=120000)
         await mp.tap('#go')
-        await mp.evaluate("(()=>{__esc.hold(true);for(let i=0;i<900&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(2)})()")
+        await mp.evaluate("(()=>{__esc.hold(true);for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(2)})()")
         r = await mp.evaluate("""(()=>{const R=q=>document.querySelector(q).getBoundingClientRect(),f=R('#foot'),a=R('#bAd'),n=R('#bNext');return {sw:document.documentElement.scrollWidth,w:innerWidth,fb:f.bottom<=innerHeight,fl:f.left,fr:f.right,btn:n.width,gap:f.top-a.bottom,u:__esc.E.u,n:__esc.pos().n[0]}})()""")
         check('en el móvil los controles caben', r['sw'] <= r['w'] and r['fb'] and r['fl'] >= 0 and r['fr'] <= r['w'] and r['btn'] >= 44 and r['gap'] >= 0 and abs(r['n']) < 4, str(r))
         cdp = await mob.new_cdp_session(mp)

@@ -36,17 +36,19 @@ El **silbato** acelera el tren unos segundos. Si cierras la página, al volver r
 
 La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
 
-## Prototipo: el tren del escaparate (`escaparates.html`)
+## El tren del escaparate (`escaparates.html`)
 
-`http://localhost:5173/escaparates.html` es el enfoque más reciente, también sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada y se para a mirar los trenes de los escaparates. La cámara va **detrás del niño**, a su altura, por una calle con luces, tiendas, puesto de castañas y gente que pasa. **No hay que hacer nada**: andan, llegan, el niño apoya las manos en el cristal y sigue el tren con la cabeza, la cámara se acerca despacio y, al cabo de un rato, siguen al siguiente.
+`http://localhost:5173/escaparates.html` es el enfoque actual: un **calendario de Adviento** sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada de **24 escaparates, uno por día**, con un circuito de tren distinto en cada uno.
 
-- **Tres escaparates, tres circuitos**: el pueblo de Navidad (mercadillo, tiovivo, noria, molino y viaducto), la montaña nevada (pista de esquí, telesilla, teleférico, trineos y lago helado) y la fábrica de Papá Noel en el Polo Norte (fábrica, casas de jengibre, palacio de hielo, pingüinos y aurora). Los tres tienen curvas, cuestas, túneles y puentes.
-- **En la calle**: arrastra para mirar alrededor y usa la rueda o un pellizco para acercarte. Las flechas (en pantalla o del teclado) llevan al escaparate anterior o al siguiente. Los controles se esconden si no tocas nada.
-- **Pincha un escaparate y entras en él**: se maneja como un mapa (arrastrar o un dedo mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho o girar dos dedos gira, subir o bajar dos dedos inclina, doble clic acerca). Tocar un vagón lo sigue de cerca, el ojo va con el tren y, si miras hacia el cristal, ves al niño asomado. «Volver a la calle» o Escape salen. Teclado: flechas o WASD, +, −, Q, E, 0 y C.
-- **Sonido**: caja de música y traqueteo, que se oyen más cuanto más cerca estás del cristal.
-- **Marcas** en el rótulo de cada tienda y en los cuatro vagones de cada tren. Qué marca va en cada sitio y qué días se escribe a mano en `src/esc-marcas.js` (con su enlace y su imagen en `m/marcas/`). Quien quiere un sitio lo diseña en la web, ve cómo queda y manda la petición; no se cobra ni se guarda nada desde la web.
+- **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta Reyes.
+- **Una historia sin palabras**: en cada escaparate, una escena de 15–30 segundos. El 31 hay campanadas, el 5 de enero cabalgata y el 6 se acaba. El guion está en `src/esc-escenas.js`; no lo leas si quieres verla.
+- **En la calle**: la cámara va detrás del niño y el paseo va solo. Arrastra para mirar alrededor, usa la rueda o un pellizco para acercarte y las flechas para ir al escaparate anterior o al siguiente.
+- **Pincha un escaparate y entras en él**: se maneja como un mapa (arrastrar o un dedo mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho o girar dos dedos gira, subir o bajar dos dedos inclina). Tocar un vagón lo sigue, el ojo va con el tren y, mirando hacia el cristal, se ve al niño asomado. «Volver a la calle» o Escape salen. Teclado: flechas o WASD, +, −, Q, E, 0 y C.
+- **Marcas** en el rótulo de cada tienda y en los cuatro vagones de su tren, salvo los días 18, 20 y 24. Se escriben a mano en `src/esc-marcas.js`; no se cobra ni se guarda nada desde la web.
 
-`?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
+Fuera de temporada es una **vista previa**: un botón cambia de día. `?dia=7` enseña un día (25 son las campanadas, 26 la cabalgata y 27 Reyes), `?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
+
+**Vídeos para TikTok y Reels**: `python scripts/clips.py 1,6,18` graba las escenas en vertical (1080×1920, con música de caja) en `clips/`. Necesita Playwright, numpy y ffmpeg.
 
 ## Prototipo: el tren de Navidad (`tren.html`)
 
@@ -85,8 +87,8 @@ python tests/perf.py           # coste por fotograma frente a tests/perf-baselin
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
 python tests/tren.py --shots   # tren de Navidad en Chromium: navegación, vagones, túnel, cruces, tu casa, calendario, marcas, sin red y móvil
-python tests/esc.py --shots    # escaparates en Chromium: paseo, manos, tres escaparates, marcas, sin red y móvil
-node tests/esc.test.mjs        # circuitos de los escaparates (curvas, cuestas, túneles, puentes) y marcas, sin navegador
+python tests/esc.py --shots    # escaparates en Chromium: calendario, las 27 escenas, paseo, navegación por dentro, marcas, sin red y móvil
+node tests/esc.test.mjs        # los 24 circuitos, el calendario y las marcas, sin navegador
 node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), calendario, marcas y guardado, sin navegador
 ```
 
