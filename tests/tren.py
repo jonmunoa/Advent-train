@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prueba end-to-end del tren de todos (tren.html, prototipo) con Playwright.
 
-Partida nueva en la maqueta alpina: zoom con la rueda hacia donde apunta el ratón, tocar un vagón para
+Partida nueva en la maqueta alpina: mover, acercar y girar la vista con ratón y con dedos, tocar un vagón para
 seguirlo (ficha con la marca y su enlace), la cámara dentro de los túneles, mandar un regalo a un amigo
 (con su enlace) y recibirlo en otro navegador, poner tu casa, reparto, objetivo del día que amplía la vía,
 subir un logo con enlace y pujar, enlace no válido, rival que te supera, vista previa en el tren, vagón con
@@ -12,7 +12,7 @@ Uso:
   python tests/tren.py --gpu      # GPU real (más rápido)
   python tests/tren.py --shots    # además guarda capturas en tests/out/tren-*.png
 """
-import asyncio, os, struct, sys, zlib
+import asyncio, math, os, struct, sys, zlib
 from playwright.async_api import async_playwright
 from harness import ROOT, OUT, serve, chromium_args, route_local_three
 
@@ -41,6 +41,223 @@ def png(w=240, h=160):
         rows.append(bytes(row))
     chunk = lambda t, d: struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
     return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b''.join(rows))) + chunk(b'IEND', b'')
+
+
+async def frames(pg, n=2):
+    await pg.evaluate(f"new Promise(r=>{{let n={n};const f=()=>--n<0?r():requestAnimationFrame(f);f()}})")
+
+
+async def px_err(pg, P, x, y):
+    """Distancia en píxeles entre (x, y) y donde se ve ahora el punto P del suelo."""
+    S = await pg.evaluate('P=>P&&__tren.onScreen(...P)', P)
+    return math.hypot(S['x'] - x, S['y'] - y) if S else 1e9
+
+
+async def nav_mouse(pg):
+    """Navegación con ratón: arrastrar, inercia, rueda, girar, doble clic, límites, botones, teclado y volver de un vagón."""
+    async def drag(x0, y0, x1, y1, btn='left', pause=0):
+        await pg.mouse.move(x0, y0)
+        await pg.mouse.down(button=btn)
+        await pg.mouse.move(x0 + 8, y0 + 4)
+        await frames(pg)
+        P = await pg.evaluate(f'__tren.under({x0 + 8},{y0 + 4})')
+        for i in range(1, 11):
+            await pg.mouse.move(x0 + 8 + (x1 - x0 - 8) * i / 10, y0 + 4 + (y1 - y0 - 4) * i / 10)
+            await frames(pg, 1)
+        await frames(pg)
+        e = await px_err(pg, P, x1, y1)
+        if pause:
+            await pg.wait_for_timeout(pause)
+        await pg.mouse.up(button=btn)
+        return e, await pg.evaluate('__tren.camInfo()')
+
+    errs = []
+    for view in ('__tren.goHome()', '__tren.look(1.2,0.3,60,-40,55)', '__tren.look(2.4,1.2,90,20,10)', '__tren.look(0.3,0.2,40,60,0)'):
+        for a in ((600, 400, 420, 520), (500, 300, 760, 420)):
+            await pg.evaluate(view + ';__tren.camSettle()')
+            e, v = await drag(*a, pause=150)
+            errs.append(e)
+    check('al arrastrar, el suelo va pegado al ratón (de lejos, de cerca, rasante y desde arriba)', max(errs) < 1.5, str([round(e, 2) for e in errs]))
+    check('si paras antes de soltar, la vista se queda quieta', v['v'] == 0, str(v['v']))
+    await pg.evaluate('__tren.look(1.57,0.6,120,-20,40)')
+    _, v = await drag(600, 400, 420, 420)
+    t0 = v['t'][0]
+    await pg.wait_for_timeout(1500)
+    w = await pg.evaluate('__tren.camInfo()')
+    check('al soltar en movimiento sigue con inercia y se para sola', v['v'] > 5 and w['v'] < 1 and abs(w['t'][0] - t0) > 2, f"{v['v']} → {w['v']}, {t0} → {w['t'][0]}")
+    errs = []
+    for (x, y) in ((930, 470), (300, 600), (700, 250)):
+        for f in (-100, 100):
+            await pg.evaluate('__tren.look(1.57,0.62,%d,-10,30)' % (200 if f < 0 else 60))
+            await frames(pg)
+            P = await pg.evaluate(f'__tren.under({x},{y})')
+            await pg.mouse.move(x, y)
+            for _ in range(6):
+                await pg.mouse.wheel(0, f)
+                await frames(pg, 1)
+                errs.append(await px_err(pg, P, x, y))
+            await pg.wait_for_timeout(600)
+            errs.append(await px_err(pg, P, x, y))
+    check('con la rueda, también girando rápido, el punto bajo el ratón no se mueve', max(errs) < 1.5, f'peor {max(errs):.2f} px')
+    await pg.evaluate('__tren.look(1.57,0.62,120,-10,30)')
+    await frames(pg)
+    C, a0 = await pg.evaluate('[__tren.under(600,380),__tren.camInfo()]')
+    await drag(600, 400, 760, 404, 'right', 150)
+    a1 = await pg.evaluate('__tren.camInfo()')
+    e = await px_err(pg, C, 600, 380)
+    await drag(600, 400, 608, 480, 'right', 150)
+    a2 = await pg.evaluate('__tren.camInfo()')
+    check('el botón derecho gira sobre el centro y sube o baja la vista', a1['az'] > a0['az'] + 0.5 and e < 14 and a2['el'] > a1['el'] + 0.2, f"giro {a0['az']} → {a1['az']}, error {e:.1f} px, inclinación {a1['el']} → {a2['el']}")
+    await pg.wait_for_timeout(200)
+    az = await pg.evaluate("new Promise(r=>{const a=__tren.camInfo().az;setTimeout(()=>r(Math.abs(__tren.camInfo().az-a)),9000)})")
+    check('la vista no gira sola después de tocarla', az < 0.002, str(az))
+    await pg.evaluate('__tren.look(1.9,0.14,30,-30,50)')
+    await pg.mouse.move(600, 380)
+    for _ in range(30):
+        await pg.mouse.wheel(0, 150)
+        await frames(pg, 1)
+    for _ in range(2):
+        await drag(900, 400, 200, 500)
+    await pg.wait_for_timeout(1500)
+    v = await pg.evaluate('({...__tren.camInfo(),c:__tren.under(600,380)})')
+    check('alejar a tope desde abajo acaba viendo la maqueta entera desde arriba, y en el borde vuelve sola', v['el'] > 0.45 and v['d'] > 220 and v['c'] and abs(v['c'][0]) < 130 and abs(v['c'][2]) < 130, str(v))
+    await pg.evaluate('__tren.look(1.57,0.62,120,-10,30)')
+    await frames(pg)
+    P = await pg.evaluate('__tren.under(800,300)')
+    await pg.mouse.dblclick(800, 300)
+    await pg.wait_for_timeout(900)
+    v, e = await pg.evaluate('__tren.camInfo()'), await px_err(pg, P, 800, 300)
+    check('doble clic acerca hacia ese punto', v['d'] < 80 and e < 1.5, f"d {v['d']}, error {e:.2f}")
+    await pg.evaluate('__tren.look(1.9,0.5,140,-30,50);__tren.hold(true)')
+    await frames(pg)
+    v0 = await pg.evaluate('__tren.camInfo()')
+    c = await pg.evaluate('__tren.carScreen(3)')
+    await pg.mouse.click(c['x'], c['y'])
+    step, last = 0, v0['p']
+    for _ in range(40):
+        await frames(pg, 1)
+        q = await pg.evaluate('__tren.camInfo().p')
+        step, last = max(step, math.dist(q, last)), q
+    f = await pg.evaluate('__tren.focused')
+    total = math.dist(v0['p'], last)
+    await pg.evaluate('__tren.camSettle()')
+    await pg.click('#focusX')
+    await pg.evaluate('__tren.camSettle()')
+    v1 = await pg.evaluate('__tren.camInfo()')
+    check('al tocar un vagón la cámara vuela sin saltos, y al volver queda como estaba', f and step < 0.35 * max(total, 60) and math.dist(v0['p'], v1['p']) < 1.5, f"vuelo {total:.0f} m, mayor paso {step:.1f} m, vuelta {v0['p']} {v1['p']}")
+    await pg.evaluate('__tren.focus({car:3});__tren.camSettle();__tren.hold(false)')
+    await pg.mouse.move(600, 380)
+    for _ in range(16):
+        await pg.mouse.wheel(0, 150)
+        await frames(pg, 2)
+    check('alejar mucho suelta el vagón', not await pg.evaluate('__tren.focused'))
+    await pg.evaluate('__tren.look(1.57,0.62,120,-10,30)')
+    await pg.keyboard.press('ArrowRight')
+    await frames(pg)
+    v = await pg.evaluate('__tren.camInfo()')
+    await pg.wait_for_timeout(1200)
+    d0 = (await pg.evaluate('__tren.camInfo()'))['d']
+    await pg.click('#nIn')
+    await pg.wait_for_timeout(600)
+    a = await pg.evaluate('__tren.camInfo()')
+    await pg.click('#nRot')
+    await pg.wait_for_timeout(900)
+    z = await pg.evaluate('__tren.camInfo()')
+    await pg.click('#nHome')
+    await pg.wait_for_timeout(1500)
+    h = await pg.evaluate('({...__tren.camInfo(),away:document.getElementById("nav").classList.contains("away")})')
+    check('flechas, botones de acercar y girar, y «Ver toda la maqueta»', v['v'] > 1 and a['d'] < d0 * 0.75 and abs(z['az'] - a['az'] - 0.785) < 0.02 and abs(h['az'] - 1.571) < 0.01 and not h['away'], f"{v['v']} · {d0} → {a['d']} · {a['az']} → {z['az']} · {h}")
+    check('la pista de manejo se va al mover la vista', await pg.evaluate("document.getElementById('navHint').hidden"))
+
+
+async def nav_touch(ctx, pg):
+    """Navegación con dedos (toques de verdad por CDP): arrastrar, pellizcar, girar, inclinar, soltar un dedo y doble toque."""
+    cdp = await ctx.new_cdp_session(pg)
+
+    async def touch(kind, pts):
+        await cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [{'x': x, 'y': y, 'id': i} for i, (x, y) in enumerate(pts)]})
+
+    async def move(a, b, n=12):
+        """Mueve los dedos de las posiciones a a las b."""
+        for i in range(1, n + 1):
+            await touch('touchMove', [(p[0] + (q[0] - p[0]) * i / n, p[1] + (q[1] - p[1]) * i / n) for p, q in zip(a, b)])
+            await frames(pg, 1)
+        await frames(pg)
+
+    view = '__tren.look(1.57,0.8,150,-10,30)'
+    await pg.evaluate(view)
+    await touch('touchStart', [(190, 400)])
+    await move([(190, 400)], [(202, 404)], 3)
+    P = await pg.evaluate('__tren.under(202,404)')
+    await move([(202, 404)], [(120, 520)])
+    e1 = await px_err(pg, P, 120, 520)
+    await pg.wait_for_timeout(150)
+    await touch('touchEnd', [])
+    check('con un dedo, el suelo va pegado al dedo', e1 < 1.5, f'{e1:.2f} px')
+
+    await pg.evaluate(view)
+    a0 = await pg.evaluate('__tren.camInfo()')
+    await touch('touchStart', [(150, 420)])
+    await touch('touchStart', [(150, 420), (230, 420)])
+    await move([(150, 420), (230, 420)], [(142, 420), (238, 420)], 4)
+    P = await pg.evaluate('__tren.under(190,420)')
+    await move([(142, 420), (238, 420)], [(60, 380), (280, 380)])
+    e2 = await px_err(pg, P, 170, 380)
+    a1 = await pg.evaluate('__tren.camInfo()')
+    check('pellizcar acerca y mueve a la vez, con el punto entre los dedos quieto y sin girar', e2 < 2.5 and a1['d'] < a0['d'] * 0.6 and abs(a1['az'] - a0['az']) < 1e-6, f"{e2:.2f} px, d {a0['d']} → {a1['d']}, az {a0['az']} → {a1['az']}")
+    # levantar un dedo: el otro sigue arrastrando sin salto
+    b = await pg.evaluate('__tren.camInfo()')
+    await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': [{'x': 280, 'y': 380, 'id': 1}]})   # se levanta el segundo dedo
+    await frames(pg)
+    c = await pg.evaluate('__tren.camInfo()')
+    P = await pg.evaluate('__tren.under(60,380)')
+    await move([(60, 380)], [(130, 430)])
+    e3 = await px_err(pg, P, 130, 430)
+    await pg.wait_for_timeout(150)
+    await touch('touchEnd', [])
+    check('al levantar un dedo, el otro sigue arrastrando sin salto', math.dist(b['p'], c['p']) < 0.5 and e3 < 2, f"{math.dist(b['p'], c['p']):.2f} m, {e3:.2f} px")
+
+    await pg.evaluate(view)
+    await touch('touchStart', [(110, 420)])
+    await touch('touchStart', [(110, 420), (270, 420)])
+    n, R0 = 14, 80
+    prev = [(110, 420), (270, 420)]
+    for i in range(1, n + 1):
+        t = 0.9 * i / n
+        nxt = [(190 - R0 * math.cos(t), 420 - R0 * math.sin(t)), (190 + R0 * math.cos(t), 420 + R0 * math.sin(t))]
+        await move(prev, nxt, 1)
+        prev = nxt
+    P = await pg.evaluate('__tren.under(190,420)')
+    a = await pg.evaluate('__tren.camInfo()')
+    await touch('touchEnd', [])
+    check('girar dos dedos gira la vista con ellos', -0.9 < a['az'] - 1.57 < -0.5 and 130 < a['d'] < 175, f"az {a['az']}, d {a['d']}")
+
+    await pg.evaluate(view)
+    await touch('touchStart', [(130, 420)])
+    await touch('touchStart', [(130, 420), (250, 420)])
+    await move([(130, 420), (250, 420)], [(130, 330), (250, 330)])
+    a = await pg.evaluate('__tren.camInfo()')
+    await touch('touchEnd', [])
+    check('subir dos dedos a la vez inclina la vista', a['el'] < 0.65 and abs(a['az'] - 1.57) < 0.01, f"el {a['el']}")
+
+    await pg.evaluate('__tren.look(1.57,0.8,250,-10,30);__tren.hold(true)')
+    await frames(pg)
+    c = await pg.evaluate('__tren.carScreen(2)')
+    await pg.touchscreen.tap(c['x'] + 10, c['y'] + 9)
+    await frames(pg)
+    f = await pg.evaluate('__tren.focused')
+    await pg.evaluate('__tren.focus(null);__tren.hold(false);__tren.look(1.57,0.8,150,-10,30)')
+    check('de lejos, un toque cerca del tren (a un dedo) lo sigue', bool(f), str(f))
+    await pg.touchscreen.tap(60, 560)
+    await pg.touchscreen.tap(62, 561)
+    await pg.wait_for_timeout(700)
+    a = await pg.evaluate('({...__tren.camInfo(),f:__tren.focused})')
+    check('doble toque acerca', a['d'] < 110 and not a['f'], str(a['d']))
+    r = await pg.evaluate("(()=>{const h=document.getElementById('nHome').getBoundingClientRect(),s=document.getElementById('shop').getBoundingClientRect();return {vis:getComputedStyle(document.getElementById('nHome')).visibility,in:getComputedStyle(document.getElementById('nIn')).display,b:h.bottom,top:s.top,r:h.right,w:innerWidth,wd:h.width}})()")
+    check('en el móvil solo queda «Ver toda la maqueta», encima de las fichas, cuando te has movido', r['vis'] == 'visible' and r['in'] == 'none' and r['b'] < r['top'] and r['r'] <= r['w'] and r['wd'] >= 40, str(r))
+    await pg.tap('#nHome')
+    await pg.wait_for_timeout(1500)
+    check('y vuelve a la vista de inicio', abs((await pg.evaluate('__tren.camInfo()'))['az'] - 1.571) < 0.01)
 
 
 READY = "window.__tren && window.__tren.ready && !window.__tren.busy"
@@ -75,8 +292,10 @@ async def main():
         z = await pg.evaluate('__tren.camInfo()')
         check('la rueda acerca la cámara hacia el punto que hay bajo el ratón', z['d'] < a['d'] * 0.45 and z['t'][0] > a['t'][0] + 25, f"{a} → {z}")
 
+        await nav_mouse(pg)
+
         # 2) tocar un vagón: la cámara se pega a él y sale su ficha; la rueda lo acerca más; el tren no cambia de ritmo
-        await pg.evaluate('__tren.hold(true);__tren.look(Math.PI/2,0.45,80,-40,55)')   # tren quieto mientras se apunta
+        await pg.evaluate('__tren.hold(true);__tren.dist=12;__tren.look(Math.PI/2,0.45,80,-40,55)')   # tren quieto mientras se apunta
         c = await pg.evaluate('__tren.carScreen(3)')
         await pg.mouse.click(c['x'], c['y'])
         await pg.evaluate('__tren.hold(false)')
@@ -256,6 +475,7 @@ async def main():
           d=document.querySelector('.day').getBoundingClientRect(),n=document.getElementById('tip').getBoundingClientRect();
           return {sw:document.documentElement.scrollWidth,w:innerWidth,shop:s.bottom<=innerHeight+1,minW:Math.min(...its.map(r=>r.width)),minH:Math.min(...its.map(r=>r.height)),dayH:d.height,gap:n.top-d.bottom}})()""")
         check('en el móvil caben la cabecera, las noticias y las tres fichas', r['sw'] <= r['w'] and r['shop'] and r['minW'] >= 90 and r['minH'] >= 44 and r['dayH'] < 24 and r['gap'] >= 0, str(r))
+        await nav_touch(mob, mp)
         await mp.evaluate('__tren.focus({car:2});__tren.camSettle()')
         r = await mp.evaluate("""(()=>{const c=document.getElementById('card').getBoundingClientRect(),s=document.getElementById('shop').getBoundingClientRect();return {l:c.left,r:c.right,b:c.bottom,top:s.top,w:innerWidth,vis:!document.getElementById('card').hidden}})()""")
         check('en el móvil la ficha del vagón cabe encima de las fichas de abajo', r['vis'] and r['l'] >= 0 and r['r'] <= r['w'] and r['b'] <= r['top'], str(r))

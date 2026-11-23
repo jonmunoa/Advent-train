@@ -895,65 +895,145 @@ $('gcHouse').onclick=()=>{const hi=+$('giftCard').dataset.h,name=$('giftCard').d
 $('gcSend').onclick=()=>{const c=$('giftCard');c.hidden=true;setFocus(null);if(RECV_PRE)openGiftSheet('');else openGiftSheet(c.dataset.to,c.dataset.me)};
 $('gcX').onclick=()=>{$('giftCard').hidden=true};
 
-/* ================= cámara: órbita libre con zoom hacia el dedo o el ratón, o pegada a un vagón ================= */
+/* ================= cámara: se maneja como un mapa, o pegada a un vagón =================
+   Arrastrar mueve (el punto del suelo que agarras va pegado al dedo o al ratón), la rueda o el pellizco acercan hacia donde
+   apuntas (ese punto no se mueve de la pantalla), el botón derecho, Mayús o girar dos dedos giran, y dos dedos en vertical inclinan.
+   Los gestos se aplican una vez por fotograma (gesture), siempre sobre la cámara que se ve. */
 const CTR=new THREE.Vector3(BCX,4,BCZ+40),HOME={w:300,d:260};// vista de inicio: encuadra la vía de la etapa
-const cam={az:Math.PI/2,el:0.62,d:300,dT:300,tgt:CTR.clone(),tgtT:CTR.clone(),azT:null,vaz:0,vel:0,follow:false,focus:null,faz:Math.PI/2,fel:0.3,fd:17,fdT:17};
-const camPos=new THREE.Vector3();
-const ptrs=new Map();let pinch0=0,mid0=null,lastInput=-1e9,tap=null;
-const FOV=42,tanH=()=>Math.tan(THREE.MathUtils.degToRad(FOV/2));
+const cam={az:Math.PI/2,el:0.62,d:300,tgt:CTR.clone(),azT:null,vx:0,vz:0,vaz:0,vel:0,focus:null,faz:Math.PI/2,fel:0.3,fd:17,fdT:17,back:null};
+const camPos=new THREE.Vector3(),camLook=new THREE.Vector3(),camDir=new THREE.Vector3(),ease3=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const bl={t:1,dur:.8,p:new THREE.Vector3(),az:0,el:0,hop:0};// vuelo entre dos vistas: sale siempre de lo que se ve
+const zm={on:false,l:0,A:new THREE.Vector3(),x:-1e4,y:0};// zoom suave hacia un punto fijo: l es lo que queda (logaritmo)
+const ptrs=new Map(),gs={moved:false,drag:false,far:false,G:new THREE.Vector3(),hist:[],lastMove:0},pn={};let lastInput=-1e9,tap=null,lastTap={t:-1e9,x:0,y:0},touched=false,hov=null,curs='';
+const FOV=42,MIND=8,tanH=()=>Math.tan(THREE.MathUtils.degToRad(FOV/2));
 const portrait=()=>camera.aspect<0.8,homeEl=()=>portrait()?0.86:0.62;
 const defD=()=>{const v=tanH();return clamp(Math.max(HOME.w/2/(v*camera.aspect),(HOME.d*0.36+18)/v),110,430)},maxD=()=>clamp(defD()*1.5,300,560);
-function clampTgt(){const t=cam.tgtT;t.x=clamp(t.x,BOARD.x0+10,BOARD.x1-10);t.z=clamp(t.z,BOARD.z0+40,BOARD.z1-5);t.y=clamp(t.y,-1,60)}
-function rotate(dx,dy){const k=coarse?0.0075:0.0055;cam.azT=null;
-  if(cam.focus&&cam.focus.car!==undefined){cam.faz-=dx*k;cam.fel=clamp(cam.fel+dy*0.005,0.02,1.35)}
-  else{cam.az-=dx*k;cam.el=clamp(cam.el+dy*0.005,0.06,1.42);cam.vaz=-dx*k*30;cam.vel=dy*0.005*30}}
-function pan(dx,dy){if(cam.focus)setFocus(null);const k=2*cam.d*tanH()/innerHeight,kf=k/Math.max(0.3,Math.sin(cam.el)),s=Math.sin(cam.az),c=Math.cos(cam.az);
-  cam.tgtT.x+=-s*dx*k-c*dy*kf;cam.tgtT.z+=c*dx*k-s*dy*kf;clampTgt()}
-/* zoom hacia el punto que hay bajo el dedo o el ratón: ese punto se queda quieto en la pantalla */
-function zoomAt(sx,sy,f){lastInput=performance.now();cam.azT=null;
-  if(cam.focus&&cam.focus.car!==undefined){cam.fdT=clamp(cam.fdT*f,6.5,90);return}
-  const d1=clamp(cam.dT*f,9,maxD()),k=d1/cam.dT,P=pickGround(sx,sy);
-  if(P)cam.tgtT.sub(P).multiplyScalar(k).add(P);
-  if(k>1)cam.tgtT.lerp(CTR,clamp((k-1)*2.5*sstep(0.5,1,d1/maxD()),0,1));
-  cam.dT=d1;clampTgt()}
-function flyTo(x,z,d,az){if(cam.focus)setFocus(null);setFollow(false);cam.tgtT.set(x,Math.max(0,groundAt(x,z))+2,z);cam.dT=d;if(az!==undefined)cam.azT=az;clampTgt();lastInput=performance.now()}
-canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,sh:e.shiftKey});
-  tap=ptrs.size===1?{id:e.pointerId,x:e.clientX,y:e.clientY,t:e.timeStamp}:null;
-  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);mid0={x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
-  cam.vaz=cam.vel=0;lastInput=performance.now()});
-canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;lastInput=performance.now();
-  if(tap){if(Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<(e.pointerType==='touch'?12:8))return;tap=null}
-  if(ptrs.size===1){if(p.b===2||p.sh||e.shiftKey)pan(dx,dy);else rotate(dx,dy)}
-  else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};if(pinch0>0&&d>0)zoomAt(m.x,m.y,pinch0/d);if(mid0&&!(cam.focus&&cam.focus.car!==undefined))pan(m.x-mid0.x,m.y-mid0.y);pinch0=d;mid0=m}});
-['pointerup','pointercancel'].forEach(ev=>canvas.addEventListener(ev,e=>{const was=ev==='pointerup'&&tap&&tap.id===e.pointerId&&e.timeStamp-tap.t<550;/* hora del gesto, no la del fotograma: un tirón no se come el toque */ptrs.delete(e.pointerId);if(ptrs.size<2){pinch0=0;mid0=null}tap=null;if(was)pick(e.clientX,e.clientY)}));
-canvas.addEventListener('lostpointercapture',e=>{ptrs.delete(e.pointerId);if(ptrs.size<2){pinch0=0;mid0=null}});
+const elMin=()=>lerp(0.1,0.5,sstep(14,95,camPos.y)),ELMAX=1.45;// cuanto más alto, menos rasante: al alejarte, la vista se inclina sola
+const effD=()=>camPos.y/Math.max(0.3,Math.sin(cam.el));// distancia de la vista según la altura: no da saltos al pasar por una montaña
+/* hasta dónde se puede mover el centro: toda la maqueta de cerca y casi solo el centro con el zoom alejado del todo */
+function bounds(){const k=0.8*sstep(0.66,1,effD()/maxD()),f=(a,c)=>lerp(a,c,k);return {x0:f(BOARD.x0+8,CTR.x),x1:f(BOARD.x1-8,CTR.x),z0:f(BOARD.z0+30,CTR.z),z1:f(BOARD.z1-4,CTR.z)}}
+const rubber=(v,lo,hi)=>{const o=v<lo?v-lo:v>hi?v-hi:0;if(!o)return v;const D=0.22*cam.d;return (o<0?lo:hi)+o*D*0.55/(D+0.55*Math.abs(o))};
+function moveTgt(x,z){const b=bounds();cam.tgt.x=rubber(x,b.x0,b.x1);cam.tgt.z=rubber(z,b.z0,b.z1)}
+function stopMotion(){cam.vx=cam.vz=cam.vaz=cam.vel=0;cam.azT=null;zm.on=false}
+/* el centro de giro pasa a ser el suelo que hay en el centro de la pantalla, sin mover la cámara (si estaba volando, se queda donde está) */
+function anchor(){const fly=bl.t<1;camera.getWorldDirection(camDir);if(fly){bl.t=1;cam.el=Math.asin(clamp(-camDir.y,-1,1));cam.az=Math.atan2(-camDir.z,-camDir.x)}
+  let t=groundT(rayAt(innerWidth/2,innerHeight/2));t=t===null?cam.d:clamp(t,5,maxD()*1.2);
+  cam.tgt.copy(camera.position).addScaledVector(camDir,t);cam.d=t}
+function blendFrom(){camera.getWorldDirection(camDir);bl.p.copy(camera.position);bl.az=Math.atan2(-camDir.z,-camDir.x);bl.el=Math.asin(clamp(-camDir.y,-1,1));bl.t=0;bl.hop=-1}
+/* punto del suelo bajo el dedo, sin irse al infinito cerca del horizonte */
+function groundPt(sx,sy,out){const R=rayAt(sx,sy),t=groundT(R);return R.at(Math.min(t||1e9,2.6*cam.d),out)}
+/* agarrar el suelo y llevarlo con el dedo */
+function grab(sx,sy){const R=rayAt(sx,sy),t=groundT(R);gs.far=!t||t>Math.max(3.2*cam.d,60);if(!gs.far)R.at(t,gs.G);gs.hist.length=0}
+function dragTo(sx,sy,dx,dy){let mx,mz;
+  if(gs.far){const k=2*cam.d*tanH()/innerHeight,kf=k/Math.max(0.35,Math.sin(cam.el)),s=Math.sin(cam.az),c=Math.cos(cam.az);mx=-s*dx*k-c*dy*kf;mz=c*dx*k-s*dy*kf}
+  else{const R=rayAt(sx,sy),tm=Math.max(4.2*cam.d,80);let t=(gs.G.y-R.origin.y)/R.direction.y;if(!(t>0)||t>tm)t=tm;R.at(t,tmpV);mx=gs.G.x-tmpV.x;mz=gs.G.z-tmpV.z}
+  moveTgt(cam.tgt.x+mx,cam.tgt.z+mz)}
+function rotate(dx,dy){const k=coarse?0.0075:0.0055;
+  if(cam.focus){cam.faz+=dx*k;cam.fel=clamp(cam.fel+dy*0.005,0.02,1.35)}
+  else{cam.az+=dx*k;cam.el=clamp(cam.el+dy*0.005,elMin(),ELMAX)}}
+/* acercar o alejar k veces respecto a un punto, que se queda quieto en la pantalla */
+function dolly(A,k){cam.tgt.sub(A).multiplyScalar(k).add(A);cam.d*=k}
+function zoomAt(sx,sy,f){lastInput=performance.now();hideHint();
+  if(cam.focus){cam.fdT*=f;if(cam.fdT>78&&f>1){setFocus(null,true)}else{cam.fdT=clamp(cam.fdT,6.5,90);return}}
+  if(!zm.on||Math.hypot(sx-zm.x,sy-zm.y)>14||bl.t<1){anchor();groundPt(sx,sy,zm.A);zm.x=sx;zm.y=sy;if(!zm.on)zm.l=0}
+  cam.vx=cam.vz=0;zm.on=true;zm.l=zoomLim(zm.A,zm.l+Math.log(f))}
+/* tope de zoom: de cerca, por la distancia al punto al que vas; de lejos, por la altura */
+const zoomLim=(A,l)=>clamp(l,Math.min(0,Math.log(MIND/Math.max(1,camera.position.distanceTo(A)))),Math.max(0,Math.log(maxD()/effD())));
+/* inclinar dejando quieto un punto en la pantalla */
+function tiltAbout(A,a){if(A){tmpV.set(Math.sin(cam.az),0,-Math.cos(cam.az));cam.tgt.sub(A).applyAxisAngle(tmpV,-a).add(A)}cam.el+=a}
+function goHome(){if(cam.focus)setFocus(null);blendFrom();stopMotion();cam.tgt.copy(CTR);cam.d=defD();cam.el=homeEl();cam.az=Math.PI/2;lastInput=performance.now()}
+function flyTo(x,z,d,az){if(cam.focus)setFocus(null);blendFrom();stopMotion();cam.tgt.set(x,Math.max(0,groundAt(x,z))+2,z);cam.d=d;if(az!==undefined)cam.az=az;cam.el=clamp(cam.el,0.35,0.75);lastInput=performance.now()}
+/* dos dedos: pellizcar, girar y mover a la vez (todo pegado a los dedos), o inclinar si los dos suben o bajan juntos */
+function pinchStart(){const [a,b]=[...ptrs.values()];Object.assign(pn,{d:Math.hypot(a.x-b.x,a.y-b.y),ang:Math.atan2(b.y-a.y,b.x-a.x),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,ax:a.x,ay:a.y,bx:b.x,by:b.y,mode:null,rot:0});pn.d0=pn.d;pn.a0=pn.ang;if(!cam.focus){anchor();pn.A=groundPt(pn.mx,pn.my,pn.A||new THREE.Vector3())}}
+function pinchMove(){const [a,b]=[...ptrs.values()],d=Math.max(20,Math.hypot(a.x-b.x,a.y-b.y)),ang=Math.atan2(b.y-a.y,b.x-a.x),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  if(!pn.mode){const ya=a.y-pn.ay,yb=b.y-pn.by,xa=a.x-pn.ax,xb=b.x-pn.bx,tw=Math.abs(wrapA(ang-pn.a0)),par=ya*yb>0&&Math.min(Math.abs(ya),Math.abs(yb))>9&&Math.abs(xa)+Math.abs(xb)<0.8*(Math.abs(ya)+Math.abs(yb));
+    if(par&&Math.abs(d/pn.d0-1)<0.12&&tw<0.16)pn.mode='tilt';else if(Math.abs(d-pn.d0)>9||tw>0.09||Math.hypot(mx-pn.mx,my-pn.my)>16)pn.mode='pin';else return;
+    pn.d=d;pn.ang=ang;pn.mx=mx;pn.my=my;if(pn.mode==='pin'&&!cam.focus)groundPt(mx,my,pn.A);return}
+  const k=pn.d/d;let tw=wrapA(ang-pn.ang);pn.rot+=tw;if(Math.abs(pn.rot)<0.12&&!pn.turn)tw=0;else pn.turn=true;// girar solo si se gira a propósito
+  if(pn.mode==='tilt')rotate(0,(my-pn.my)*1.25);
+  else if(cam.focus){cam.fd=cam.fdT=clamp(cam.fd*k,6.5,90);cam.faz-=tw;if(cam.fd>78&&k>1){setFocus(null,true);groundPt(mx,my,pn.A=pn.A||new THREE.Vector3())}}
+  else{const lo=camera.position.distanceTo(pn.A)<MIND&&k<1,hi=effD()>maxD()&&k>1;dolly(pn.A,lo||hi?Math.pow(k,0.3):k);
+    if(tw){cam.az-=tw;const x=cam.tgt.x-pn.A.x,z=cam.tgt.z-pn.A.z,c=Math.cos(-tw),s=Math.sin(-tw);cam.tgt.x=pn.A.x+x*c-z*s;cam.tgt.z=pn.A.z+x*s+z*c}
+    freePose();placeCam();gs.G.copy(pn.A);gs.far=false;dragTo(mx,my,mx-pn.mx,my-pn.my)}
+  pn.d=d;pn.ang=ang;pn.mx=mx;pn.my=my}
+function gesture(){if(!gs.moved||!ptrs.size)return;gs.moved=false;
+  if(ptrs.size>1){if(ptrs.size===2)pinchMove();return}
+  const q=ptrs.values().next().value,dx=q.x-q.px,dy=q.y-q.py;if(!gs.drag)return;q.px=q.x;q.py=q.y;
+  if(cam.focus||q.rot)rotate(dx,dy);else dragTo(q.x,q.y,dx,dy);
+  gs.hist.push({t:performance.now(),x:cam.tgt.x,z:cam.tgt.z,az:cam.focus?cam.faz:cam.az,el:cam.focus?cam.fel:cam.el});if(gs.hist.length>8)gs.hist.shift()}
+/* al empezar a arrastrar (o al levantar uno de los dos dedos): se agarra desde donde está ahora, sin salto */
+function startDrag(){const q=ptrs.values().next().value;gs.drag=true;q.px=q.x;q.py=q.y;gs.hist.length=0;hideHint();if(cam.focus)return;if(bl.t<1)anchor();if(q.rot)anchor();else grab(q.x,q.y)}
+/* al soltar, sigue con la velocidad que llevaba el dedo */
+function throwIt(q){const H=gs.hist,now=performance.now();if(H.length<2||now-gs.lastMove>70)return;const b=H[H.length-1],a=H.find(h=>b.t-h.t<110)||H[0],T0=(b.t-a.t)/1000;if(T0<0.012)return;
+  if(cam.focus||q.rot){cam.vaz=clamp((b.az-a.az)/T0,-4,4);cam.vel=clamp((b.el-a.el)/T0,-3,3)}
+  else{const vm=2.2*cam.d;let vx=(b.x-a.x)/T0,vz=(b.z-a.z)/T0;const v=Math.hypot(vx,vz);if(v>vm){vx*=vm/v;vz*=vm/v}cam.vx=vx;cam.vz=vz}}
+const setCursor=c=>{if(c!==curs){curs=c;canvas.style.cursor=c}};
+canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId)}catch(_){}if(ready)updateCam(0);touched=true;stopMotion();gs.moved=false;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY,rot:e.button===2||e.button===1||e.shiftKey||e.ctrlKey||e.metaKey});
+  tap=ptrs.size===1&&e.button===0?{id:e.pointerId,x:e.clientX,y:e.clientY,t:e.timeStamp}:null;gs.drag=false;
+  if(!cam.focus&&bl.t<1&&ready)anchor();// agarrar la vista en pleno vuelo la para ahí
+  if(ptrs.size===2&&ready)pinchStart();else if(ptrs.size===1&&e.button===1)e.preventDefault();
+  if(ptrs.size===1)setCursor(ptrs.get(e.pointerId).rot||cam.focus?'move':'grabbing');lastInput=performance.now()});
+canvas.addEventListener('pointermove',e=>{const q=ptrs.get(e.pointerId);if(!q){if(e.pointerType==='mouse')hov={x:e.clientX,y:e.clientY};return}
+  q.x=e.clientX;q.y=e.clientY;lastInput=gs.lastMove=performance.now();gs.moved=true;
+  if(ptrs.size===1&&!gs.drag){if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<(e.pointerType==='touch'?9:4))return;tap=null;if(ready)startDrag()}});
+['pointerup','pointercancel'].forEach(ev=>canvas.addEventListener(ev,e=>{const q=ptrs.get(e.pointerId);if(!q)return;const was=ev==='pointerup'&&tap&&tap.id===e.pointerId&&e.timeStamp-tap.t<550;/* hora del gesto, no la del fotograma: un tirón no se come el toque */
+  if(ready)updateCam(0);const n=ptrs.size;ptrs.delete(e.pointerId);tap=null;lastInput=performance.now();
+  if(n===2){pn.turn=false;if(!cam.focus&&pn.mode==='pin'){const l=Math.log(effD()>maxD()?maxD()/effD():camera.position.distanceTo(pn.A)<MIND?MIND/camera.position.distanceTo(pn.A):1);if(l){zm.on=true;zm.l=l;zm.A.copy(pn.A);zm.x=-1e4}}if(ready)startDrag()}
+  else if(n===1){if(gs.drag&&ev==='pointerup')throwIt(q);gs.drag=false;setCursor('grab');hov=e.pointerType==='mouse'?{x:e.clientX,y:e.clientY}:null}
+  if(was&&!pick(e.clientX,e.clientY,e.pointerType==='touch'?22:6)){const dbl=e.timeStamp-lastTap.t<340&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<32;lastTap={t:dbl?-1e9:e.timeStamp,x:e.clientX,y:e.clientY};if(dbl)zoomAt(e.clientX,e.clientY,0.5)}}));
+canvas.addEventListener('lostpointercapture',e=>{ptrs.delete(e.pointerId)});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(clamp(e.deltaY,-120,120)*0.0016))},{passive:false});
-function updateCam(dt){const idle=(performance.now()-lastInput)/1000,s=1-Math.exp(-7*dt);
-  if(!ptrs.size){cam.az+=cam.vaz*dt;cam.el=clamp(cam.el+cam.vel*dt,0.06,1.42);cam.vaz*=Math.exp(-5*dt);cam.vel*=Math.exp(-5*dt)}
-  if(cam.azT!==null){cam.az+=wrapA(cam.azT-cam.az)*s;if(Math.abs(wrapA(cam.azT-cam.az))<0.002)cam.azT=null}
-  if(idle>8&&!REDUCED&&!cam.focus&&!cam.follow)cam.az+=dt*0.018;
-  const fc=cam.focus&&cam.focus.car!==undefined?cars[cam.focus.car]:null;let px,py,pz;
-  if(fc){const yaw=-fc.rotation.y;cam.fd=lerp(cam.fd,cam.fdT,s);tmpV.set(fc.position.x,fc.position.y+2.7,fc.position.z);cam.tgt.lerp(tmpV,1-Math.exp(-14*dt));
-    const a=yaw+cam.faz,ce=Math.cos(cam.fel);px=cam.tgt.x+Math.cos(a)*ce*cam.fd;py=cam.tgt.y+Math.sin(cam.fel)*cam.fd;pz=cam.tgt.z+Math.sin(a)*ce*cam.fd}
-  else if(cam.follow&&cars[0]){const L=cars[0],yaw=-L.rotation.y,fx=Math.cos(yaw),fz=Math.sin(yaw);tmpV.set(L.position.x+fx*12,L.position.y+2,L.position.z+fz*12);cam.tgt.lerp(tmpV,1-Math.exp(-5*dt));px=L.position.x-fx*20-fz*8;py=L.position.y+10;pz=L.position.z-fz*20+fx*8}
-  else{cam.d=lerp(cam.d,cam.dT,s);cam.tgt.lerp(cam.tgtT,s);const ce=Math.cos(cam.el);px=cam.tgt.x+Math.cos(cam.az)*ce*cam.d;py=cam.tgt.y+Math.sin(cam.el)*cam.d;pz=cam.tgt.z+Math.sin(cam.az)*ce*cam.d}
-  const gy=groundAt(px,pz)+1.4;if(py<gy)py=gy;
-  if(cam.follow&&!fc)camPos.lerp(tmpV2.set(px,py,pz),1-Math.exp(-4*dt));else camPos.set(px,py,pz);
+/* rueda o panel táctil (pellizcar en el panel llega como rueda con Ctrl) */
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(!ready)return;touched=true;const px=e.deltaY*(e.deltaMode===1?33:e.deltaMode===2?innerHeight:1);zoomAt(e.clientX,e.clientY,Math.exp(e.ctrlKey?clamp(px,-40,40)*0.011:clamp(px,-160,160)*0.0021))},{passive:false});
+/* cámara libre: posición a partir del centro, el giro, la inclinación y la distancia, sin meterse en el suelo */
+function freePose(){const ce=Math.cos(cam.el);camPos.set(cam.tgt.x+Math.cos(cam.az)*ce*cam.d,cam.tgt.y+Math.sin(cam.el)*cam.d,cam.tgt.z+Math.sin(cam.az)*ce*cam.d);
+  const gy=groundAt(camPos.x,camPos.z)+1.8;if(camPos.y<gy){cam.tgt.y+=gy-camPos.y;camPos.y=gy}camLook.copy(cam.tgt)}
+function placeCam(){camera.position.copy(camPos);camera.lookAt(camLook);camera.updateMatrixWorld()}
+function freeStep(dt){
+  if(zm.on){const q=zm.l*(1-Math.exp(-13*dt));zm.l-=q;dolly(zm.A,Math.exp(q));freePose();placeCam();anchor();if(Math.abs(zm.l)<0.0015)zm.on=false}
+  const b=bounds(),t=cam.tgt,out=t.x<b.x0||t.x>b.x1||t.z<b.z0||t.z>b.z1;
+  if(!ptrs.size){if(cam.vx||cam.vz){t.x+=cam.vx*dt;t.z+=cam.vz*dt;const f=Math.exp(-(out?16:4.2)*dt);cam.vx*=f;cam.vz*=f;if(Math.hypot(cam.vx,cam.vz)<0.01*cam.d)cam.vx=cam.vz=0}
+    if(cam.vaz||cam.vel){cam.az+=cam.vaz*dt;cam.el+=cam.vel*dt;const f=Math.exp(-6*dt);cam.vaz*=f;cam.vel*=f;if(Math.abs(cam.vaz)+Math.abs(cam.vel)<0.004)cam.vaz=cam.vel=0}
+    if(out){const s=1-Math.exp(-9*dt);t.x=lerp(t.x,clamp(t.x,b.x0,b.x1),s);t.z=lerp(t.z,clamp(t.z,b.z0,b.z1),s)}}
+  if(cam.azT!==null){cam.az+=wrapA(cam.azT-cam.az)*(1-Math.exp(-9*dt));if(Math.abs(wrapA(cam.azT-cam.az))<0.002)cam.azT=null}
+  const em=elMin();if(cam.el<em)tiltAbout(zm.on?zm.A:ptrs.size===2&&pn.mode==='pin'?pn.A:null,(em-cam.el)*(1-Math.exp(-8*dt)));if(cam.el>ELMAX)cam.el=ELMAX;
+  if(!touched&&!REDUCED&&performance.now()-lastInput>8000)cam.az+=dt*0.018;// solo gira sola hasta que la tocas por primera vez
+  freePose()}
+function updateCam(dt){gesture();const s=1-Math.exp(-7*dt);
+  const fc=cam.focus?cars[cam.focus.car]:null;
+  if(fc){if(!ptrs.size&&(cam.vaz||cam.vel)){cam.faz+=cam.vaz*dt;cam.fel=clamp(cam.fel+cam.vel*dt,0.02,1.35);const f=Math.exp(-6*dt);cam.vaz*=f;cam.vel*=f}
+    const yaw=-fc.rotation.y;cam.fd=lerp(cam.fd,cam.fdT,1-Math.exp(-11*dt));tmpV.set(fc.position.x,fc.position.y+2.7,fc.position.z);cam.tgt.lerp(tmpV,1-Math.exp(-14*dt));
+    const a=yaw+cam.faz,ce=Math.cos(cam.fel);camPos.set(cam.tgt.x+Math.cos(a)*ce*cam.fd,cam.tgt.y+Math.sin(cam.fel)*cam.fd,cam.tgt.z+Math.sin(a)*ce*cam.fd);camLook.copy(cam.tgt);
+    const gy=groundAt(camPos.x,camPos.z)+1.4;if(camPos.y<gy)camPos.y=gy}
+  else freeStep(dt);
   // en un túnel, la cámara entra con el tren: un fundido corto y va por dentro de la gruta, mirando el costado del coche
-  const fcar=fc?cam.focus.car:(cam.follow?0:-1);let inT=false;
+  const fcar=fc?cam.focus.car:-1;let inT=false;
   if(fcar>=0&&T){const s0=dist+OFFS[fcar];inT=kindAt(T,s0+2.5)===KT||kindAt(T,s0-2.5)===KT}
   cutK=fcar<0?0:inT?Math.min(1,cutK+dt/0.5):Math.max(0,cutK-dt/0.5);const inside=fcar>=0&&cutK>=0.5;
-  if(inside){const s0=dist+OFFS[fcar],side=Math.sin(cam.faz)>=0?1:-1,sc=caveClamp(s0,s0+(fc?(portrait()?7.5:3.5):11)),q=atM(T,sc),w=caveW(sc)||4,lat=side*clamp(w-1.1,2.2,fc?6.4:3.2),lk=atM(T,fc?s0:s0-1);
+  if(inside){bl.t=1;const s0=dist+OFFS[fcar],side=Math.sin(cam.faz)>=0?1:-1,sc=caveClamp(s0,s0+(portrait()?7.5:3.5)),q=atM(T,sc),w=caveW(sc)||4,lat=side*clamp(w-1.1,2.2,6.4),lk=atM(T,s0);
     camera.position.set(q.x-Math.sin(q.a)*lat,q.y+2.9,q.z+Math.cos(q.a)*lat);camera.lookAt(lk.x,lk.y+2.7,lk.z)}
-  else{camera.position.copy(camPos);camera.lookAt(cam.tgt)}
+  else{
+    if(bl.t<1){if(bl.hop<0){const D=bl.p.distanceTo(camPos);bl.dur=REDUCED?0.001:clamp(0.5+D/420,0.55,1.15);bl.hop=Math.min(26,D*0.1)}
+      bl.t=Math.min(1,bl.t+dt/bl.dur);const e=ease3(bl.t);camDir.copy(camPos).sub(camLook);const az=Math.atan2(camDir.z,camDir.x),el=Math.atan2(camDir.y,Math.hypot(camDir.x,camDir.z)),a=bl.az+wrapA(az-bl.az)*e,l=lerp(bl.el,el,e);
+      camPos.lerpVectors(bl.p,camPos,e);camPos.y+=bl.hop*Math.sin(Math.PI*e);const gy=groundAt(camPos.x,camPos.z)+1.4;if(camPos.y<gy)camPos.y=gy;
+      camLook.set(camPos.x-Math.cos(a)*Math.cos(l),camPos.y-Math.sin(l),camPos.z-Math.sin(a)*Math.cos(l))}
+    camera.position.copy(camPos);camera.lookAt(camLook)}
   const fov=inside?(portrait()?66:48):FOV;if(camera.fov!==fov){camera.fov=fov;camera.updateProjectionMatrix()}
   if(snow.visible===inside){snow.visible=!inside;key.intensity=inside?0.4:1.25;hemi.intensity=inside?1:0.42}camera.updateMatrixWorld();
   {const op=Math.round(Math.min(1,(1-Math.abs(2*cutK-1))*1.6)*50)/50;if(op!==fadeOp){fadeOp=op;$('tunFade').style.opacity=op}}
   cutK2=lerp(cutK2,fcar>=0&&!inside?1:0,1-Math.exp(-5*dt));CUT.r.value=cutK2<0.02?0:cutK2*5;if(CUT.r.value>0&&fcar>=0){const c=cars[fcar];CUT.a.value.copy(camera.position);CUT.b.value.set(c.position.x,c.position.y+2.4,c.position.z)}// los abetos no tapan el coche que sigues
-  grade.uniforms.tilt.value=lerp(grade.uniforms.tilt.value,coarse||fc||cam.follow?0:0.85*sstep(70,220,cam.d),1-Math.exp(-3*dt));grade.uniforms.focus.value=0.5}
-function setFollow(on){cam.follow=on;$('bCam').classList.toggle('on',on);$('bCam').setAttribute('aria-pressed',on);$('bCam').title=on?'Ver la maqueta (C)':'Seguir al tren (C)';if(!on){cam.tgtT.copy(cam.tgt);cam.dT=cam.d=clamp(camera.position.distanceTo(cam.tgt),9,maxD())}}
-function snapCam(){cam.d=cam.dT;cam.tgt.copy(cam.tgtT);updateCam(0)}
+  if(hov&&!ptrs.size){setCursor(hitCar(hov.x,hov.y,6)>=0||hitHouse(hov.x,hov.y)?'pointer':cam.focus?'move':'grab');hov=null}
+  navUI();
+  grade.uniforms.tilt.value=lerp(grade.uniforms.tilt.value,coarse||fc?0:0.85*sstep(70,220,cam.d),1-Math.exp(-3*dt));grade.uniforms.focus.value=0.5}
+/* el botón «Ver toda la maqueta» solo destaca si te has ido de la vista de inicio */
+let awayOn=null;function navUI(){const aw=!!cam.focus||Math.abs(Math.log(cam.d/defD()))>0.12||cam.tgt.distanceTo(CTR)>0.12*cam.d||Math.abs(wrapA(cam.az-Math.PI/2))>0.25;if(aw!==awayOn){awayOn=aw;$('nav').classList.toggle('away',aw)}}
+/* seguir al tren desde atrás (el botón del ojo) */
+function setFollow(on){if(on)setFocus({car:0,chase:true});else if(cam.focus&&cam.focus.chase)setFocus(null)}
+function snapCam(){bl.t=1;zm.on=false;updateCam(0)}
+/* pista de manejo: se ve la primera vez y se va en cuanto mueves la vista */
+let hintOn=false;function showHint(){if(store.get('advx-tren-nav'))return;hintOn=true;const h=$('navHint');h.innerHTML=coarse?'<b>Un dedo</b> mueve · <b>pellizca</b> para acercar · <b>gira</b> con dos dedos':'<b>Arrastra</b> para moverte · <b>rueda</b> para acercarte · <b>botón derecho</b> para girar';h.hidden=false}
+function hideHint(){if(!hintOn)return;hintOn=false;store.set('advx-tren-nav','1');$('navHint').classList.add('bye');setTimeout(()=>{$('navHint').hidden=true},260)}
 /* tocar: un vagón (la cámara se pega a él) o tu casa */
 const RC=new THREE.Raycaster(),NDC=new THREE.Vector2(),_inv=new THREE.Matrix4(),_box=new THREE.Box3(),_ray=new THREE.Ray();
 function rayAt(sx,sy){NDC.set(sx/innerWidth*2-1,-(sy/innerHeight)*2+1);RC.setFromCamera(NDC,camera);return RC.ray}
@@ -962,13 +1042,17 @@ function groundT(R,max=1800){const o=R.origin,d=R.direction;if(o.y<groundAt(o.x,
   while(t<max){t+=step;const y=o.y+d.y*t;if(y<groundAt(o.x+d.x*t,o.z+d.z*t)){let a=t-step,b=t;for(let k=0;k<14;k++){const m=(a+b)/2;if(o.y+d.y*m<groundAt(o.x+d.x*m,o.z+d.z*m))b=m;else a=m}return (a+b)/2}
     if(y<-3&&d.y<0)return null;step=Math.max(0.8,t*0.012)}return null}
 function pickGround(sx,sy){const R=rayAt(sx,sy),t=groundT(R);return t===null?null:R.at(t,new THREE.Vector3())}
-function pick(sx,sy){if(!ready||busy)return;au();const R=rayAt(sx,sy),tg=groundT(R)||1e9;let bt=1e9;// 0: la cámara está dentro de la montaña (en un túnel)
-  // coches del tren
-  let bc=-1;cars.forEach((c,ci)=>{_inv.copy(c.matrixWorld).invert();_ray.copy(R).applyMatrix4(_inv);const L=c.userData.len/2;_box.min.set(-L,0.3,-1.7);_box.max.set(L,c.userData.top,1.7);
-    const p=_ray.intersectBox(_box,tmpV2);if(p){const t=p.applyMatrix4(c.matrixWorld).distanceTo(R.origin);if(t<bt&&t<tg+1){bt=t;bc=ci}}});
-  if(bc>=0){setFocus({car:bc});return}
-  // tu casa
-  const h=st.mine>=0&&HS[st.mine];if(h){const c=h.g.position,t=tmpV.copy(c).sub(R.origin).dot(R.direction);if(t>0&&R.at(t,tmpV2).distanceTo(c)<6&&t<tg+6)focusHouse()}}
+/* coche bajo el dedo: primero el que se toca de lleno; si no, el más cercano a menos de «slop» píxeles (de lejos el tren es muy pequeño) */
+function hitCar(sx,sy,slop){const R=rayAt(sx,sy),tg=groundT(R)||1e9,px=2*tanH()/innerHeight;let bt=1e9,bc=-1,nd=1e9,nc=-1;// groundT 0: la cámara está dentro de la montaña (en un túnel)
+  cars.forEach((c,ci)=>{_inv.copy(c.matrixWorld).invert();_ray.copy(R).applyMatrix4(_inv);const L=c.userData.len/2;
+    _box.min.set(-L,0.3,-1.7);_box.max.set(L,c.userData.top,1.7);const p=_ray.intersectBox(_box,tmpV2);
+    if(p){const t=p.applyMatrix4(c.matrixWorld).distanceTo(R.origin);if(t<bt&&t<tg+1){bt=t;bc=ci}}
+    else if(slop){const e=slop*px*c.position.distanceTo(R.origin);_box.expandByScalar(e);const q=_ray.intersectBox(_box,tmpV2);if(q){const t=q.applyMatrix4(c.matrixWorld).distanceTo(R.origin),dd=R.distanceToPoint(tmpV.copy(c.position));if(t<tg+1+2*e&&dd<nd){nd=dd;nc=ci}}}});
+  return bc>=0?bc:nc}
+function hitHouse(sx,sy){const h=st.mine>=0&&HS[st.mine];if(!h)return false;const R=rayAt(sx,sy),tg=groundT(R)||1e9,c=h.g.position,t=tmpV.copy(c).sub(R.origin).dot(R.direction);return t>0&&R.at(t,tmpV2).distanceTo(c)<6&&t<tg+6}
+function pick(sx,sy,slop=6){if(!ready||busy)return false;au();const bc=hitCar(sx,sy,slop);
+  if(bc>=0){if(!(cam.focus&&cam.focus.car===bc&&!cam.focus.chase))setFocus({car:bc});return true}
+  if(hitHouse(sx,sy)){focusHouse();return true}return false}
 function focusHouse(){const h=HS[st.mine];if(!h)return;const sl=SL[st.mine];flyTo(h.g.position.x,h.g.position.z,40,Math.atan2(-sl.nz,-sl.nx))}
 
 /* ================= marcas en los furgones: imagen y texto en los dos costados, con enlace ================= */
@@ -1058,7 +1142,7 @@ function uiShop(){const E=tiles.tGift;if(!E)return;const left=giftsLeft(st);
 const dayE={c:{}};
 async function expand(){busy=true;if(!FASTSTEP){grade.uniforms.flash.value=0.45;bells()}
   await buildWorld(st.stage);buildDeco();placeTown(true);markMine();downgrade(scene);dist=2;WAG.slice(1).forEach(W=>fillWagon(W));poseTrain(dist);if(GIFT&&GIFT.mode==='rec')clearGift();if(RECV_TAG){dropObj(RECV_TAG);RECV_TAG=null}
-  if(!cam.focus&&!cam.follow){cam.tgtT.copy(CTR);cam.dT=defD();cam.el=homeEl();cam.az=Math.PI/2}
+  if(!cam.focus)goHome()
   if(!FASTSTEP&&treeParts[0]){confettiBurst(treeParts[0].top.clone(),30);for(let i=0;i<6;i++)fwQ.push({at:performance.now()/1000+0.3+i*0.35,p:new THREE.Vector3(BCX+(Math.random()-.5)*120,70+Math.random()*30,BCZ+40+(Math.random()-.5)*80)})}
   busy=false;uiShop()}
 /* tu casa: estrella encima y cartel con tu nombre */
@@ -1147,18 +1231,29 @@ function floatAt(p,text,cls){if(FASTSTEP)return;tmpV.copy(p);tmpV.y+=2.5;tmpV.pr
   s.getAnimations().forEach(a=>a.cancel());
   s.animate(REDUCED?[{opacity:0},{opacity:1,offset:.2},{opacity:0}]:[{opacity:0,transform:'translate(-50%,-20%) scale(.9)'},{opacity:1,offset:.18,transform:'translate(-50%,-90%) scale(1)'},{opacity:0,transform:'translate(-50%,-260%) scale(1)'}],{duration:cls==='me'?1700:1100,easing:'cubic-bezier(.23,1,.32,1)',fill:'forwards'})}
 /* cámara pegada a un vagón (con su ficha) o libre */
-function setFocus(f){if(!f&&previewOf)endPreview();const was=cam.focus;
-  if(f&&f.car!==undefined){const c=cars[f.car];if(!c)return;if(cam.follow)setFollow(false);const yaw=-c.rotation.y,ca=Math.atan2(camera.position.z-c.position.z,camera.position.x-c.position.x);
-    cam.faz=Math.sin(ca-yaw)>=0?Math.PI/2:-Math.PI/2;cam.fel=0.3;const wag=f.car>=2&&f.car<cars.length-1;cam.fdT=wag?clamp(4.8/(tanH()*camera.aspect),12,46):18;if(!was)cam.fd=Math.min(80,camera.position.distanceTo(c.position))}
-  else if(was&&was.car!==undefined){cam.tgtT.copy(cam.tgt);cam.d=cam.fd;cam.dT=clamp(cam.fd*2.2,30,maxD());const c=cars[was.car];if(c){cam.az=-c.rotation.y+cam.faz;cam.el=clamp(cam.fel,0.06,1.42)}}
-  cam.focus=f||null;lastInput=performance.now();
+/* keep: al soltarlo alejando el zoom, la vista se queda donde está; si no, vuelve a la que tenías antes de seguirlo */
+function setFocus(f,keep){if(!f&&previewOf)endPreview();const was=cam.focus;
+  if(f){const c=cars[f.car];if(!c)return;const yaw=-c.rotation.y,ca=Math.atan2(camera.position.z-c.position.z,camera.position.x-c.position.x);
+    if(!was)cam.back={x:cam.tgt.x,y:cam.tgt.y,z:cam.tgt.z,d:cam.d,az:cam.az,el:cam.el};blendFrom();stopMotion();
+    if(f.chase){cam.faz=Math.PI-0.45;cam.fel=0.36;cam.fdT=26}
+    else{cam.faz=Math.sin(ca-yaw)>=0?Math.PI/2:-Math.PI/2;cam.fel=0.3;cam.fdT=f.car>=2&&f.car<cars.length-1?clamp(4.8/(tanH()*camera.aspect),12,46):18}
+    cam.fd=cam.fdT;cam.tgt.set(c.position.x,c.position.y+2.7,c.position.z);hideHint()}
+  else if(was){cam.vaz=cam.vel=0;if(keep){bl.t=0;cam.focus=null;cam.d=cam.fd;anchor()}else{blendFrom();const b=cam.back;if(b){cam.tgt.set(b.x,b.y,b.z);cam.d=b.d;cam.az=b.az;cam.el=b.el}else{cam.tgt.copy(CTR);cam.d=defD();cam.el=homeEl();cam.az=Math.PI/2}}}
+  cam.focus=f||null;lastInput=performance.now();document.body.classList.toggle('foc',!!f);{const on=!!(f&&f.chase),b=$('bCam');b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);b.title=on?'Ver la maqueta (C)':'Seguir al tren (C)'}
   const wi=f&&f.car!==undefined?f.car-1:-1;if(wi>=1&&wi<WAG.length)showCard(wi);else hideCard();
   const pill=$('focusX');pill.hidden=!f;if(f)pill.textContent=f.preview?'Vista previa · Volver':'Volver a la maqueta'}
 $('focusX').onclick=()=>{const wasPrev=previewOf;setFocus(null);if(wasPrev)openAd()};
-$('bCam').onclick=()=>{au();setFocus(null);setFollow(!cam.follow)};
+$('bCam').onclick=()=>{au();setFollow(!(cam.focus&&cam.focus.chase))};
+/* botones de la vista */
+const mid=()=>[innerWidth/2,innerHeight/2],turn=a=>{touched=true;if(cam.focus){cam.vaz=a*6;return}anchor();cam.vaz=0;cam.azT=(cam.azT===null?cam.az:cam.azT)+a;lastInput=performance.now();hideHint()};
+$('nIn').onclick=()=>{touched=true;zoomAt(...mid(),0.62)};$('nOut').onclick=()=>{touched=true;zoomAt(...mid(),1.6)};$('nRot').onclick=()=>turn(Math.PI/4);$('nHome').onclick=()=>{touched=true;hideHint();goHome()};
+function nudge(dx,dy){touched=true;hideHint();if(cam.focus)return rotate(-dx*1.2,-dy);if(bl.t<1)anchor();const k=2.1*cam.d*tanH()/innerHeight,s=Math.sin(cam.az),c=Math.cos(cam.az),v=6;cam.vx=clamp(cam.vx+(s*dx+c*dy)*k*v,-1.4*cam.d,1.4*cam.d);cam.vz=clamp(cam.vz+(-c*dx+s*dy)*k*v,-1.4*cam.d,1.4*cam.d);lastInput=performance.now()}
+const NAVK={ArrowLeft:[-34,0],ArrowRight:[34,0],ArrowUp:[0,-34],ArrowDown:[0,34],a:[-34,0],d:[34,0],w:[0,-34],s:[0,34]};
+addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||!ready||anyModal()||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.length===1?e.key.toLowerCase():e.key;
+  if(NAVK[k]){e.preventDefault();nudge(...NAVK[k])}else if(k==='+'||k==='=')zoomAt(...mid(),0.75);else if(k==='-')zoomAt(...mid(),1.34);else if(k==='q'&&!e.repeat)turn(-Math.PI/6);else if(k==='e'&&!e.repeat)turn(Math.PI/6);else if(k==='0'||k==='Home'){touched=true;goHome()}});
 addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Escape'){const m=anyModal();if(m)closeModal(m.id);else if(!$('giftCard').hidden)$('giftCard').hidden=true;else if(cam.focus)setFocus(null);return}
   if(anyModal()||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  if(!e.repeat&&(e.key==='c'||e.key==='C')){setFocus(null);setFollow(!cam.follow)}else if(!e.repeat&&(e.key==='r'||e.key==='R'))openGiftSheet()});
+  if(!e.repeat&&(e.key==='c'||e.key==='C'))setFollow(!(cam.focus&&cam.focus.chase));else if(!e.repeat&&(e.key==='r'||e.key==='R'))openGiftSheet()});
 new ResizeObserver(()=>document.documentElement.style.setProperty('--shop-h',$('shop').offsetHeight+'px')).observe($('shop'));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&ready)save()});
 addEventListener('pagehide',()=>{if(ready)save()});
@@ -1208,7 +1303,7 @@ function fx(dt,t){
      G.op=lerp(G.op,want,k);G.mats.forEach(m=>{m.opacity=G.op;m.depthWrite=G.op>0.98});G.o.visible=G.op>0.04;const sh=G.op>0.5;if(G.sh!==sh){G.sh=sh;G.o.traverse(c=>{if(c.isMesh)c.castShadow=sh})}}}
   grade.uniforms.flash.value*=Math.exp(-5*dt);grade.uniforms.t.value=t;
   burstBudget=Math.min(3,burstBudget+dt*2);if(noneT>0)noneT-=dt;
-  if(beam)beam.visible=!cam.follow&&!inTun;
+  if(beam)beam.visible=!(cam.focus&&cam.focus.chase)&&!inTun;
   if(mineMark){mineMark.star.rotation.y=t*1.4;mineMark.star.position.y=mineMark.y+Math.sin(t*2.2)*0.35}
   // esquiadores: bajan haciendo eses y vuelven a salir de arriba
   if(SKI){const S=SKI;S.list.forEach((s,i)=>{s.s+=dt*s.v;if(s.s>S.L)s.s=0;const q=S.at(s.s),ph=t*s.f+s.ph,lat=Math.sin(ph)*4,wd=Math.cos(ph)*s.f*4,x=q.x-q.dz*lat,z=q.z+q.dx*lat,vx=q.dx*s.v-q.dz*wd,vz=q.dz*s.v+q.dx*wd;
@@ -1267,8 +1362,8 @@ async function boot(){
   await buildWorld(st.stage);buildDeco();placeTown(false);
   WAG.slice(1).forEach(W=>fillWagon(W));poseTrain(dist);vCur=TRAIN_V;
   await fontP;markMine();await applyAds();downgrade(scene);
-  cam.tgtT.copy(CTR);cam.dT=defD();cam.el=homeEl();snapCam();trainInst();
-  prog(100,'');ready=true;$('load').classList.add('done');uiShop();
+  cam.tgt.copy(CTR);cam.d=defD();cam.el=homeEl();snapCam();trainInst();setCursor('grab');
+  prog(100,'');ready=true;$('load').classList.add('done');uiShop();showHint();
   news('Manda un regalo a quien quieras: el tren se lo lleva a su casa',true);
   checkGiftHash();
   save();
@@ -1285,13 +1380,14 @@ window.__tren={get st(){return st},get ready(){return ready},get busy(){return b
   houses:()=>HS.length,wagons:()=>WAG.length-1,delivered:()=>delivered,starve:()=>starve,laps:()=>laps,
   ads:()=>Object.keys(ADS).filter(i=>ADS[i].ad).map(Number),adImg:i=>ADS[i]&&ADS[i].ad?{w:ADS[i].tex.image.width,h:ADS[i].tex.image.height,text:ADS[i].ad.text||'',img:!!ADS[i].ad.img,url:ADS[i].ad.url||''}:null,
   news:()=>newsCur,focus:f=>setFocus(f),get focused(){return cam.focus},camSettle:()=>{for(let i=0;i<90;i++)updateCam(0.05)},
-  camInfo:()=>({p:camera.position.toArray().map(v=>+v.toFixed(1)),t:cam.tgt.toArray().map(v=>+v.toFixed(1)),d:+cam.d.toFixed(1),fd:+cam.fd.toFixed(1)}),
+  camInfo:()=>({p:camera.position.toArray().map(v=>+v.toFixed(1)),t:cam.tgt.toArray().map(v=>+v.toFixed(1)),d:+cam.d.toFixed(1),fd:+cam.fd.toFixed(1),az:+cam.az.toFixed(3),el:+cam.el.toFixed(3),v:+Math.hypot(cam.vx,cam.vz).toFixed(1),fly:bl.t<1}),
+  under:(x,y)=>{const P=pickGround(x,y);return P&&P.toArray()},onScreen:(x,y,z)=>scr(new THREE.Vector3(x,y,z)),goHome,
   follow:setFollow,perf,get scene(){return scene},settle:()=>snapCam(),
-  look:(az,el,d,x,z)=>{setFocus(null);setFollow(false);cam.az=az;cam.el=el;cam.dT=cam.d=d||defD();if(x!==undefined)cam.tgtT.set(x,Math.max(0,groundAt(x,z))+2,z);else cam.tgtT.copy(CTR);lastInput=performance.now()+1e9;snapCam()},
+  look:(az,el,d,x,z)=>{setFocus(null);stopMotion();cam.az=az;cam.el=el;cam.d=d||defD();if(x!==undefined)cam.tgt.set(x,Math.max(0,groundAt(x,z))+2,z);else cam.tgt.copy(CTR);lastInput=performance.now()+1e9;snapCam()},
   // toques: se proyecta un punto a la pantalla y se toca ahí, como haría un dedo
   carScreen:i=>{const c=cars[i];if(!c)return null;return scr(c.localToWorld(new THREE.Vector3(0,2.9,0)))},
   giftCar:()=>cars.indexOf(GIFTCAR),offs:i=>OFFS[i],gift:()=>GIFT&&{mode:GIFT.mode,p:GIFT.g.p,d:GIFT.g.d,onCar:GIFT.o.parent===GIFTCAR,house:GIFT.house},decode:decodeGift,receive:g=>receive(g),prov:()=>st.prov,inside:()=>cutK>=0.5,
-  lookP:(x,y,z,d,az,el)=>{setFocus(null);setFollow(false);cam.az=az;cam.el=el;cam.tgtT.set(x,y,z);cam.dT=d;lastInput=performance.now()+1e9;snapCam()},
+  lookP:(x,y,z,d,az,el)=>{setFocus(null);stopMotion();cam.az=az;cam.el=el;cam.tgt.set(x,y,z);cam.d=d;lastInput=performance.now()+1e9;snapCam()},
   sleigh:()=>SLEIGH&&SLEIGH.position.toArray(),hold:on=>{HOLD=!!on},
   cpu:(n=60)=>{const t0=performance.now();for(let i=0;i<n;i++){sim(1/60);fx(1/60,i/60);trainInst();updateCam(1/60)}return +((performance.now()-t0)/n).toFixed(2)},
   tap:(x,y)=>pick(x,y),zoomAt:(x,y,f)=>zoomAt(x,y,f),ground:groundAt,

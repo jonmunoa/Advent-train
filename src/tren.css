@@ -10,6 +10,17 @@
 .dbar i{position:absolute;inset:0;background:linear-gradient(90deg,var(--gold),#ffe08a);transform-origin:left;transform:scaleX(0);transition:transform 300ms var(--ease-out)}
 .day .mono{font-size:11px;font-weight:700;opacity:.85}
 
+/* la cabecera y las noticias no roban el arrastre */
+.bank,.tip.news{pointer-events:none}
+html,body{overscroll-behavior:none}
+
+/* ---------- botones de la vista y pista de manejo ---------- */
+.nav{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:10;display:flex;flex-direction:column;gap:8px}
+.navhint{position:fixed;left:50%;bottom:calc(var(--shop-h,130px) + 30px + env(safe-area-inset-bottom,0px));z-index:9;transform:translateX(-50%);margin:0;padding:9px 16px;border-radius:999px;background:rgba(11,21,48,.8);color:var(--cream);font-size:13.5px;white-space:nowrap;pointer-events:none;transition:opacity 220ms var(--ease-out),transform 220ms var(--ease-out)}
+.navhint b{color:var(--gold);font-weight:700}
+.navhint.bye{opacity:0;transform:translate(-50%,6px)}
+.foc .navhint{display:none}
+
 /* ---------- noticias de la comunidad ---------- */
 .tip.news{top:calc(150px + var(--safe-t));display:flex;align-items:center;gap:8px;text-align:left;font-size:13.5px}
 .tip.news.hi{border-color:var(--gold);background:rgba(43,26,18,.86)}
@@ -96,6 +107,12 @@ body.lowq::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none
 /* ---------- móvil: interfaz compacta (la maqueta ocupa casi toda la pantalla) ---------- */
 .nm .sm{display:none}
 @media (max-width:560px){
+  .nav{bottom:calc(var(--shop-h,90px) + 18px + env(safe-area-inset-bottom,0px));right:12px}
+  .nav #nIn,.nav #nOut,.nav #nRot{display:none}
+  .nav #nHome{width:44px;height:44px;opacity:0;visibility:hidden;transform:scale(.94);transition:opacity 180ms var(--ease-out),transform 180ms var(--ease-out),visibility 0s 180ms}
+  .nav.away #nHome{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+  .foc .nav{display:none}
+  .navhint{font-size:12px;padding:8px 13px;bottom:calc(var(--shop-h,90px) + 22px + env(safe-area-inset-bottom,0px))}
   .top{padding:calc(8px + var(--safe-t)) 12px 0}
   .brand{font-size:11.5px}.brand span{font-size:14px}
   .bank .row{margin-top:3px;font-size:25px;gap:6px}
