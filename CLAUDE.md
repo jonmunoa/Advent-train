@@ -39,6 +39,10 @@ assets-src/kenney/         .glb originales (Kenney Holiday Kit + Train Kit, CC0)
 scripts/fetch-polyhaven.mjs   descarga y aligera los recursos de Poly Haven (lista en scripts/polyhaven.json)
 tests/e2e.py, perf.py      prueba end-to-end (con Supabase simulado) y banco de rendimiento (harness.py: servidor y Chromium)
 tests/edge.test.mjs        validación antitrampas y submit-run con Node (npm i para tener three)
+idle.html, src/idle.js     prototipo idle «Mi maqueta de Navidad» (motor, salón, árbol, vía y tren copiados de main.js)
+src/idle-eco.js            economía y trazado del idle, sin DOM: etapas de vía, huecos de casas, precios, guardado, ganancias sin conexión
+src/idle.css               estilos del idle (misma paleta que styles.css)
+tests/idle.py, idle.test.mjs, idle-balance.mjs   pruebas del idle (Playwright y Node) y simulador de ritmo
 ```
 
 Los modelos Kenney se cargan con `GLTFLoader.loadAsync` desde el mapa `MODELS` de `main.js`. Los muebles de Poly Haven usan `loadGLB` (con `MeshoptDecoder`) y se cargan sin bloquear la carga del día (`buildFurniture`, `__adv.roomReady()`). Para añadir un modelo Kenney, cópialo de `assets-src/kenney/` a `m/<kit>/` y añádelo a `MODELS`.
@@ -66,6 +70,17 @@ Convenciones:
 - Fantasma (codec v2 en `sim.js`, lee también v1): velocidad media cada 0,1 s cuantizada a 0,15 m/s, deltas zigzag, deflate-raw y base64url (~270 caracteres por carrera); lleva repartos y flags (rebufo, atajo). Se guarda en `advx-gh-<día>` y viaja en los enlaces `#reto-<código>`, que llevan día y nombre. El fantasma de un amigo es dorado con su nombre.
 - Todo el texto de UI en español de España.
 - `localStorage`: `advx-best-<día>`, `advx-medal-<día>`, `advx-gh-<día>` (fantasma codificado), `advx-lb-<día>` (ranking local), `advx-name`, `advx-device` (UUID para el ranking), `advx-run-<día>` (id de mi fila en el ranking), `advx-stars-<día>` (máscara de estrellas), `advx-racha` (días jugados en su día), `advx-look` (cochera), `advx-ligas` y `advx-liga` (ligas y la activa), `advx-cam`, `advx-music`, `advx-sfx`, `advx-dev`.
+
+## Prototipo idle: Mi maqueta de Navidad (`idle.html`)
+
+Reenfoque en pruebas (noviembre de 2026): Jon no estaba convencido del calendario de carreras y se probó un idle. El juego de carreras (`index.html`) sigue intacto. Si el idle se queda, toca sacar el código copiado de `main.js` a módulos comunes.
+
+- Bucle: el tren va solo por la vía de la etapa (`trackOf(stage)`). Al pasar el taller (s=0) carga todos los vagones (`ECO.cap`=5 regalos cada uno). Al pasar cada casa (`slotsOf(stage)[i].s`, en orden) entrega un regalo del último vagón con carga y suma `valueOf(st)` monedas; si no quedan regalos, esa casa se queda sin regalo. Ritmo teórico: `rateOf(st)` = min(casas, carga) × valor / tiempo de vuelta.
+- Compras (`ITEMS`): casa, vagón, máquina (velocidad), luces (×1,5 por regalo; los niveles 1–3 añaden guirnaldas, farolas y arcos) y más vía (6 etapas, más huecos y ×3 por regalo). Los precios se redondean a 2 cifras (`nice`).
+- La simulación (`sim`) avanza en pasos de 0,05 s con el tiempo real de cada fotograma (hasta 1 s). Más allá de eso, `offlineGain` da el 60 % del ritmo, como mucho 8 h: al cargar la página y al volver de una pestaña oculta.
+- Rendimiento: las casas colocadas van unidas por material (`rebatch`); los vagones y sus regalos son `InstancedMesh` (`trainInst`). Los regalos gigantes del salón se desvanecen si tapan la maqueta. En el móvil va a 30 fps salvo mientras tocas. Con la maqueta completa: ~290 draw calls.
+- Hook de pruebas: `window.__idle` (`step(s)` sin efectos, `buy(k)`, `give(n)`, `rate()`, `offline(s)`, `look(az, el)`, `follow(on)`, `perf(n)`…). URL: `?reiniciar`, `?rapido` (monedas ×10) y `?debug`.
+- `localStorage`: `advx-idle` (partida, validada con `parseSave`) y `advx-idle-silbato`.
 
 ## Pendientes conocidos
 

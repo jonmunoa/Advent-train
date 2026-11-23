@@ -18,6 +18,24 @@ python -m http.server 5173
 
 Abre `http://localhost:5173`. Antes del 1 de diciembre solo está abierta la puerta 1; marca "Modo pruebas" al final del calendario para abrir todas.
 
+## Prototipo idle: Mi maqueta de Navidad
+
+`http://localhost:5173/idle.html` es un prototipo de otro enfoque. El tren da vueltas solo bajo el árbol, carga regalos en el taller y los reparte a las casas; cada regalo da monedas de chocolate. Con ellas compras:
+
+- **Casa**: más casas a las que repartir.
+- **Vagón**: más regalos por vuelta.
+- **Máquina**: más velocidad.
+- **Luces**: cada regalo vale más, y además aparecen guirnaldas, farolas y arcos.
+- **Más vía**: la vía crece, caben más casas y cada regalo vale el triple.
+
+El **silbato** acelera el tren unos segundos. Si cierras la página, al volver recoges lo que ha repartido mientras no estabas (60 %, hasta 8 h).
+
+- Arrastra para girar la maqueta y pellizca o usa la rueda para acercarte. Con el botón del ojo (o C) la cámara sigue al tren.
+- Teclado: 1–5 compran y Espacio toca el silbato.
+- `?reiniciar` empieza una partida nueva, `?rapido` multiplica por 10 las monedas (para probar) y `?debug` muestra fps y draw calls.
+
+La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
+
 ## Controles
 
 | Acción | Teclado | Móvil |
@@ -38,6 +56,8 @@ npm i                          # three para las pruebas de Node
 python tests/e2e.py --shots    # juego completo en Chromium (capturas en tests/out/)
 node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin navegador
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
+python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
+node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
 ```
 
 ## Clasificación global (Supabase)
