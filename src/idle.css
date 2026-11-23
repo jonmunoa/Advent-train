@@ -1,0 +1,112 @@
+/* Mi maqueta de Navidad (idle): billetes de papel crema y oro sobre la escena nocturna.
+   Misma paleta y tipos que Adviento Express (styles.css). */
+:root{color-scheme:dark;--night:#0b1530;--paper:#f1e6cc;--paper2:#ddcdaa;--ink:#2b1a12;--ink2:#6d5642;--cream:#fbf3df;--red:#c41e2e;--red2:#8e1220;--green:#1b5a40;--gold:#e0ad45;--gold2:#a8771f;
+  --ease-out:cubic-bezier(.23,1,.32,1);--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);--shop-h:112px}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;background:#070d1f;color:var(--cream);font:16px/1.4 Rubik,system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:800;font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.coin{width:1em;height:1em;flex:none;display:block}
+
+/* ---------- arriba: monedas y botones ---------- */
+.top{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:calc(12px + var(--safe-t)) 16px 0;pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{font:400 13px/1 'Alfa Slab One',Georgia,serif;color:var(--gold);letter-spacing:.02em;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.brand span{font:400 17px/1 Yesteryear,cursive;color:var(--cream);margin-left:2px}
+.bank .row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:clamp(28px,7vw,40px)}
+#coins{font-size:inherit;line-height:1;color:var(--cream);text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 22px rgba(224,173,69,.35)}
+.rate{margin-top:5px;font-size:13px;color:#d6ecc8;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.tools{display:flex;gap:8px}
+.tb{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(224,173,69,.7);background:rgba(11,21,48,.62);display:grid;place-items:center;cursor:pointer;color:var(--gold);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:transform 160ms var(--ease-out),background-color 200ms ease}
+.tb:active{transform:scale(.94)}
+.tb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tb.off{opacity:.45}.tb.off .on{display:none}.tb:not(.off) .of{display:none}
+.tb#bCam.on{background:var(--gold);color:var(--ink)}
+
+/* ---------- consejo ---------- */
+.tip{position:fixed;left:50%;top:calc(104px + var(--safe-t));z-index:9;margin:0;width:max-content;max-width:min(560px,calc(100% - 32px));padding:8px 14px;border-radius:999px;background:rgba(11,21,48,.74);border:1px solid rgba(224,173,69,.45);font-size:14px;line-height:1.3;text-align:center;color:var(--cream);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);pointer-events:none;
+  transform:translateX(-50%);transition:opacity 200ms ease,transform 240ms var(--ease-out)}
+.tip.hide{opacity:0;transform:translateX(-50%) translateY(-6px)}
+
+/* ---------- números que suben de las chimeneas ---------- */
+#floats{position:fixed;inset:0;z-index:8;pointer-events:none;overflow:hidden}
+.fl{position:absolute;left:0;top:0}
+.fl span{display:block;opacity:0;white-space:nowrap;font:800 15px/1 'JetBrains Mono',monospace;color:#ffe08a;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 10px rgba(255,190,80,.45)}
+.fl.none span{font:600 12px/1 Rubik,sans-serif;color:#cfd6ea;text-shadow:0 1px 0 rgba(0,0,0,.7)}
+
+/* ---------- tienda: cinco billetes ---------- */
+.shop{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:10px 12px calc(12px + var(--safe-b));max-width:1000px;margin:0 auto}
+.it{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:3px;padding:16px 4px 9px;border:0;border-radius:12px;background:var(--paper);color:var(--ink);cursor:pointer;text-align:center;
+  box-shadow:0 2px 0 var(--gold2),0 10px 24px rgba(0,0,0,.35);transition:transform 160ms var(--ease-out),background-color 200ms ease,box-shadow 200ms ease,opacity 200ms ease}
+.it::before{content:"";position:absolute;left:8px;right:8px;top:6px;border-top:2px dotted rgba(43,26,18,.22)}
+.it:active{transform:scale(.96)}
+.it .fill{position:absolute;left:0;bottom:0;width:100%;height:4px;background:var(--gold);transform-origin:left;transform:scaleX(0);transition:transform 120ms linear}
+.it.no{background:var(--paper2)}
+.it.no .ic,.it.no .nm{opacity:.62}
+.it.ok{box-shadow:0 2px 0 var(--gold2),0 0 0 2px var(--gold),0 0 18px rgba(224,173,69,.4),0 10px 24px rgba(0,0,0,.35)}
+.it.ok .fill{background:var(--green)}
+.it.max{opacity:.6;cursor:default}
+.it.max:active{transform:none}
+.ic svg{width:28px;height:28px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nm{font-weight:700;font-size:13px;line-height:1.1}
+.fx{display:none;font-size:12px;line-height:1.25;color:var(--ink2)}
+.pr{display:flex;align-items:center;gap:4px;font-size:12.5px;line-height:1;margin-top:2px}
+.pr .coin{font-size:14px}
+.it.max .pr .coin{display:none}
+.lv{position:absolute;top:10px;right:8px;font-size:10px;line-height:1;color:var(--ink2);font-weight:700}
+.flag{position:absolute;top:9px;left:8px;width:9px;height:9px;border-radius:50%;background:var(--red);font-size:0;display:none;box-shadow:0 0 0 2px var(--paper)}
+.it.hot .flag{display:block;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 2px var(--paper),0 0 0 6px rgba(196,30,46,.25)}}
+@media (min-width:640px){
+  .shop{gap:10px;padding-left:16px;padding-right:16px}
+  .it{padding:18px 10px 11px;gap:4px}
+  .ic svg{width:30px;height:30px}
+  .nm{font-size:15px}.fx{display:block}.pr{font-size:14px}.pr .coin{font-size:16px}
+  .lv{font-size:11px}
+  .flag{width:auto;height:auto;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:#fff;box-shadow:none}
+  .it.hot .flag{animation:none}
+}
+@media (hover:hover) and (pointer:fine){.it.ok:hover{transform:translateY(-2px)}.it:active,.it.ok:active{transform:scale(.96)}}
+
+/* ---------- silbato ---------- */
+.boost{position:fixed;right:16px;bottom:calc(var(--shop-h) + 22px);z-index:10;width:64px;height:64px;padding:0;border:0;border-radius:50%;background:var(--red);color:var(--cream);display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 4px 0 var(--red2),0 12px 26px rgba(0,0,0,.4);transition:transform 160ms var(--ease-out),filter 200ms ease}
+.boost:active{transform:scale(.94)}
+.boost .ring{position:absolute;inset:-5px;width:74px;height:74px;transform:rotate(-90deg);pointer-events:none}
+.boost .ring circle{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 120ms linear}
+.boost .ico{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.boost .lbl{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:7px;font-size:11px;font-weight:700;color:var(--cream);text-shadow:0 1px 0 rgba(0,0,0,.7);white-space:nowrap}
+.boost.wait{filter:saturate(.35) brightness(.78)}
+.boost.wait:active{transform:none}
+
+/* ---------- ventana: lo ganado sin conexión ---------- */
+.modal{position:fixed;inset:0;z-index:30;display:none;place-items:center;padding:16px;background:rgba(4,8,20,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.modal.on{display:grid}
+.card{width:min(380px,100%);background:var(--paper);color:var(--ink);border-radius:14px;padding:24px 20px 18px;text-align:center;box-shadow:0 0 0 2px var(--gold),0 24px 60px rgba(0,0,0,.5);
+  transition:opacity 240ms var(--ease-out),transform 240ms var(--ease-out)}
+@starting-style{.modal.on .card{opacity:0;transform:scale(.96)}}
+.card h2{font:400 24px/1.1 'Alfa Slab One',Georgia,serif;margin:0;color:var(--red2)}
+.card .when{margin:6px 0 0;font-size:14px;color:var(--ink2)}
+.card .big{display:flex;align-items:center;justify-content:center;gap:10px;margin:16px 0 8px;font-size:38px;line-height:1;color:var(--ink)}
+.card p{margin:0;color:var(--ink2);font-size:15px}
+.btn{margin-top:18px;width:100%;padding:13px 16px;border:0;border-radius:10px;background:var(--red);color:var(--cream);font-weight:700;font-size:16px;cursor:pointer;box-shadow:0 3px 0 var(--red2);transition:transform 160ms var(--ease-out)}
+.btn:active{transform:scale(.97)}
+
+/* ---------- carga y errores ---------- */
+.load{position:fixed;inset:0;z-index:40;display:grid;place-items:center;text-align:center;padding:16px;background:radial-gradient(circle at 50% 40%,#16244a,#070d1f 70%);transition:opacity 450ms ease,visibility 0s linear 450ms}
+.load.done{opacity:0;visibility:hidden;pointer-events:none}
+.load .ttl{font:400 clamp(36px,9vw,60px)/1 'Alfa Slab One',Georgia,serif;color:var(--cream);text-shadow:3px 3px 0 var(--red),6px 6px 0 rgba(0,0,0,.35)}
+.load .sub{font:400 clamp(32px,8vw,50px)/1 Yesteryear,cursive;color:var(--gold);margin:-4px 0 0 1.4em;transform:rotate(-4deg)}
+.bar{width:220px;max-width:70vw;height:6px;border-radius:3px;background:rgba(255,255,255,.12);margin:26px auto 10px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold);transform-origin:left;transform:scaleX(0);transition:transform 200ms var(--ease-out)}
+.load p{margin:0;font-size:14px;color:#c9cfe0}
+.err{display:none;position:fixed;left:16px;right:16px;top:calc(16px + var(--safe-t));z-index:50;padding:12px 14px;border-radius:10px;background:var(--red);color:#fff;font-weight:600;text-align:center}
+#dbg{position:fixed;left:50%;bottom:calc(var(--shop-h) + 4px);transform:translateX(-50%);z-index:60;font:700 11px/1.3 'JetBrains Mono',monospace;color:#fff;background:rgba(0,0,0,.6);padding:3px 8px;pointer-events:none;white-space:nowrap}
+
+@media (prefers-reduced-motion:reduce){
+  .it,.tb,.boost,.btn,.tip{transition-property:opacity,background-color,filter}
+  .it.hot .flag{animation:none}
+  @starting-style{.modal.on .card{opacity:0;transform:none}}
+}
