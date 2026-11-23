@@ -1,9 +1,9 @@
-// Pruebas de la maqueta (src/tren-map.js) y de la economía y la comunidad simulada (src/tren-eco.js), sin navegador.
+// Pruebas de la maqueta (src/tren-map.js) y del calendario, las marcas y la partida (src/tren-eco.js), sin navegador.
 //   node tests/tren.test.mjs
 import {strict as assert} from 'node:assert';
 import {STAGES, MAXSTAGE, KT, KB, KG, mapOf, atM, H0, F, BOARD, lakeE, pisteD, nearTrack, otherNear, TUN_DY} from '../src/tren-map.js';
-import {DAYS, WAGON_MAX, BID_MIN, CLOSE_H, newWorld, addVotes, nextDay, rewardOf, goalFor, crowdVotes, online, newPoll, crowdVote, castVote, votesOf, winnerOf, drawDriver,
-  closeAt, showDay, minBid, cleanText, cleanUrl, parseWorld} from '../src/tren-eco.js';
+import {DAYS, WAGON_MAX, MAXLIGHTS, PLAN, newWorld, parseWorld, saveOf, planOf, rewardText, dayOf, daysToEve, isoDay, autoRoute, marcasDe, askText, cleanText, cleanUrl} from '../src/tren-eco.js';
+import {MARCAS, PRECIO_DIA, PRECIO_VAGON} from '../src/tren-marcas.js';
 
 let fails = 0;
 const ok = (name, fn) => {try {fn(); console.log('  ok   ' + name)} catch (e) {fails++; console.log('  FALLO ' + name + '\n        ' + e.message)}};
@@ -49,7 +49,6 @@ ok('atM interpola posición, altura y rumbo a lo largo de la vía (y da la vuelt
   assert.ok(Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6); assert.ok(Math.hypot(atM(T, 11).x - a.x, atM(T, 11).z - a.z) > 0.9);
 });
 
-/* ---------- la economía ---------- */
 /* ---------- agujas ---------- */
 ok('cada etapa tiene sus agujas: dos caminos distintos, con la salida a un lado y sin curvas cerradas ni cuestas', () => {
   [1, 2, 3, 3].forEach((n, k) => {const M = mapOf(k), {T} = M; assert.equal(M.forks.length, n); assert.equal(M.R.length, 1 << n);
@@ -80,38 +79,35 @@ ok('cada casa sabe en qué vueltas pasa el tren por delante (las de un camino, s
     assert.ok(a && b)}
 });
 
-/* ---------- la economía ---------- */
-ok('la partida empieza con tren, casas de otros y huecos libres', () => {
-  const w = newWorld(0); assert.ok(w.wagons >= 2 && w.houses < mapOf(0).SL.length); assert.equal(w.mine, -1); assert.ok(w.goal > 0); assert.equal(w.votes, 0);
+/* ---------- calendario, marcas y partida ---------- */
+ok('el día sale del calendario: 1 a 24 en diciembre, 24 hasta Reyes y fuera de temporada, 0', () => {
+  const at = (y, m, d) => new Date(y, m - 1, d, 12).getTime();
+  assert.equal(dayOf(at(2026, 11, 30)), 0); assert.equal(dayOf(at(2026, 12, 1)), 1); assert.equal(dayOf(at(2026, 12, 24)), 24); assert.equal(dayOf(at(2026, 12, 31)), 24); assert.equal(dayOf(at(2027, 1, 6)), 24); assert.equal(dayOf(at(2027, 1, 7)), 0);
+  assert.equal(daysToEve(at(2026, 12, 23)), 1); assert.equal(daysToEve(at(2026, 12, 24)), 0); assert.ok(daysToEve(at(2026, 12, 25)) > 360); assert.equal(isoDay(at(2026, 12, 5)), '2026-12-05');
 });
-ok('un voto por aguja: se puede cambiar, pero no repetir', () => {
-  const p = newPoll(() => 0.5); assert.equal(castVote(p, 0), 'nuevo'); assert.equal(castVote(p, 0), null); assert.deepEqual(votesOf(p), [1, 0]);
-  assert.equal(castVote(p, 1), 'cambio'); assert.deepEqual(votesOf(p), [0, 1]); assert.equal(castVote(p, 2), null); assert.equal(castVote(p, '1'), null); assert.equal(winnerOf(p), 1);
+ok('cada día trae algo, el tren solo crece y en Nochebuena está completo', () => {
+  let a = planOf(1); assert.equal(a.stage, 0); assert.equal(a.wagons, 3);
+  for (let d = 2; d <= DAYS; d++) {assert.ok(PLAN[d], `día ${d} sin nada`); assert.ok(rewardText(d).length > 5); const b = planOf(d); for (const k of ['stage', 'wagons', 'lights', 'houses']) assert.ok(b[k] >= a[k], `${k} baja el día ${d}`);
+    assert.ok(b.stage > a.stage || b.wagons > a.wagons || b.lights > a.lights || b.houses > a.houses); assert.ok(b.houses < mapOf(b.stage).SL.length, `día ${d}: sin hueco para tu casa`); a = b}
+  assert.equal(a.stage, MAXSTAGE); assert.equal(a.wagons, WAGON_MAX); assert.equal(a.lights, MAXLIGHTS);
+  for (const x of [0, -3, 'x', undefined]) assert.equal(planOf(x).day, 1); assert.equal(planOf(99).day, DAYS); assert.deepEqual(planOf(9), planOf(9));
 });
-ok('gana quien tiene más votos; el resto de la gente reparte los suyos y suele haber pelea', () => {
-  assert.equal(winnerOf({n: [10, 4], mine: 1}), 0); assert.equal(winnerOf({n: [4, 10], mine: 0}), 1); assert.equal(winnerOf({n: [5.4, 5.2], mine: 1}), 1); assert.equal(winnerOf({n: [5, 5], mine: -1}, () => 0.9), 1);
-  let close = 0, total = 0; for (let q = 0; q < 60; q++) {const p = newPoll(); for (let t = 0; t < 60; t += 0.5) crowdVote(p, 0.45, q * 70 + t); const [a, b] = votesOf(p); assert.ok(a + b > 48 && a + b < 56); total++; if (Math.abs(a - b) / (a + b) < 0.25) close++; assert.ok(Math.min(a, b) > 3)}
-  assert.ok(close > total * 0.4, `reñidas: ${close} de ${total}`);
+ok('si no eliges camino, el tren va por el que menos ha ido y, si empatan, alterna', () => {
+  assert.equal(autoRoute(['a', 'b'], {a: 3, b: 1}, 0), 1); assert.equal(autoRoute(['a', 'b'], {b: 2}, 1), 0); assert.equal(autoRoute(['a', 'b'], {}, 0), 1); assert.equal(autoRoute(['a', 'b'], {}, 1), 0);
 });
-ok('solo puede tocarte ser maquinista si has votado, y como tarde al tercer voto', () => {
-  const w = newWorld(0); for (let i = 0; i < 20; i++) assert.equal(drawDriver(w, false, () => 0), false);
-  assert.equal(drawDriver(w, true, () => 0.9), false); assert.equal(drawDriver(w, true, () => 0.9), false); assert.equal(drawDriver(w, true, () => 0.9), true); assert.equal(w.drives, 1); assert.equal(drawDriver(w, true, () => 0.1), true);
+ok('todos los caminos tienen nombre, descripción corta e icono propio', () => {
+  for (let k = 0; k <= MAXSTAGE; k++) for (const f of mapOf(k).forks) for (const o of f.opts) {assert.ok(o.n && o.art && o.d && o.d.length <= 22, o.id); assert.match(o.id, /^[a-z]{2,12}$/)}
 });
-ok('el objetivo del día cuesta unos minutos con la gente que hay', () => {
-  const w = newWorld(0); let t = 0, sec = 0; while (w.today < w.goal && sec < 2000) {addVotes(w, crowdVotes(t, w.day) * 0.5); t += 0.5; sec += 0.5}
-  assert.ok(sec > 120 && sec < 400, `${sec} s`); assert.equal(goalFor(w), w.goal); for (let t2 = 0; t2 < 3600; t2 += 7) assert.ok(online(t2) >= 12);
+ok('las marcas salen solo en sus fechas y en un vagón que exista, y una línea mal escrita no rompe nada', () => {
+  const L = [{vagon: 1, desde: '2026-12-05', hasta: '2026-12-06', texto: 'Panadería <b>Ogi</b>', url: 'panaderiaogi.es', img: 'm/marcas/ogi.png', fondo: '#1d3a78'}, {vagon: 2, desde: '2026-12-05', texto: 'Un día', fondo: 'rojo'}, {vagon: 7, desde: '2026-12-05', texto: 'Lejos'},
+    {vagon: 3, desde: '2026-12-05', hasta: '2026-12-05', texto: '', img: 'https://otra.web/x.png'}, {vagon: 'x', desde: '2026-12-05', texto: 'mal'}, {vagon: 3, desde: 'ayer', texto: 'mal'}, null, 5, {vagon: 3, desde: '2026-12-05', texto: 'Enlace raro', url: 'javascript:alert(1)'}];
+  const d5 = marcasDe(L, '2026-12-05', 5), d6 = marcasDe(L, '2026-12-06', 5);
+  assert.deepEqual(Object.keys(d5), ['1', '2', '3']); assert.deepEqual(Object.keys(d6), ['1']); assert.deepEqual(marcasDe(L, '2026-12-07', 5), {}); assert.deepEqual(marcasDe(undefined, '2026-12-07'), {});
+  assert.equal(d5[1].url, 'https://panaderiaogi.es/'); assert.equal(d5[1].img, 'm/marcas/ogi.png'); assert.ok(!/[<>]/.test(d5[1].text)); assert.equal(d5[1].tag, 'Patrocinado'); assert.equal(d5[2].bg, '#7a1020'); assert.equal(d5[3].url, ''); assert.equal(d5[3].text, 'Enlace raro');
 });
-ok('cumplir objetivos abre toda la vía, llena el tren de vagones y enciende las luces', () => {
-  const w = newWorld(0), got = [];
-  for (let d = 1; d < DAYS; d++) {const g0 = w.goal; assert.equal(addVotes(w, w.goal), true); got.push(nextDay(w)); assert.ok(w.goal >= g0, 'el objetivo no baja'); assert.equal(w.today, 0)}
-  assert.equal(w.stage, MAXSTAGE); assert.equal(w.day, DAYS); assert.equal(got.filter(r => r === 'via').length, MAXSTAGE);
-  assert.ok(got.slice(0, 7).includes('vagon') && got.includes('luces')); assert.equal(w.wagons, WAGON_MAX); assert.equal(rewardOf({...w, lights: 3}), null);
-});
-ok(`la subasta cierra a las ${CLOSE_H}:00 y el vagón sale el día siguiente`, () => {
-  const am = new Date(2026, 11, 3, 10, 0).getTime(), pm = new Date(2026, 11, 3, 22, 30).getTime();
-  assert.equal(new Date(closeAt(am)).getDate(), 3); assert.equal(new Date(closeAt(am)).getHours(), CLOSE_H);
-  assert.equal(new Date(closeAt(pm)).getDate(), 4); assert.equal(new Date(showDay(am)).getDate(), 4); assert.equal(new Date(showDay(pm)).getDate(), 5);
-  assert.equal(minBid(0), BID_MIN); assert.equal(minBid(41), 42);
+ok('el fichero de marcas está bien escrito y la petición lleva los datos', () => {
+  assert.ok(Array.isArray(MARCAS) && PRECIO_DIA > 0 && PRECIO_VAGON > 0); for (const m of MARCAS) assert.ok(Object.keys(marcasDe([m], m.desde)).length, 'línea que no sale nunca: ' + JSON.stringify(m));
+  const t = askText({text: 'Ogi', sub: 'Roscón', url: 'https://ogi.es/', bg: '#1d3a78', img: 'x'}, 'dia', 5); for (const q of ['vagón del día', '5 €', 'Ogi', 'Roscón', 'https://ogi.es/', 'adjunto']) assert.ok(t.includes(q), q);
 });
 ok('el texto de los jugadores se limpia y se acota', () => {
   assert.equal(cleanText('  Ane  <b>\n</b> ', 14), 'Ane b /b'); assert.equal(cleanText('x'.repeat(40), 14).length, 14); assert.equal(cleanText(null, 5), '');
@@ -122,12 +118,12 @@ ok('el enlace de una marca solo vale si es una web (http o https) con dominio', 
   assert.equal(cleanUrl('http://bar-txoko.eus/carta?x=1'), 'http://bar-txoko.eus/carta?x=1');
   for (const bad of ['javascript:alert(1)', 'data:text/html,hola', 'mailto:a@b.es', 'localhost:3000', 'https://intranet', 'https://user:pw@tumarca.com', 'https://' + 'a'.repeat(200) + '.com']) assert.equal(cleanUrl(bad), null, bad);
 });
-ok('el guardado roto o manipulado no rompe la partida', () => {
-  assert.equal(parseWorld(null), null); assert.equal(parseWorld('{'), null); assert.equal(parseWorld('{"v":3}'), null, 'versión vieja');
-  const w = parseWorld(JSON.stringify({v: 4, stage: 99, wagons: 0, houses: 999, mine: 3, myName: '', lights: 'x', today: -4, day: 40, votes: -7, wins: 'x'}));
-  assert.equal(w.stage, MAXSTAGE); assert.equal(w.wagons, 1); assert.equal(w.houses, mapOf(MAXSTAGE).SL.length);
-  assert.equal(w.mine, -1, 'sin nombre no hay casa propia'); assert.equal(w.lights, 0); assert.equal(w.today, 0); assert.equal(w.day, DAYS); assert.equal(w.votes, 0); assert.equal(w.wins, 0);
-  const a = newWorld(5); a.mine = 2; a.myName = 'Jon'; a.stage = 1; a.houses = 7; a.votes = 12; a.wins = 5; a.sinceDrive = 2; assert.deepEqual(parseWorld(JSON.stringify(a)), a);
+ok('el guardado solo lleva lo tuyo, y roto o manipulado no rompe la partida', () => {
+  for (const bad of [null, '', '{', '[]', '"x"', '{"v":4}']) assert.equal(parseWorld(bad, 3), null);
+  const w = parseWorld(JSON.stringify({v: 5, mine: 7, myName: '', total: -4, myGifts: 'x', chosen: 1e99, stage: 3, wagons: 99, day: 24, seen: {tunel: 2, 'x y': 4, valle: -1, __proto__: 5}}), 3);
+  assert.equal(w.mine, -1); assert.equal(w.total, 0); assert.equal(w.myGifts, 0); assert.deepEqual(w.seen, {tunel: 2}); assert.equal(w.day, 3); assert.equal(w.stage, planOf(3).stage); assert.equal(w.wagons, planOf(3).wagons);
+  const a = newWorld(9); a.mine = 0; a.myName = 'Jon'; a.total = 120; a.myGifts = 40; a.chosen = 6; a.seen = {bosque: 3, tunel: 1};
+  assert.deepEqual(parseWorld(saveOf(a), 9), a); assert.ok(!/stage|wagons|houses|day/.test(saveOf(a)));
 });
 
 console.log(fails ? `\n${fails} FALLO(S)` : '\nTodo OK');

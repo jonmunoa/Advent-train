@@ -1,10 +1,8 @@
-/* El tren de Navidad · prototipo comunitario (nombre provisional).
-   Un solo tren para todo el mundo recorre una maqueta alpina (tren-map.js): pueblo con plaza, colina con túnel,
-   lago helado, montaña del túnel grande y estación de esquí con telesilla. Cada jugador manda regalos a sus amigos por
-   el tren: viajan en el vagón de regalos hasta su casa y al amigo le llega un enlace para verlo llegar (y devolverlo).
-   Los regalos de todos suman al objetivo común del día; al cumplirlo la vía crece, llega otro vagón o más luces. Cada jugador puede poner su casa junto a la vía, y los furgones llevan marcas o mensajes
-   con enlace: el primero se subasta cada día y el resto se venden. En la demo los demás jugadores están simulados
-   (tren-eco.js). El motor, el salón y las casas vienen de idle.js; si este enfoque se queda, toca sacarlos a un módulo común. */
+/* El tren de Navidad (prototipo, nombre provisional; sin servidor ni base de datos).
+   Un tren recorre despacio una maqueta alpina. En cada aguja eliges por dónde va, cada día de diciembre crece (calendario)
+   y tu casa, tu nombre y los caminos recorridos se guardan solo en tu navegador. Los vagones llevan marcas con su enlace,
+   que se escriben a mano en tren-marcas.js.
+   El motor, el salón, el árbol y las casas están adaptados de idle.js (si se queda, toca sacarlos a un módulo común). */
 import * as THREE from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
@@ -16,8 +14,9 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {rng, wrapA} from './sim.js';
-import {mapOf, atM, kindAt, F, BOARD, GAUGE as GA, KT, KB, LAKE_Y, pisteD, lakeE, TRAIN_V, STAGE_NAMES, nearTrack, otherNear, branchNear} from './tren-map.js';
-import {TKEY, DAYS, CLOSE_H, MSG_PRICE, BIZ, NAMES, CAP, WAGON_MAX, newWorld, parseWorld, sacoOf, addVotes, nextDay, online, crowdVotes, newPoll, crowdVote, castVote, votesOf, winnerOf, drawDriver, closeAt, showDay, minBid, cleanText, cleanUrl} from './tren-eco.js';
+import {mapOf, atM, kindAt, F, BOARD, GAUGE as GA, KT, KB, LAKE_Y, pisteD, lakeE, TRAIN_V, nearTrack, otherNear, branchNear} from './tren-map.js';
+import {TKEY, DAYS, CAP, WAGON_MAX, PLAN, newWorld, parseWorld, saveOf, planOf, rewardText, dayOf, daysToEve, isoDay, sacoOf, autoRoute, marcasDe, askText, cleanText, cleanUrl} from './tren-eco.js';
+import {CONTACTO, PRECIO_DIA, PRECIO_VAGON, MARCAS} from './tren-marcas.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled = true;
 
@@ -31,7 +30,7 @@ function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=x
 const fbm=(x,y)=>vnoise(x,y)*0.6+vnoise(x*2.1,y*2.1)*0.28+vnoise(x*4.3,y*4.3)*0.12;
 const tick=()=>new Promise(r=>setTimeout(r,0));
 const QS=new URLSearchParams(location.search),DEBUG=QS.has('debug');
-if(QS.has('reiniciar')){store.del(TKEY);store.del('advx-tren-subasta');store.del('advx-tren-marca');QS.delete('reiniciar');try{history.replaceState(null,'',location.pathname+(QS.toString()?'?'+QS:''))}catch(e){}}
+if(QS.has('reiniciar')){store.del(TKEY);store.del('advx-tren-subasta');store.del('advx-tren-nav');store.del('advx-tren-marca');QS.delete('reiniciar');try{history.replaceState(null,'',location.pathname+(QS.toString()?'?'+QS:''))}catch(e){}}
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const NF=new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}),NF1=new Intl.NumberFormat('es-ES',{maximumFractionDigits:1}),NF3=new Intl.NumberFormat('es-ES',{minimumSignificantDigits:3,maximumSignificantDigits:3});
 const SUF=[[1e15,'mil B'],[1e12,'B'],[1e9,'mil M'],[1e6,'M']];
@@ -40,10 +39,13 @@ const fmtRate=r=>r<10?NF1.format(r):fmtN(r);
 const fmtDur=s=>{if(s<90)return Math.round(s)+' s';if(s<3600)return Math.round(s/60)+' min';const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h+' h'+(m?' '+m+' min':'')};
 
 /* ================= estado ================= */
-let st=parseWorld(store.get(TKEY))||newWorld();
+/* el día sale del calendario; fuera de temporada (o con ?dia=7 o #dia-7) es una vista previa en la que se puede pasar de día */
+const askDay=+(QS.get('dia')||(location.hash.match(/^#dia-(\d+)$/)||[])[1]||0),PREVIEW=askDay>0||dayOf()===0;
+const day0=Math.min(DAYS,Math.max(1,askDay||dayOf()||1));
+let st=parseWorld(store.get(TKEY),day0)||newWorld(day0);
 let ready=false,busy=false,FASTSTEP=false;
-let dist=2,vCur=TRAIN_V,laps=0,delivered=0,starve=0,saveT=0,simClock=0;
-function save(){st.t=Date.now();store.set(TKEY,JSON.stringify(st))}
+let dist=2,vCur=TRAIN_V,laps=0,delivered=0,starve=0,saveT=0;
+function save(){store.set(TKEY,saveOf(st))}
 
 /* ================= motor ================= */
 const coarse=matchMedia('(pointer:coarse)').matches;
@@ -722,8 +724,10 @@ function makeHouse(i){const sl=SL[i],r=rng(9001+i*131),g=house(r,HMAT[(i*5+st.st
   g.userData.eaves.forEach(([x0,x1,y,z])=>{for(let x=x0;x<=x1;x+=0.42){v.set(x,y,z);g.localToWorld(v);ev.push(v.clone());if(r()<0.7){const u=v.clone();u.y-=0.05;ice.push([u,0.25+r()*0.55])}}});
   return {g,chim,ev,ice,i,pop:1,landed:true,y0:sl.y}}
 function clearTown(){townBatch.forEach(m=>{townG.remove(m);m.geometry.dispose();if(m.isInstancedMesh)m.dispose()});townBatch=[];eaveLights=[];HS.forEach(h=>{if(h.g.parent)townG.remove(h.g);disposeObj(h.g)});HS=[];popQ=[]}
-function placeTown(anim){clearTown();for(let i=0;i<Math.min(st.houses,SL.length);i++){const h=makeHouse(i);HS.push(h);if(anim&&!FASTSTEP){h.pop=-i*0.05;h.landed=false;h.g.visible=false;townG.add(h.g);popQ.push(h)}}rebatch()}
-function addHouse(){const h=makeHouse(HS.length);HS.push(h);if(FASTSTEP){rebatch();return}h.pop=0;h.landed=false;townG.add(h.g);popQ.push(h)}
+const npcN=()=>Math.min(st.houses,SL.length-1);// casas del pueblo: huecos 1…n; el 0 es el de tu casa
+function putHouse(i,delay,anim){const h=makeHouse(i);HS[i]=h;if(anim&&!FASTSTEP){h.pop=-delay;h.landed=false;h.g.visible=false;townG.add(h.g);popQ.push(h)}}
+function placeTown(anim){clearTown();if(st.mine===0)putHouse(0,0,anim);for(let i=1;i<=npcN();i++)putHouse(i,i*0.05,anim);rebatch()}
+function addHouse(i){if(HS[i])return;putHouse(i,0,true);if(FASTSTEP)rebatch()}
 /* las casas ya colocadas van unidas por material; las que están apareciendo van sueltas */
 function rebatch(){townBatch.forEach(m=>{townG.remove(m);m.geometry.dispose();if(m.isInstancedMesh)m.dispose()});townBatch=[];eaveLights=[];
   const settled=HS.filter(h=>h.pop>=1),meshes=[];settled.forEach(h=>{if(h.g.parent)townG.remove(h.g);h.g.updateMatrixWorld(true);h.g.traverse(o=>{if(o.isMesh)meshes.push(o)})});
@@ -735,7 +739,7 @@ function rebatch(){townBatch.forEach(m=>{townG.remove(m);m.geometry.dispose();if
     idx.forEach((v,i)=>{o3.position.copy(v);o3.position.y+=0.08;o3.rotation.set(0,0,0);o3.updateMatrix();m.setMatrixAt(i,o3.matrix);m.setColorAt(i,new THREE.Color(...pal[(i+q)%4]))});if(m.instanceColor)m.instanceColor.needsUpdate=true;if(!idx.length)m.visible=false;return m});townBatch.push(...eaveLights)}
   townBatch.forEach(m=>townG.add(m))}
 
-/* luces que llegan entre todos: farolas junto a la vía (nivel 2) y arcos de caramelo (nivel 3); las guirnaldas van con las casas */
+/* luces que llegan con el calendario: farolas junto a la vía (nivel 2) y arcos de caramelo (nivel 3); las guirnaldas van con las casas */
 let treeLightK=0.6;
 function buildDeco(){const T=MP.T;if(decoG){world.remove(decoG);disposeObj(decoG)}decoG=new THREE.Group();world.add(decoG);arches=[];treeLightK=0.55+0.15*Math.min(3,st.lights);
   const okS=s=>s>22&&s<T.L-22&&[-6,0,6].every(q=>kindAt(T,s+q)===0);
@@ -805,8 +809,8 @@ $('bMusic').onclick=()=>{music=!music;store.set('advx-music',music?'1':'0');setT
 $('bSfx').onclick=()=>{sfx=!sfx;store.set('advx-sfx',sfx?'1':'0');setTog();au()};
 addEventListener('pointerdown',au,{passive:true});addEventListener('keydown',au);
 
-/* ================= simulación: el tren reparte y la comunidad (simulada) vota ================= */
-const flyers=[],flyQ=[];let burstBudget=0,noneT=0,claimT=12;
+/* ================= simulación: el tren reparte ================= */
+const flyers=[],flyQ=[];let burstBudget=0,noneT=0,fwT=6;
 function flyGift(from,to,dur,arc,onEnd){let f=flyers.find(x=>!x.visible);if(!f){if(flyers.length>=16){onEnd&&onEnd();return}f=obj(['presB','presC','presD','presA'][flyers.length%4],1.2);f.castShadow=false;scene.add(f);flyers.push(f)}
   f.visible=true;f.position.copy(from);flyQ.push({f,from:from.clone(),to:to.clone(),t:0,dur,arc,onEnd})}
 function atStation(){laps++;for(let k=1;k<WAG.length;k++)fillWagon(WAG[k]);
@@ -820,62 +824,61 @@ function atHouse(i){const h=HS[i];if(!h)return;let W=null;for(let k=WAG.length-1
       if(me){burst(h.chim,70,8,[4,3,.8]);floatAt(h.chim,'¡Para ti! +'+fmtN(val),'me');kaching()}
       else{if(burstBudget>0){burstBudget--;burst(h.chim,24,5,[4,3,.8])}floatAt(h.chim,'+'+fmtN(val),'');chime()}})}}
 function celebrate(){if(FASTSTEP)return;const P=treeParts[0];if(P){confettiBurst(P.top.clone(),24);bells()}}
-/* objetivo del día cumplido: mañana (en la demo, ahora) llega la mejora */
-function dayDone(){const d=st.day,rw=nextDay(st);save();
-  news({via:`¡Objetivo del día ${d} cumplido entre todos! La vía llega ${('a '+STAGE_NAMES[st.stage].toLowerCase()).replace(/^a el /,'al ')}`,vagon:`¡Objetivo del día ${d} cumplido entre todos! El tren estrena otro vagón`,luces:`¡Objetivo del día ${d} cumplido entre todos! Se encienden más luces`}[rw]||`¡Objetivo del día ${d} cumplido entre todos!`,true);
-  if(rw==='via'){expand();return}
-  if(rw==='vagon')addWagon();else if(rw==='luces')buildDeco();
+/* pasa a otro día: llega lo que toca (vía, vagón, luces o casas) */
+async function setDay(n){n=clamp(Math.floor(n),1,DAYS);if(busy||n<=st.day)return;const a=st.stage,l=st.lights;Object.assign(st,planOf(n));
+  news(n===DAYS?'¡Es Nochebuena! El tren está completo':`Día ${n}: ${rewardText(n)}`,true);
+  while(WAG.length-1<st.wagons)addWagon();
+  if(st.stage!==a){await expand();return}
+  if(st.lights!==l)buildDeco();for(let i=1;i<=npcN();i++)addHouse(i);
   celebrate();uiShop()}
+let dayT=0;
 function sim(dt){
   if(busy||!T)return;
-  simClock+=dt;vCur+=(TRAIN_V-vCur)*(1-Math.exp(-1.5*dt));
+  vCur+=(TRAIN_V-vCur)*(1-Math.exp(-1.5*dt));
   pollTick(dt);if(busy)return;
   const prev=dist;dist+=vCur*dt;odo+=vCur*dt;wheelT+=vCur*dt;
   for(const F of MP.forks)if(prev<T.fs[F.f]&&dist>=T.fs[F.f])takeFork(F);
   const lap=dist>=T.L;if(lap)dist-=T.L;
   for(let i=0;i<HS.length;i++){const e=SL[i].rs[T.bits];if(e>=0&&(lap?e>prev||e<=dist:e>prev&&e<=dist))atHouse(i)}
   if(lap)atStation();
-  // otros jugadores ponen su casa de vez en cuando (siempre queda un hueco para ti)
-  claimT-=dt;if(claimT<=0&&!busy){claimT=16+Math.random()*16;const free=SL.length-st.houses;
-    if(free>(st.mine<0?1:0)){st.houses++;addHouse();news(`${person()} ha puesto su casa junto a la vía`)}}
+  if(st.day===DAYS&&!FASTSTEP){fwT-=dt;if(fwT<0){fwT=9+Math.random()*8;for(let i=0;i<3;i++)fwQ.push({at:performance.now()/1000+i*0.5,p:new THREE.Vector3(BCX+(Math.random()-.5)*150,70+Math.random()*34,BCZ+(Math.random()-.5)*120)})}}// Nochebuena: fuegos artificiales
   poseTrain();
   saveT+=dt;if(saveT>5){saveT=0;save()}
 }
-const person=()=>NAMES[Math.random()*NAMES.length|0];
 
-/* ================= votación: por dónde va el tren, y quién lo lleva ================= */
-/* POLL: la votación de la próxima aguja. left/right son las opciones en pantalla (la de la izquierda es el camino que sale a la izquierda) */
-let POLL=null,DRV=null,FORKG=[];const SIDE_COL=['#c8182c','#1d7a4c'],LINE_COL=[[1.15,.02,.07],[.05,.72,.28]],CLOSE_D=11,VOTE_CARD={t:0};
-const pollOpt=(P,side)=>P.F.opts[side===0?P.F.left:1-P.F.left];
+
+/* ================= agujas: tú eliges por dónde va el tren ================= */
+/* POLL: la próxima aguja. El lado 0 es el camino que sale a la izquierda y el 1, a la derecha. mine: lo que has elegido; won: por dónde va */
+let POLL=null,DRVTAG=null,FORKG=[];const SIDE_COL=['#c8182c','#1d7a4c'],LINE_COL=[[1.15,.02,.07],[.05,.72,.28]],CLOSE_D=8;
 const pollRoute=(P,side)=>side===0?P.F.left:1-P.F.left;// 0: vía principal, 1: ramal
+const pollOpt=(P,side)=>P.F.opts[pollRoute(P,side)];
 const forkD=F=>{const d=T.fs[F.f]-dist;return d>0.01?d:d+T.L};
 function nextFork(){let b=null,bd=1e9;for(const F of MP.forks){const d=forkD(F);if(d<bd){bd=d;b=F}}return b}
-function openPoll(seed){const F=nextFork();if(!F)return;POLL={F,state:'open',won:-1,t:0,d0:Math.max(30,forkD(F)),...newPoll()};if(seed)crowdVote(POLL,seed,simClock);signDirty=true}
-/* al empezar, el tren va de camino a la primera aguja (a unos 28 s) y ya hay gente votando */
-function startRun(){setDist(T.fs[0]-156);openPoll(17)}
+function openPoll(){const F=nextFork();if(!F)return;POLL={F,state:'open',mine:-1,won:-1,t:0,d0:Math.max(30,forkD(F))};signDirty=true}
+/* al empezar, el tren va de camino a la primera aguja (a unos 28 s) */
+function startRun(){setDist(T.fs[0]-156);openPoll()}
+/* los caminos que hay en la maqueta de hoy y cuántos has recorrido ya */
+const pathsNow=()=>MP?[...new Set(MP.forks.flatMap(F=>F.opts.map(o=>o.id)))]:[];
+const pathsSeen=()=>pathsNow().filter(id=>st.seen[id]).length;
+/* lo que hará el tren: lo que has elegido o, si no has elegido, el camino por el que menos ha ido */
+function sideToTake(P){if(P.mine>=0)return P.mine;const r=autoRoute(P.F.opts.map(o=>o.id),st.seen,T.bits>>P.F.f&1);return pollRoute(P,0)===r?0:1}
 function pollTick(dt){if(!POLL){openPoll();return}
   const P=POLL;P.t+=dt;
-  if(P.state==='open'){const k=crowdVotes(simClock,st.day)*dt;crowdVote(P,k,simClock);if(addVotes(st,k)){dayDone();if(busy)return}
-    if(forkD(P.F)<CLOSE_D){P.state='closed';P.won=winnerOf(P);signDirty=true}}
-  else if(P.state==='done'&&P.t>4.5)openPoll()}
-/* la máquina llega a la aguja: toma el camino que ha ganado */
-function takeFork(F){const P=POLL&&POLL.F===F?POLL:null;if(P&&P.won<0)P.won=winnerOf(P);
+  if(P.state==='open'&&forkD(P.F)<CLOSE_D){P.state='closed';P.won=sideToTake(P);signDirty=true}
+  else if(P.state==='done'&&P.t>3.5)openPoll()}
+/* la máquina llega a la aguja */
+function takeFork(F){const P=POLL&&POLL.F===F?POLL:null;if(P&&P.won<0)P.won=sideToTake(P);
   const go=P?pollRoute(P,P.won):0,bits=(T.bits&~(1<<F.f))|(go<<F.f);setRoute(bits);
-  if(!P)return;P.state='done';P.t=0;signDirty=true;
-  const v=votesOf(P),tot=v[0]+v[1],pct=tot?Math.round(v[P.won]/tot*100):50,o=pollOpt(P,P.won),ok=P.mine===P.won;if(ok)st.wins++;
-  news(P.mine>=0&&ok?`¡Tu voto ha ganado! El tren va por ${o.art}`:`El tren va por ${o.art}: ${pct} % de los votos`,true);
-  const me=drawDriver(st,P.mine>=0);setDriver(me?(st.myName||''):person(),me);if(!FASTSTEP)toot();save()}
-/* tu voto */
-function vote(side){const P=POLL;if(!P||P.state!=='open'||busy)return false;const r=castVote(P,side);if(!r)return false;au();
-  if(r==='nuevo'){st.votes++;tone(1319,0.16,'triangle',0.06);tone(1760,0.25,'triangle',0.05,0.07);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}
-    if(addVotes(st,1)){save();dayDone();return true}}else tone(988,0.14,'triangle',0.05);
-  signDirty=true;save();uiPoll();return true}
-/* maquinista: su nombre va sobre la locomotora hasta la aguja siguiente */
-function setDriver(name,me){if(DRV&&DRV.tag)dropObj(DRV.tag);DRV={name,me,tag:null};driverTag();
-  if(me&&!FASTSTEP){openDrv();kaching();bells()}else if(!me)$('drvCard').hidden=true}
-function driverTag(){if(!DRV||!LOCO)return;if(DRV.tag)dropObj(DRV.tag);const n=DRV.name||(DRV.me?'tú':'');if(!n){DRV.tag=null;return}
-  DRV.tag=tagSprite('Maquinista: '+n,DRV.me?'rgba(122,16,32,.94)':'rgba(11,21,48,.88)');DRV.tag.material.sizeAttenuation=false;DRV.tag.center.set(0.5,0);DRV.tag.position.set(0,6.6,0);LOCO.add(DRV.tag)}// del mismo tamaño en pantalla de lejos y de cerca
-function openDrv(){hideHint();$('drvName').value=st.myName||'';$('drvNameRow').hidden=!!st.myName;$('drvCard').hidden=false}
+  const o=F.opts[go],first=!st.seen[o.id];st.seen[o.id]=(st.seen[o.id]||0)+1;if(P&&P.mine>=0)st.chosen++;
+  if(P){P.state='done';P.t=0;signDirty=true}
+  if(first){const a=pathsSeen(),b=pathsNow().length;news(a<b?`¡Camino nuevo: ${o.art}! Llevas ${a} de ${b}`:`¡Camino nuevo: ${o.art}! Ya los has recorrido todos`,true);if(!FASTSTEP&&P&&P.mine>=0){kaching();if(LOCO)confettiBurst(LOCO.position.clone().setY(LOCO.position.y+6),10)}}
+  if(!FASTSTEP)toot();save()}
+/* eliges camino (se puede cambiar hasta que el tren llega) */
+function choose(side){const P=POLL;if(!P||P.state!=='open'||busy||(side!==0&&side!==1)||P.mine===side)return false;P.mine=side;au();tone(1319,0.16,'triangle',0.06);tone(1760,0.25,'triangle',0.05,0.07);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}
+  signDirty=true;uiPoll();return true}
+/* tu nombre, si lo has puesto, va sobre la locomotora */
+function driverTag(){if(DRVTAG){dropObj(DRVTAG);DRVTAG=null}if(!st.myName||!LOCO)return;
+  DRVTAG=tagSprite('Maquinista: '+st.myName,'rgba(122,16,32,.94)');DRVTAG.material.sizeAttenuation=false;DRVTAG.center.set(0.5,0);DRVTAG.position.set(0,6.6,0);LOCO.add(DRVTAG)}// del mismo tamaño en pantalla de lejos y de cerca
 let tootT=-1e9;
 function toot(){const now=performance.now();if(now-tootT<1100)return;tootT=now;whistle();if(!LOCO)return;LOCO.updateMatrixWorld();LOCO.localToWorld(tmpV.copy(LOCO.userData.chimney));for(let i=0;i<7;i++)puff(tmpV.clone(),new THREE.Vector3((Math.random()-.5)*2.4,5+Math.random()*3,(Math.random()-.5)*2.4),1.5,.5,1.6)}
 function tagSprite(text,bg){const t=canvasTex(512,128,(c,w,hh)=>{c.fillStyle=bg;rrect(c,6,10,w-12,hh-20,40);c.fill();c.strokeStyle='#e0ad45';c.lineWidth=5;rrect(c,6,10,w-12,hh-20,40);c.stroke();
@@ -883,19 +886,19 @@ function tagSprite(text,bg){const t=canvasTex(512,128,(c,w,hh)=>{c.fillStyle=bg;
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,toneMapped:false,depthTest:false,transparent:true,color:new THREE.Color(.82,.82,.82)}));sp.scale.set(6,1.5,1);sp.renderOrder=6;return sp}// por debajo del umbral del bloom: texto nítido
 const dropObj=o=>{if(o.parent)o.parent.remove(o);o.traverse(c=>{if(c.geometry&&!c.isSprite)c.geometry.dispose();if(c.material){if(c.material.map)c.material.map.dispose();c.material.dispose()}})};
 
-/* en la maqueta: dos hilos de luz por los dos caminos de la próxima aguja y un cartel en cada uno con su porcentaje (también se vota tocándolos) */
+/* en la maqueta: dos hilos de luz por los dos caminos de la próxima aguja y un cartel en cada uno (también se elige tocándolos) */
 let signDirty=true;const SIGN=[0,1].map(i=>{const cv=document.createElement('canvas');cv.width=320;cv.height=112;const tx=new THREE.CanvasTexture(cv);tx.colorSpace=THREE.SRGBColorSpace;
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,toneMapped:false,depthTest:false,transparent:true,sizeAttenuation:false,color:new THREE.Color(.84,.84,.84)}));sp.renderOrder=7;sp.visible=false;sp.center.set(0.5,0);scene.add(sp);return {cv,tx,sp,txt:''}});
 function buildForks(){FORKG=MP.forks.map(F=>[0,1].map(side=>{const rt=side===0?F.left:1-F.left,R=MP.R[rt?1<<F.f:0],i0=Math.round((rt?R.alt[F.f]:R.fs[F.f])/R.ds),n=Math.round(F.len[rt]/R.ds),T0=T;T=R;
     const gs=[-1,1].map(sd=>ext3([[sd*(GAUGE+0.95),0.34],[sd*(GAUGE+1.32),0.34]],i0+6,n-12,2,M.roadbed).geometry);T=T0;const col=new THREE.Color(...LINE_COL[side]);
     const m=new THREE.Mesh(mergeGeometries(gs,false),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,toneMapped:false,side:THREE.DoubleSide,depthWrite:false}));gs.forEach(g=>g.dispose());m.renderOrder=2;m.visible=false;world.add(m);
     const q=atM(R,(rt?R.alt[F.f]:R.fs[F.f])+Math.min(34,F.len[rt]*0.4));return {m,p:new THREE.Vector3(q.x,Math.max(q.y+5,groundAt(q.x,q.z)+3),q.z)}}))}
-function drawSign(i){const P=POLL,S=SIGN[i],v=votesOf(P),tot=v[0]+v[1],pct=tot?Math.round(v[i]/tot*100):50,o=pollOpt(P,i),t=o.n+'|'+pct+'|'+(P.mine===i)+'|'+P.state+P.won;if(S.txt===t)return;S.txt=t;
-  const g=S.cv.getContext('2d'),w=320,h=112;g.clearRect(0,0,w,h);g.globalAlpha=P.won>=0&&P.won!==i?0.45:1;g.fillStyle=SIDE_COL[i];rrect(g,6,4,w-12,80,40);g.fill();g.lineWidth=P.mine===i||P.won===i?9:4;g.strokeStyle=P.mine===i||P.won===i?'#ffd56b':'rgba(255,245,225,.85)';rrect(g,6,4,w-12,80,40);g.stroke();
+function drawSign(i){const P=POLL,S=SIGN[i],o=pollOpt(P,i),on=P.won>=0?P.won===i:P.mine===i,off=P.won>=0?P.won!==i:P.mine===1-i,nw=!st.seen[o.id],t=o.n+on+off+nw;if(S.txt===t)return;S.txt=t;
+  const g=S.cv.getContext('2d'),w=320,h=112;g.clearRect(0,0,w,h);g.globalAlpha=off?0.6:1;g.fillStyle=SIDE_COL[i];rrect(g,6,4,w-12,80,40);g.fill();g.lineWidth=on?10:4;g.strokeStyle=on?'#ffd56b':'rgba(255,245,225,.85)';rrect(g,6,4,w-12,80,40);g.stroke();
   g.fillStyle=SIDE_COL[i];g.beginPath();g.moveTo(w/2-16,82);g.lineTo(w/2+16,82);g.lineTo(w/2,108);g.closePath();g.fill();
-  g.fillStyle='#fff8e8';g.textBaseline='middle';g.textAlign='left';g.font='800 42px Rubik, system-ui, sans-serif';g.fillText(o.n,30,46,172);g.textAlign='right';g.font='800 40px "JetBrains Mono", monospace';g.fillText(pct+'%',w-28,46,104);g.globalAlpha=1;S.tx.needsUpdate=true}
+  g.fillStyle='#fff8e8';g.textBaseline='middle';g.textAlign='center';g.font='800 46px Rubik, system-ui, sans-serif';g.fillText((i===0?'‹ ':'')+o.n+(on?' ✓':'')+(i===1?' ›':''),w/2,46,w-44);g.globalAlpha=1;S.tx.needsUpdate=true}
 function forkFx(t){const P=POLL,hide=!P||busy||cutK>=0.5;
-  FORKG.forEach((G,f)=>G.forEach((g,side)=>{const on=P&&P.F.f===f;let op=0;if(on)op=P.state==='open'?0.5+0.28*Math.sin(t*3.2+side*Math.PI)+(P.mine===side?0.2:0):P.won===side?1:0.06;
+  FORKG.forEach((G,f)=>G.forEach((g,side)=>{const on=P&&P.F.f===f;let op=0;if(on)op=P.won>=0?(P.won===side?1:0.05):P.mine>=0?(P.mine===side?0.85+0.15*Math.sin(t*4):0.12):0.5+0.28*Math.sin(t*3.2+side*Math.PI);
     g.m.material.opacity=lerp(g.m.material.opacity,op,0.12);g.m.visible=g.m.material.opacity>0.02}));
   const k=2*tanH()/innerHeight,W=innerWidth<560?92:118;
   SIGN.forEach((S,i)=>{S.sp.visible=!hide&&!(P.state==='done'&&P.won!==i);if(!S.sp.visible)return;S.sp.position.copy(FORKG[P.F.f][i].p);S.sp.scale.set(W*k,W*k*0.35,1);S.sp.center.x=0.5});
@@ -1059,7 +1062,7 @@ function hitCar(sx,sy,slop){const R=rayAt(sx,sy),tg=groundT(R)||1e9,px=2*tanH()/
     else if(slop){const e=slop*px*c.position.distanceTo(R.origin);_box.expandByScalar(e);const q=_ray.intersectBox(_box,tmpV2);if(q){const t=q.applyMatrix4(c.matrixWorld).distanceTo(R.origin),dd=R.distanceToPoint(tmpV.copy(c.position));if(t<tg+1+2*e&&dd<nd){nd=dd;nc=ci}}}});
   return bc>=0?bc:nc}
 function hitHouse(sx,sy){const h=st.mine>=0&&HS[st.mine];if(!h)return false;const R=rayAt(sx,sy),tg=groundT(R)||1e9,c=h.g.position,t=tmpV.copy(c).sub(R.origin).dot(R.direction);return t>0&&R.at(t,tmpV2).distanceTo(c)<6&&t<tg+6}
-function pick(sx,sy,slop=6){if(!ready||busy)return false;au();const sg=hitSign(sx,sy);if(sg>=0){vote(sg);return true}
+function pick(sx,sy,slop=6){if(!ready||busy)return false;au();const sg=hitSign(sx,sy);if(sg>=0){choose(sg);return true}
   const bc=hitCar(sx,sy,slop);
   if(bc>=0){if(!(cam.focus&&cam.focus.car===bc&&!cam.focus.chase))setFocus({car:bc});return true}
   if(hitHouse(sx,sy)){focusHouse();return true}return false}
@@ -1103,17 +1106,10 @@ async function setAd(i,ad){const W=WAG[i];if(!W)return;const tok=(W.userData.adT
 const logoURL=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#fbf3df';g.beginPath();g.arc(128,128,118,0,7);g.fill();g.fillStyle='#1d3a78';g.beginPath();g.arc(128,128,100,0,7);g.fill();
   g.fillStyle='#e0ad45';g.beginPath();for(let k=0;k<10;k++){const r=k%2?34:82,a=-Math.PI/2+k*Math.PI/5;g.lineTo(128+Math.cos(a)*r,128+Math.sin(a)*r)}g.closePath();g.fill();return c.toDataURL('image/png')})();
 const EX_SPONSOR={text:'Pastelería La Estrella',sub:'Turrón artesano · ejemplo',bg:'#1d3a78',img:logoURL,tag:'Patrocinado',url:'https://www.example.com/'};
-const EX_MSG={text:'¡Feliz Navidad, amama Maite!',sub:'De Ane, desde Bilbao',bg:'#b3162a'};
-/* subasta (simulada) y vagones con mensaje */
-const AUC_KEY='advx-tren-subasta';
-let auc=(()=>{try{const o=JSON.parse(store.get(AUC_KEY));if(o&&o.top&&Number.isFinite(o.top.amt))return o}catch(e){}return {top:{amt:41,who:'Pastelería La Estrella',me:false},bid:null,mine:null}})();
-const saveAuc=()=>store.set(AUC_KEY,JSON.stringify(auc));
-let rivalT=25;
-function auctionTick(dt){rivalT-=dt;if(rivalT>0)return;rivalT=22+Math.random()*26;if(Math.random()>(auc.top.me?0.6:0.45))return;
-  const was=auc.top.me,amt=auc.top.amt+1+Math.floor(Math.random()*4);auc.top={amt,who:BIZ[Math.random()*BIZ.length|0],me:false};saveAuc();
-  news(was?`Te han superado: ${amt} € por el vagón de mañana`:`Nueva puja por el vagón de mañana: ${amt} €`,was);if(was&&tiles.tAd){tiles.tAd.b.querySelector('.flag').textContent='¡Te superan!';tiles.tAd.b.classList.add('hot')}if($('adSheet').classList.contains('on'))syncAdForm()}
-const msgWagon=()=>{for(let i=2;i<WAG.length;i++)if(!ADS[i]||!ADS[i].ad)return i;return -1};
-async function applyAds(){await setAd(1,EX_SPONSOR);if(WAG.length>2)await setAd(2,EX_MSG);for(let i=3;i<WAG.length;i++)await setAd(i,null);if(auc.mine&&auc.mine.wagon<WAG.length)await setAd(auc.mine.wagon,auc.mine.ad)}
+const EX_MSG={text:'¡Feliz Navidad, amama Maite!',sub:'Ejemplo de mensaje',bg:'#b3162a'};
+/* las marcas de hoy salen de tren-marcas.js; mientras no haya ninguna, dos de ejemplo */
+const freeWagon=()=>{for(let i=2;i<WAG.length;i++)if(!ADS[i]||!ADS[i].ad)return i;return -1};
+async function applyAds(){const M=MARCAS.length?marcasDe(MARCAS,isoDay(),WAG.length-1):{1:EX_SPONSOR,2:EX_MSG};for(let i=1;i<WAG.length;i++)await setAd(i,M[i]||null)}
 /* ficha del vagón: la marca, su web y, si está libre, el botón para ponerla */
 function showCard(i){const A=ADS[i]&&ADS[i].ad,u=A&&A.url?cleanUrl(A.url):'';$('card').hidden=false;
   $('caTag').textContent=i===1?'Vagón del día · patrocinado':A?'Vagón con mensaje':`Vagón nº ${i} · libre`;
@@ -1136,45 +1132,41 @@ const ICON={
 };
 const tiles={};
 function buildShop(){$('shop').innerHTML=
-  `<section class="poll" id="poll" aria-label="Votación: por dónde va el tren"><div class="phead"><b id="pTitle">¿Por dónde tira el tren?</b><button class="plnk" id="pGo" type="button">Ver el cruce</button><a class="plnk" id="pAsk" target="_blank" rel="noopener noreferrer" hidden>Pide votos</a><span class="ptime mono" id="pTime"></span></div><div class="pbar" aria-hidden="true"><i id="pBar"></i></div><div class="popts">`+
-  [0,1].map(i=>`<button class="po ${i?'r':'l'}" id="po${i}" type="button" aria-pressed="false" style="--c:${SIDE_COL[i]}"><i class="pf"></i><svg class="pi" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="pn"></span><span class="pv"></span><span class="pp mono"></span></button>`).join('')+`</div></section>`+
+  `<section class="poll" id="poll" aria-label="Por dónde va el tren"><div class="phead"><b id="pTitle">¿Por dónde va el tren?</b><button class="plnk" id="pGo" type="button">Ver el cruce</button><button class="ptoot" id="pToot" type="button" aria-label="Tocar el silbato" title="Tocar el silbato"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h9l5-4v12l-5-4H4z"/><path d="M8 14v5"/></svg></button><span class="ptime mono" id="pTime"></span></div><div class="pbar" aria-hidden="true"><i id="pBar"></i></div><div class="popts">`+
+  [0,1].map(i=>`<button class="po ${i?'r':'l'}" id="po${i}" type="button" aria-pressed="false" style="--c:${SIDE_COL[i]}"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="pn"></span><span class="pv"></span><span class="pp"></span></button>`).join('')+`</div></section>`+
   `<button class="it" id="tHouse"><span class="flag">¡Libre!</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.casa}</svg></span><span class="nm"></span><span class="fx"></span><span class="pr mono"><b></b></span></button>`+
   `<button class="it" id="tAd"><span class="flag">Nuevo</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.marca}</svg></span><span class="nm">Tu marca</span><span class="fx">En un vagón 24 h, con enlace</span><span class="pr mono"><b></b></span></button>`;
   for(const id of ['tHouse','tAd']){const b=$(id);tiles[id]={b,lv:b.querySelector('.lv'),ic:b.querySelector('.ic svg'),nm:b.querySelector('.nm'),fx:b.querySelector('.fx'),pr:b.querySelector('.pr b'),c:{}}}
-  for(const i of [0,1]){const b=$('po'+i);PO[i]={b,f:b.querySelector('.pf'),i:b.querySelector('.pi'),n:b.querySelector('.pn'),v:b.querySelector('.pv'),p:b.querySelector('.pp'),c:{}};b.onclick=()=>{if(!vote(i)&&POLL&&POLL.state==='open')return;uiPoll()}}
+  for(const i of [0,1]){const b=$('po'+i);PO[i]={b,i:b.querySelector('.pi'),n:b.querySelector('.pn'),v:b.querySelector('.pv'),p:b.querySelector('.pp'),c:{}};b.onclick=()=>choose(i)}
+  $('pToot').onclick=()=>{au();toot()};
   if(!store.get('advx-tren-marca'))$('tAd').classList.add('hot');
   $('pGo').onclick=()=>{au();if(POLL)seeFork()};
-  $('tHouse').onclick=()=>{au();if(st.mine<0)openHouse();else focusHouse()};
+  $('tHouse').onclick=()=>{au();if(st.mine<0)openHouse();else focusHouse()};$('dayNext').onclick=()=>{au();setDay(st.day+1)};
   $('tAd').onclick=()=>{au();openAd()}}
 const PO=[],pollE={c:{}};
 function seeFork(){const F=POLL.F,g=FORKG[F.f],p=g[0].p,q=g[1].p;touched=true;flyTo((F.x+p.x+q.x)/3,(F.z+p.z+q.z)/3,portrait()?150:105,Math.atan2(-Math.sin(F.a),-Math.cos(F.a)));cam.el=0.72}
 const shareUrl=()=>window.ADVX_TREN_URL||location.origin+location.pathname;// ADVX_TREN_URL: dirección pública si la página va dentro de un marco
-/* panel de la votación: opciones, porcentajes, cuenta atrás y cómo va tu voto */
-function uiPoll(){const P=POLL,E=pollE;if(!P||!PO[0])return;const v=votesOf(P),tot=v[0]+v[1],open=P.state==='open',left=Math.max(0,(forkD(P.F)-CLOSE_D)/TRAIN_V);
-  for(const i of [0,1]){const o=pollOpt(P,i),q=PO[i],pct=tot?Math.round(v[i]/tot*100):50;
-    if(q.c.id!==o.id){q.c.id=o.id;q.i.innerHTML=ICON[o.id]||''}setTxt(q,'n',q.n,o.n);setTxt(q,'p',q.p,pct+' %');setTxt(q,'v',q.v,`${fmtN(v[i])} voto${v[i]===1?'':'s'}`);
-    const f=(Math.round(pct)/100).toFixed(2);if(q.c.f!==f){q.c.f=f;q.f.style.transform=`scaleX(${f})`}
-    const cls='po '+(i?'r':'l')+(P.won>=0?(P.won===i?' win':' lose'):'');if(q.c.cls!==cls){q.c.cls=cls;q.b.className=cls}
-    const pr=String(P.mine===i);if(q.c.pr!==pr){q.c.pr=pr;q.b.setAttribute('aria-pressed',pr)}if(q.b.disabled!==!open)q.b.disabled=!open}
-  let t='¿Por dónde tira el tren?';const h=st.mine>=0?SL[st.mine]:null;
-  if(P.state==='closed')t='¡Votación cerrada!';else if(P.state==='done')t=`¡Gana ${pollOpt(P,P.won).art}!`;
-  else if(P.mine>=0){const d=v[P.mine]-v[1-P.mine],o=pollOpt(P,P.mine).art;t=d>0?`Tu voto gana por ${d}`:d<0?`Tu voto pierde por ${-d}`:'Tu voto va empatado'}
-  else if(h&&h.f===P.F.f)t=`Tu casa está por ${P.F.opts[h.side1].art}`;
-  setTxt(E,'t',$('pTitle'),t);setTxt(E,'s',$('pTime'),open?`${Math.floor(left/60)}:${String(Math.floor(left%60)).padStart(2,'0')}`:'');
-  const b=open?clamp(left*TRAIN_V/(P.d0-CLOSE_D),0,1).toFixed(3):'0';if(E.c.b!==b){E.c.b=b;$('pBar').style.transform=`scaleX(${b})`}
-  const ask=open&&P.mine>=0;if(E.c.ask!==ask){E.c.ask=ask;$('pAsk').hidden=!ask;$('pGo').hidden=ask}
-  if(ask){const o=pollOpt(P,P.mine),k=o.id+(v[P.mine]>=v[1-P.mine]);if(E.c.k!==k){E.c.k=k;$('pAsk').href='https://wa.me/?text='+encodeURIComponent(`🚂 El Tren de Navidad llega al cruce y ${v[P.mine]>=v[1-P.mine]?'va ganando':'va perdiendo'} ${o.art}. ¡Vota ${o.n} antes de que pase! ${shareUrl()}`)}}
-  signDirty=true}
 const setTxt=(E,k,el,v)=>{if(E.c[k]!==v){E.c[k]=v;el.textContent=v}};
-const fmtLeft=ms=>{const m=Math.max(0,Math.round(ms/60000));return m<60?m+' min':Math.floor(m/60)+' h '+(m%60)+' min'};
+/* panel del cruce: los dos caminos, cuenta atrás y lo que has elegido */
+function uiPoll(){const P=POLL,E=pollE;if(!P||!PO[0])return;const open=P.state==='open',left=Math.max(0,(forkD(P.F)-CLOSE_D)/TRAIN_V),sel=P.won>=0?P.won:P.mine;
+  for(const i of [0,1]){const o=pollOpt(P,i),q=PO[i],n=st.seen[o.id]||0;
+    if(q.c.id!==o.id){q.c.id=o.id;q.i.innerHTML=ICON[o.id]||''}setTxt(q,'n',q.n,o.n);setTxt(q,'v',q.v,o.d);setTxt(q,'p',q.p,n?'':'Nuevo');
+    const cls='po '+(i?'r':'l')+(P.won>=0?(P.won===i?' win':' lose'):P.mine===1-i?' dim':'');if(q.c.cls!==cls){q.c.cls=cls;q.b.className=cls}
+    const pr=String(sel===i);if(q.c.pr!==pr){q.c.pr=pr;q.b.setAttribute('aria-pressed',pr)}if(q.b.disabled!==!open)q.b.disabled=!open}
+  setTxt(E,'t',$('pTitle'),P.state==='done'?`¡Por ${pollOpt(P,P.won).art}!`:P.state==='closed'?`Va por ${pollOpt(P,P.won).art}`:P.mine>=0?`Irá por ${pollOpt(P,P.mine).art}`:'¿Por dónde va el tren?');
+  setTxt(E,'s',$('pTime'),open?`${Math.floor(left/60)}:${String(Math.floor(left%60)).padStart(2,'0')}`:'');
+  const b=open?clamp(left*TRAIN_V/(P.d0-CLOSE_D),0,1).toFixed(3):'0';if(E.c.b!==b){E.c.b=b;$('pBar').style.transform=`scaleX(${b})`}
+  signDirty=true}
 function uiShop(){if(!tiles.tHouse)return;uiPoll();
-  const H=tiles.tHouse,slots=SL.length,free=slots-st.houses;
-  if(st.mine<0){setTxt(H,'nm',H.nm,'Pon tu casa');setTxt(H,'fx',H.fx,free>0?'El tren te traerá regalos':'Vía llena: espera al tramo nuevo');setTxt(H,'pr',H.pr,free>0?`${free} libre${free===1?'':'s'}`:'Llena')}
-  else{setTxt(H,'nm',H.nm,'Tu casa');setTxt(H,'fx',H.fx,st.myName);setTxt(H,'pr',H.pr,`${fmtN(st.myGifts)} regalos`)}
-  setTxt(H,'lv',H.lv,`${st.houses}/${slots}`);const hc='it'+(st.mine<0&&free>0?' hot':'');if(H.c.cls!==hc){H.c.cls=hc;H.b.className=hc}
-  const A=tiles.tAd;setTxt(A,'pr',A.pr,`Puja: ${auc.top.amt} €`);setTxt(A,'lv',A.lv,fmtLeft(closeAt()-Date.now()));
-  const D=Math.min(1,st.today/st.goal);setTxt(dayE,'t',$('dayTxt'),`Día ${st.day} de ${DAYS}`);setTxt(dayE,'p',$('dayPct'),`${fmtN(st.today)}/${fmtN(st.goal)}`);
-  const dr=Math.round(D*400)/400;if(dayE.c.f!==dr){dayE.c.f=dr;$('dayBar').style.transform=`scaleX(${dr})`}}
+  const H=tiles.tHouse;
+  if(st.mine<0){setTxt(H,'nm',H.nm,'Pon tu casa');setTxt(H,'fx',H.fx,'El tren te traerá regalos');setTxt(H,'pr',H.pr,'Con tu nombre')}
+  else{setTxt(H,'nm',H.nm,'Tu casa');setTxt(H,'fx',H.fx,st.myName);setTxt(H,'pr',H.pr,`${fmtN(st.myGifts)} regalo${st.myGifts===1?'':'s'}`)}
+  const hc='it'+(st.mine<0?' hot':'');if(H.c.cls!==hc){H.c.cls=hc;H.b.className=hc}
+  const A=tiles.tAd;setTxt(A,'pr',A.pr,`Desde ${Math.min(PRECIO_DIA,PRECIO_VAGON)} €`);
+  setTxt(dayE,'t',$('dayTxt'),PREVIEW&&innerWidth>560?`Avance · día ${st.day} de ${DAYS}`:`Día ${st.day} de ${DAYS}`);setTxt(dayE,'p',$('dayPct'),st.day<DAYS?`Día ${st.day+1}: ${rewardText(st.day+1)}`:'¡Nochebuena!');
+  const dr=Math.round(st.day/DAYS*400)/400;if(dayE.c.f!==dr){dayE.c.f=dr;$('dayBar').style.transform=`scaleX(${dr})`}
+  const nx=PREVIEW&&st.day<DAYS;if(dayE.c.n!==nx){dayE.c.n=nx;$('dayNext').hidden=!nx}if(nx)setTxt(dayE,'nt',$('dayNext'),`Ver el ${st.day+1} ›`);
+  if(!PREVIEW&&performance.now()-dayT>3e4){dayT=performance.now();const d=dayOf();if(d>st.day)setDay(d)}}
 const dayE={c:{}};
 async function expand(){busy=true;if(!FASTSTEP){grade.uniforms.flash.value=0.45;bells()}
   await buildWorld(st.stage);buildDeco();placeTown(true);markMine();downgrade(scene);startRun();WAG.slice(1).forEach(W=>fillWagon(W));poseTrain();
@@ -1196,17 +1188,11 @@ function closeModal(id){$(id).classList.remove('on');if(lastFocusEl&&lastFocusEl
 const anyModal=()=>document.querySelector('.modal.on');
 const shake=el=>el.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(-2px)'},{transform:'translateX(0)'}],{duration:220,easing:'ease-out'});
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id)}));
-function openHouse(){const free=SL.length-st.houses;if(free<=0){news('La vía está llena: cuando se cumpla el objetivo del día se abre un tramo nuevo con sitio',true);return}
-  $('hName').value=st.myName||'';openModal('houseSheet');setTimeout(()=>$('hName').focus(),60)}
-function claimHouse(name){const n=cleanText(name,14);if(!n||st.mine>=0||st.houses>=SL.length)return false;
-  st.myName=n;st.mine=st.houses;st.houses++;addHouse();markMine();save();uiShop();return true}
+function openHouse(){$('hName').value=st.myName||'';openModal('houseSheet');setTimeout(()=>$('hName').focus(),60)}
+function claimHouse(name){const n=cleanText(name,14);if(!n||st.mine>=0)return false;st.myName=n;st.mine=0;addHouse(0);markMine();driverTag();save();uiShop();return true}
 $('houseForm').addEventListener('submit',e=>{e.preventDefault();if(!claimHouse($('hName').value)){shake($('hName'));$('hName').focus();return}
   closeModal('houseSheet');kaching();news(`¡Ya tienes casa junto a la vía, ${st.myName}! El tren te dejará regalos cada vez que pase`,true);setTimeout(focusHouse,250)});
 $('hX').onclick=()=>closeModal('houseSheet');
-/* te ha tocado ser el maquinista */
-$('drvForm').addEventListener('submit',e=>{e.preventDefault();const n=cleanText($('drvName').value,14);if(!n){shake($('drvName'));return}st.myName=n;if(DRV&&DRV.me){DRV.name=n;driverTag()}$('drvNameRow').hidden=true;save();uiShop();if(st.mine>=0)markMine();kaching()});
-$('drvToot').onclick=()=>{au();toot()};$('drvSee').onclick=()=>setFocus({car:0});$('drvX').onclick=()=>{$('drvCard').hidden=true};
-$('drvShare').onclick=()=>{$('drvShare').href='https://wa.me/?text='+encodeURIComponent(`🚂 ¡Ahora mismo llevo yo el Tren de Navidad! Mira mi nombre en la locomotora y vota por dónde va: ${shareUrl()}`)};
 /* tu marca: editor, vista previa, puja y vagón con mensaje */
 const ed={tab:'bid',img:'',text:'',sub:'',url:'',bg:AD_BG[0]};
 const edAd=()=>({text:cleanText(ed.text,32),sub:cleanText(ed.sub,40),bg:ed.bg,img:ed.img,url:cleanUrl(ed.url)||''});
@@ -1214,18 +1200,14 @@ const edEmpty=()=>!ed.img&&!cleanText(ed.text,32)&&!cleanText(ed.sub,40);
 const urlBad=()=>cleanUrl(ed.url)===null;
 async function drawPrev(){const a=edAd(),im=await loadImg(a.img);const cv=$('adPrev');
   if(edEmpty())drawAd(cv,{text:'Tu marca aquí',sub:'Sube una imagen o escribe un mensaje',bg:a.bg,tag:ed.tab==='bid'?'Patrocinado':''});else drawAd(cv,{...a,im,host:a.url?hostOf(a.url):'',tag:ed.tab==='bid'?'Patrocinado':''})}
-const fmtDay=ms=>new Intl.DateTimeFormat('es-ES',{weekday:'long',day:'numeric',month:'long'}).format(ms);
-function syncAdForm(){const bid=ed.tab==='bid';$('tabBid').setAttribute('aria-selected',bid);$('tabMsg').setAttribute('aria-selected',!bid);$('bidRow').hidden=!bid;$('msgGo').hidden=bid;
-  if(bid){const t=auc.top;$('adLead').innerHTML=`Tu imagen va en el <b>primer vagón</b> todo el <b>${fmtDay(showDay())}</b>. Puja más alta: <b>${t.amt} €</b> (${t.me?'tú':t.who}). Cierra a las ${CLOSE_H}:00, dentro de ${fmtLeft(closeAt()-Date.now())}.`;
-    const mb=minBid(t.amt),inp=$('bidAmt');inp.min=mb;if(!(+inp.value>=mb))inp.value=mb;$('bidGo').textContent=t.me?'Subir mi puja':`Pujar ${Math.max(mb,+inp.value||mb)} €`}
-  else{const w=msgWagon(),free=WAG.slice(1).filter((_,k)=>!ADS[k+1]||!ADS[k+1].ad).length;$('adLead').innerHTML=w>0?`Tu imagen o mensaje va en un vagón durante <b>24 horas</b> por <b>${MSG_PRICE} €</b>. ${free===1?'Queda 1 vagón libre':'Quedan '+free+' vagones libres'} hoy.`:'Hoy no quedan vagones libres. Cuando entre todos ganéis otro vagón, habrá sitio.';$('msgGo').disabled=w<0}
-  drawPrev()}
-function openAd(tab){store.set('advx-tren-marca','1');tiles.tAd.b.classList.remove('hot');if(tab)ed.tab=tab;syncAdForm();openModal('adSheet')}
+function syncAdForm(){const dia=ed.tab==='bid',pr=dia?PRECIO_DIA:PRECIO_VAGON;$('tabBid').setAttribute('aria-selected',dia);$('tabMsg').setAttribute('aria-selected',!dia);
+  $('adLead').innerHTML=dia?`Tu imagen va en el <b>primer vagón</b>, en los dos costados, <b>un día entero</b> por <b>${pr} €</b>. Quien lo toca ve tu ficha con tu enlace.`:`Tu imagen o mensaje va en un vagón durante <b>24 horas</b> por <b>${pr} €</b>.`;
+  $('adAsk').textContent=`Pedir este vagón · ${pr} €`;drawPrev()}
+function openAd(tab){$('adOk').hidden=true;store.set('advx-tren-marca','1');tiles.tAd.b.classList.remove('hot');if(tab)ed.tab=tab;syncAdForm();openModal('adSheet')}
 $('adX').onclick=()=>closeModal('adSheet');
 $('tabBid').onclick=()=>{ed.tab='bid';syncAdForm()};$('tabMsg').onclick=()=>{ed.tab='msg';syncAdForm()};
 $('adText').addEventListener('input',e=>{ed.text=e.target.value;drawPrev()});$('adSub').addEventListener('input',e=>{ed.sub=e.target.value;drawPrev()});
 $('adUrl').addEventListener('input',e=>{ed.url=e.target.value;$('adErr').textContent='';drawPrev()});
-$('bidAmt').addEventListener('input',()=>{if(!auc.top.me)$('bidGo').textContent=`Pujar ${Math.max(minBid(auc.top.amt),+$('bidAmt').value||0)} €`});
 $('adBg').innerHTML=AD_BG.map((c,i)=>`<button type="button" role="radio" aria-checked="${i===0}" aria-label="Color ${i+1}" style="--c:${c}" data-c="${c}"></button>`).join('');
 $('adBg').onclick=e=>{const b=e.target.closest('button');if(!b)return;ed.bg=b.dataset.c;$('adBg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-checked',x===b));drawPrev()};
 /* la imagen se reduce a 800 px como mucho en el propio navegador (en la versión real se sube y se revisa) */
@@ -1236,34 +1218,30 @@ $('adFile').addEventListener('change',async e=>{const f=e.target.files&&e.target
   ed.img=c.toDataURL(f.type==='image/jpeg'?'image/jpeg':'image/png',0.9);$('adFileLbl').textContent='Cambiar imagen';drawPrev()});
 function adCheck(){if(edEmpty()){$('adErr').textContent='Sube una imagen o escribe un mensaje.';shake($('adPrev'));return false}
   if(urlBad()){$('adErr').textContent='Revisa el enlace: tiene que ser una web, por ejemplo tumarca.com o instagram.com/tumarca.';shake($('adUrl'));$('adUrl').focus();return false}return true}
-$('bidGo').onclick=()=>{if(!adCheck())return;
-  const amt=Math.floor(+$('bidAmt').value),mb=auc.top.me?auc.top.amt+1:minBid(auc.top.amt);if(!(amt>=mb)){$('adErr').textContent=`La puja mínima es de ${mb} €.`;shake($('bidAmt'));return}
-  $('adErr').textContent='';auc.top={amt,who:cleanText(ed.text,32)||'Tu marca',me:true};auc.bid={amt,ad:edAd()};saveAuc();kaching();rivalT=Math.max(rivalT,20);
-  news(`Vas ganando la puja con ${amt} €. Si alguien te supera, te avisamos`,true);syncAdForm();uiShop()};
-$('msgGo').onclick=async()=>{if(!adCheck())return;
-  const w=msgWagon();if(w<0)return;$('adErr').textContent='';auc.mine={wagon:w,ad:edAd()};saveAuc();await setAd(w,auc.mine.ad);kaching();closeModal('adSheet');
-  news('¡Tu vagón ya va en el tren! (En la versión real, en cuanto se revise y se pague)',true);setFocus({car:w+1})};
+/* la petición sale por correo (o se copia): no hay servidor; cuando se paga, la marca se añade a tren-marcas.js */
+$('adAsk').onclick=()=>{if(!adCheck())return;$('adErr').textContent='';const dia=ed.tab==='bid',txt=askText(edAd(),dia?'dia':'vagon',dia?PRECIO_DIA:PRECIO_VAGON);
+  const done=ok=>{$('adOk').hidden=false;$('adOk').textContent=CONTACTO?(ok?'Se abre tu correo con los datos puestos (también están copiados).':'Se abre tu correo con los datos puestos.'):ok?'Datos copiados. Pégalos en un mensaje y adjunta tu imagen.':'No se han podido copiar los datos.'};
+  try{navigator.clipboard.writeText(txt).then(()=>done(true),()=>done(false))}catch(e){done(false)}
+  if(CONTACTO){const a=document.createElement('a');a.href=`mailto:${CONTACTO}?subject=${encodeURIComponent('Mi vagón en el Tren de Navidad')}&body=${encodeURIComponent(txt)}`;a.click()}};
 let previewOf=null;
-$('adSee').onclick=async()=>{if(urlBad()){adCheck();return}const i=ed.tab==='bid'?1:(msgWagon()>0?msgWagon():2);if(!WAG[i])return;previewOf={i,ad:ADS[i]?ADS[i].ad:null};
+$('adSee').onclick=async()=>{if(urlBad()){adCheck();return}const i=ed.tab==='bid'?1:(freeWagon()>0?freeWagon():2);if(!WAG[i])return;previewOf={i,ad:ADS[i]?ADS[i].ad:null};
   await setAd(i,edEmpty()?{text:'Tu marca aquí',bg:ed.bg,tag:ed.tab==='bid'?'Patrocinado':''}:{...edAd(),tag:ed.tab==='bid'?'Patrocinado':''});closeModal('adSheet');setFocus({car:i+1,preview:true})};
 async function endPreview(){if(!previewOf)return;const p=previewOf;previewOf=null;await setAd(p.i,p.ad)}
 $('caFree').onclick=()=>{au();openAd(+$('card').dataset.w===1?'bid':'msg')};
-/* noticias de la comunidad (simuladas en la demo) */
+/* avisos: lo que pasa en la maqueta y trucos (nada inventado) */
 const newsQ=[];let newsT=0;
 function news(t,hi){if(FASTSTEP)return;if(hi){newsQ.unshift({t,hi});newsT=Math.min(newsT,0.2)}else newsQ.push({t,hi});if(newsQ.length>5)newsQ.length=5}
-function chatter(){const r=Math.random(),P=POLL;
-  if(P&&P.state==='open'){if(r<0.34)return `${person()} ha votado ${pollOpt(P,Math.random()<.5?0:1).art}`;
-    if(r<0.52){const v=votesOf(P),w=v[0]>=v[1]?0:1,d=Math.abs(v[0]-v[1]);return d?`Va ganando ${pollOpt(P,w).art} por ${d} voto${d===1?'':'s'}`:'¡Empate en el cruce!'}}
-  if(r<0.66&&DRV&&DRV.name&&!DRV.me)return `${DRV.name} lleva el tren hasta el próximo cruce`;
-  if(r<0.84)return `${person()} ha recibido ${fmtN(sacoOf(st))} regalos en su casa`;
-  return `Puja más alta por el vagón de mañana: ${auc.top.amt} €`}
+function chatter(){const L=['Toca un vagón para verlo de cerca','Con el ojo de arriba sigues al tren desde atrás'],a=pathsSeen(),b=pathsNow().length,d=daysToEve();
+  if(POLL&&POLL.state==='open'&&POLL.mine<0)L.push('En el cruce eliges tú por dónde va');if(a<b)L.push(`Caminos recorridos: ${a} de ${b}`);if(d>0)L.push(d===1?'¡Mañana es Nochebuena!':`Faltan ${d} días para Nochebuena`);
+  if(st.day<DAYS){const q=PLAN[st.day+1];L.push(`El día ${st.day+1} ${q==='via'?'':q==='vagon'?'llega ':'llegan '}${rewardText(st.day+1)}`)}if(st.mine===0&&st.myGifts)L.push(`Tu casa ya tiene ${fmtN(st.myGifts)} regalos`);
+  return L[Math.random()*L.length|0]}
 let newsCur='';
-function uiNews(dt){newsT-=dt;if(newsT>0)return;const n=newsQ.shift()||{t:chatter()};newsT=n.hi?5:3.4;if(n.t===newsCur)return;newsCur=n.t;
+function uiNews(dt){newsT-=dt;if(newsT>0)return;const n=newsQ.shift()||{t:chatter()};newsT=n.hi?5:8;if(n.t===newsCur)return;newsCur=n.t;
   const el=$('newsTxt');el.textContent=n.t;$('tip').classList.toggle('hi',!!n.hi);if(!REDUCED)el.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.23,1,.32,1)'})}
-/* contador de regalos de todos y gente mirando el tren */
+/* contador de regalos de tu tren y caminos recorridos */
 let dispG=st.total,lastRate='';
 function uiBank(dt){dispG=Math.abs(st.total-dispG)<1?st.total:lerp(dispG,st.total,1-Math.exp(-8*dt));const t=fmtN(dispG);if($('gifts').textContent!==t)$('gifts').textContent=t;
-  const r=`${NF.format(online(simClock))} viendo el tren`;if(r!==lastRate){lastRate=r;$('rate').textContent=r}}
+  const r=`Caminos recorridos: ${pathsSeen()} de ${pathsNow().length||2}`;if(r!==lastRate){lastRate=r;$('rate').textContent=r}}
 /* números que salen de las chimeneas */
 const FL=[];let flI=0;
 function floatAt(p,text,cls){if(FASTSTEP)return;tmpV.copy(p);tmpV.y+=2.5;tmpV.project(camera);if(tmpV.z>1||Math.abs(tmpV.x)>1.1||Math.abs(tmpV.y)>1.1)return;
@@ -1284,6 +1262,10 @@ function setFocus(f,keep){if(!f&&previewOf)endPreview();const was=cam.focus;
   const wi=f&&f.car!==undefined?f.car-1:-1;if(wi>=1&&wi<WAG.length)showCard(wi);else hideCard();
   const pill=$('focusX');pill.hidden=!f;if(f)pill.textContent=f.preview?'Vista previa · Volver':'Volver a la maqueta'}
 $('focusX').onclick=()=>{const wasPrev=previewOf;setFocus(null);if(wasPrev)openAd()};
+/* compartir: el menú del móvil o, si no hay, se copia el enlace */
+$('bShare').onclick=async()=>{const url=shareUrl(),text='🚂 Mira el Tren de Navidad: eliges por dónde va en cada cruce y cada día de diciembre crece.';
+  if(navigator.share)try{await navigator.share({title:'El tren de Navidad',text,url});return}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(url);news('Enlace copiado: pégalo donde quieras',true)}catch(e){news('No se ha podido copiar el enlace',true)}};
 $('bCam').onclick=()=>{au();setFollow(!(cam.focus&&cam.focus.chase))};
 /* botones de la vista */
 const mid=()=>[innerWidth/2,innerHeight/2],turn=a=>{touched=true;if(cam.focus){cam.vaz=a*6;return}anchor();cam.vaz=0;cam.azT=(cam.azT===null?cam.az:cam.azT)+a;lastInput=performance.now();hideHint()};
@@ -1292,9 +1274,9 @@ function nudge(dx,dy){touched=true;hideHint();if(cam.focus)return rotate(-dx*1.2
 const NAVK={ArrowLeft:[-34,0],ArrowRight:[34,0],ArrowUp:[0,-34],ArrowDown:[0,34],a:[-34,0],d:[34,0],w:[0,-34],s:[0,34]};
 addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||!ready||anyModal()||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.length===1?e.key.toLowerCase():e.key;
   if(NAVK[k]){e.preventDefault();nudge(...NAVK[k])}else if(k==='+'||k==='=')zoomAt(...mid(),0.75);else if(k==='-')zoomAt(...mid(),1.34);else if(k==='q'&&!e.repeat)turn(-Math.PI/6);else if(k==='e'&&!e.repeat)turn(Math.PI/6);else if(k==='0'||k==='Home'){touched=true;goHome()}});
-addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Escape'){const m=anyModal();if(m)closeModal(m.id);else if(!$('drvCard').hidden)$('drvCard').hidden=true;else if(cam.focus)setFocus(null);return}
+addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Escape'){const m=anyModal();if(m)closeModal(m.id);else if(cam.focus)setFocus(null);return}
   if(anyModal()||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  if(!e.repeat&&(e.key==='c'||e.key==='C'))setFollow(!(cam.focus&&cam.focus.chase));else if(!e.repeat&&(e.key==='1'||e.key==='2'))vote(+e.key-1)});
+  if(!e.repeat&&(e.key==='c'||e.key==='C'))setFollow(!(cam.focus&&cam.focus.chase));else if(!e.repeat&&(e.key==='1'||e.key==='2'))choose(+e.key-1)});
 new ResizeObserver(()=>document.documentElement.style.setProperty('--shop-h',$('shop').offsetHeight+'px')).observe($('shop'));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&ready)save()});
 addEventListener('pagehide',()=>{if(ready)save()});
@@ -1359,7 +1341,7 @@ function fx(dt,t){
   // el trineo de Papá Noel, por encima de todo
   if(SLEIGH){const a=t*0.05,rx=175,rz=150;SLEIGH.position.set(BCX+Math.cos(a)*rx,96+Math.sin(t*0.7)*5,BCZ+Math.sin(a)*rz);SLEIGH.rotation.set(0,-Math.atan2(Math.cos(a)*rz,-Math.sin(a)*rx),Math.sin(t*0.7)*0.06)}
   forkFx(t);
-  if(DRV&&DRV.tag){const k=2*tanH()/innerHeight*(innerWidth<560?112:136);DRV.tag.scale.set(k,k/4,1);DRV.tag.position.y=cutK>=0.5?5.2:6.6}
+  if(DRVTAG){const k=2*tanH()/innerHeight*(innerWidth<560?112:136);DRVTAG.scale.set(k,k/4,1);DRVTAG.position.y=cutK>=0.5?5.2:6.6}
 }
 /* resolución adaptativa; en el móvil, 30 fps salvo mientras tocas la pantalla */
 let slowN=0;
@@ -1377,7 +1359,7 @@ function loop(now){requestAnimationFrame(loop);
   last=now;const dt=Math.min(0.05,raw),t=now/1000;
   if(!ready)return;
   if(!HOLD){let simT=Math.min(raw,1);while(simT>1e-4){const h=Math.min(0.05,simT);sim(h);simT-=h}}
-  fx(dt,t);trainInst();updateCam(Math.min(0.2,raw));uiBank(dt);uiNews(raw);auctionTick(raw);
+  fx(dt,t);trainInst();updateCam(Math.min(0.2,raw));uiBank(dt);uiNews(raw);
   uiAcc+=dt;if(uiAcc>0.1){uiAcc=0;uiShop()}
   if(dbg)renderer.info.reset();draw(dt);dbgFrame(raw);
   if(!window.__idleNoAdapt)adapt(raw,now,cap);
@@ -1404,7 +1386,7 @@ async function boot(){
   await fontP;markMine();await applyAds();downgrade(scene);
   cam.tgt.copy(CTR);cam.d=defD();cam.el=homeEl();snapCam();trainInst();setCursor('grab');
   prog(100,'');ready=true;$('load').classList.add('done');uiShop();showHint();
-  setDriver(person(),false);news('Vota por dónde va el tren: en el cruce manda la mayoría',true);
+  driverTag();news('Elige por dónde va el tren en el próximo cruce',true);
   save();
 }
 boot().catch(e=>{console.error(e);const el=$('err');el.textContent='No se ha podido montar la maqueta. Recarga la página.';el.style.display='block'});
@@ -1412,11 +1394,10 @@ requestAnimationFrame(loop);
 
 /* gancho para las pruebas automáticas */
 const scr=w=>{w.project(camera);return {x:(w.x*.5+.5)*innerWidth,y:(-w.y*.5+.5)*innerHeight,z:w.z}};
-window.__tren={get st(){return st},get ready(){return ready},get busy(){return busy},get auc(){return auc},
+window.__tren={get st(){return st},get ready(){return ready},get busy(){return busy},
   step(sec){FASTSTEP=true;try{let n=Math.ceil(sec/0.05);while(n-->0)sim(0.05)}finally{FASTSTEP=false}},
-  claim:claimHouse,finishDay:()=>{if(addVotes(st,Math.max(0,st.goal-st.today)))dayDone()},
-  rival:()=>{rivalT=0;const r=Math.random;Math.random=()=>0;try{auctionTick(0)}finally{Math.random=r}},
-  houses:()=>HS.length,wagons:()=>WAG.length-1,delivered:()=>delivered,starve:()=>starve,laps:()=>laps,
+  claim:claimHouse,setDay,nextDay:()=>setDay(st.day+1),preview:PREVIEW,
+  houses:()=>HS.filter(Boolean).length,wagons:()=>WAG.length-1,delivered:()=>delivered,starve:()=>starve,laps:()=>laps,
   ads:()=>Object.keys(ADS).filter(i=>ADS[i].ad).map(Number),adImg:i=>ADS[i]&&ADS[i].ad?{w:ADS[i].tex.image.width,h:ADS[i].tex.image.height,text:ADS[i].ad.text||'',img:!!ADS[i].ad.img,url:ADS[i].ad.url||''}:null,
   news:()=>newsCur,focus:f=>setFocus(f),get focused(){return cam.focus},camSettle:()=>{for(let i=0;i<90;i++)updateCam(0.05)},
   camInfo:()=>({p:camera.position.toArray().map(v=>+v.toFixed(1)),t:cam.tgt.toArray().map(v=>+v.toFixed(1)),d:+cam.d.toFixed(1),fd:+cam.fd.toFixed(1),az:+cam.az.toFixed(3),el:+cam.el.toFixed(3),v:+Math.hypot(cam.vx,cam.vz).toFixed(1),fly:bl.t<1}),
@@ -1425,8 +1406,8 @@ window.__tren={get st(){return st},get ready(){return ready},get busy(){return b
   look:(az,el,d,x,z)=>{setFocus(null);stopMotion();cam.az=az;cam.el=el;cam.d=d||defD();if(x!==undefined)cam.tgt.set(x,Math.max(0,groundAt(x,z))+2,z);else cam.tgt.copy(CTR);lastInput=performance.now()+1e9;snapCam()},
   // toques: se proyecta un punto a la pantalla y se toca ahí, como haría un dedo
   carScreen:i=>{const c=cars[i];if(!c)return null;return scr(c.localToWorld(new THREE.Vector3(0,2.9,0)))},
-  offs:i=>OFFS[i],poll:()=>POLL&&{f:POLL.F.f,id:POLL.F.id,state:POLL.state,won:POLL.won,mine:POLL.mine,votes:votesOf(POLL),opts:[0,1].map(i=>pollOpt(POLL,i).n),route:[0,1].map(i=>pollRoute(POLL,i)),d:+forkD(POLL.F).toFixed(1)},vote,setVotes:(a,b)=>{POLL.n=[a,b];uiPoll()},sign:i=>SIGN[i].sp.visible?scr(SIGN[i].sp.position.clone()):null,seeFork,
-  driver:()=>DRV&&{name:DRV.name,me:DRV.me,tag:!!DRV.tag},drive:()=>setDriver(st.myName||'',true),bits:()=>T.bits,route:b=>{T=MP.R[b||0];setDist(dist);poseTrain()},routes:()=>MP.R.map(r=>+r.L.toFixed(1)),forks:()=>MP.forks.map(F=>({id:F.id,s:+T.fs[F.f].toFixed(1),m:+T.ms[F.f].toFixed(1)})),carPos:i=>cars[i].position.toArray(),slot:i=>({...SL[i],rs:[...SL[i].rs]}),inside:()=>cutK>=0.5,
+  offs:i=>OFFS[i],poll:()=>POLL&&{f:POLL.F.f,id:POLL.F.id,state:POLL.state,won:POLL.won,mine:POLL.mine,opts:[0,1].map(i=>pollOpt(POLL,i).n),ids:[0,1].map(i=>pollOpt(POLL,i).id),route:[0,1].map(i=>pollRoute(POLL,i)),d:+forkD(POLL.F).toFixed(1)},choose,paths:()=>[pathsSeen(),pathsNow().length],sign:i=>SIGN[i].sp.visible?scr(SIGN[i].sp.position.clone()):null,seeFork,
+  driver:()=>DRVTAG?st.myName:'',bits:()=>T.bits,route:b=>{T=MP.R[b||0];setDist(dist);poseTrain()},routes:()=>MP.R.map(r=>+r.L.toFixed(1)),forks:()=>MP.forks.map(F=>({id:F.id,s:+T.fs[F.f].toFixed(1),m:+T.ms[F.f].toFixed(1)})),carPos:i=>cars[i].position.toArray(),slot:i=>({...SL[i],rs:[...SL[i].rs]}),inside:()=>cutK>=0.5,
   lookP:(x,y,z,d,az,el)=>{setFocus(null);stopMotion();cam.az=az;cam.el=el;cam.tgt.set(x,y,z);cam.d=d;lastInput=performance.now()+1e9;snapCam()},
   sleigh:()=>SLEIGH&&SLEIGH.position.toArray(),hold:on=>{HOLD=!!on},
   cpu:(n=60)=>{const t0=performance.now();for(let i=0;i<n;i++){sim(1/60);fx(1/60,i/60);trainInst();updateCam(1/60)}return +((performance.now()-t0)/n).toFixed(2)},

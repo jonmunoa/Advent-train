@@ -98,9 +98,9 @@ export const KG = 0, KT = 1, KB = 2;       // a ras, túnel, puente
 /* Agujas: en cada una la gente vota entre seguir por la vía principal o por un ramal que vuelve a ella más adelante.
    from y to son puntos [x, z] de la vía principal (se toma la muestra más cercana) y pts, los del ramal [x, z, y]. */
 const OPT = {
-  tunel: {n: 'Túnel', art: 'el túnel'}, bosque: {n: 'Bosque', art: 'el bosque'},
-  orilla: {n: 'Orilla', art: 'la orilla'}, puente: {n: 'Puente', art: 'el puente del lago'}, pistas: {n: 'Pistas', art: 'las pistas de esquí'}, lago: {n: 'Lago', art: 'el lago'},
-  monte: {n: 'Montaña', art: 'la montaña'}, valle: {n: 'Valle', art: 'el valle'},
+  tunel: {n: 'Túnel', art: 'el túnel', d: 'Bajo la colina'}, bosque: {n: 'Bosque', art: 'el bosque', d: 'Entre abetos'},
+  orilla: {n: 'Orilla', art: 'la orilla', d: 'Rodeando el lago'}, puente: {n: 'Puente', art: 'el puente del lago', d: 'Sobre el hielo'}, pistas: {n: 'Pistas', art: 'las pistas de esquí', d: 'Con los esquiadores'}, lago: {n: 'Lago', art: 'el lago', d: 'Sobre el hielo'},
+  monte: {n: 'Montaña', art: 'la montaña', d: 'Por lo alto'}, valle: {n: 'Valle', art: 'el valle', d: 'Por el atajo'},
 };
 const F_HILL = {id: 'colina', from: [-19.5, 3], to: [17, -43.2], opts: ['tunel', 'bosque'], pts: [[-25, -12, 1.2], [-33, -27, 1.6], [-32, -44, 2], [-19, -57, 2.3], [-3, -58, 2.5], [8, -49, 2.7]]};
 const F_HILL3 = {...F_HILL, to: [22, -52], pts: [[-25, -12, 1.2], [-33, -27, 1.6], [-34, -46, 2], [-22, -61, 2.4], [-4, -65, 2.8], [10, -59, 3.2]]};
