@@ -40,10 +40,10 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 `http://localhost:5173/tren.html` prueba otro enfoque, comunitario: **un solo tren para todo el mundo** (el nombre es provisional).
 
-El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**: se cruza a sí misma pasando por encima por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
+El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**: se cruza a sí misma pasando por encima por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles (por dentro, una gruta de hielo iluminada en la que la cámara entra con el tren) y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
 
-- **Busca los duendes**: cada día se esconden 5 por la maqueta (en un tejado, en el lago, junto a un túnel, en el telesilla, subido en un vagón…). Tócalos para encontrarlos: cada uno suma al **objetivo común del día**. La ficha te da una pista y te lleva a la zona.
-- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y se esconden 5 duendes nuevos (en la demo, un día dura unos 3 minutos).
+- **Manda un regalo a un amigo**: pones su nombre, eliges papel y dedicatoria y el regalo sube al tren. Sale un **enlace solo para esa persona** (WhatsApp, compartir o copiar): al abrirlo ve llegar el tren con «Para Iker», el regalo vuela a su chimenea, se abre la tarjeta y puede **devolverte otro** y quedarse la casa. Hay 3 regalos gratis al día y cada uno suma al **objetivo común del día**.
+- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y todos vuelven a tener 3 regalos (en la demo, un día dura unos 3 minutos).
 - **Pon tu casa** junto a la vía: el tren te deja regalos en cada vuelta y todos ven tu nombre y tu provincia.
 - **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, poner un **enlace** a tu web o a tus redes, elegir color y ver cómo queda en el tren. Quien toca el vagón ve su ficha con el botón «Visitar».
 - **Cámara**: la rueda o el pellizco acercan hacia donde apuntas; tocar un vagón lo sigue de cerca (y puedes girar y acercarte más); dos dedos, el botón derecho o Mayús desplazan.
@@ -72,8 +72,8 @@ node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin na
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
-python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, duendes, tu casa, día, subasta, enlaces y móvil
-node tests/tren.test.mjs       # maqueta (túneles, puentes, terreno), duendes, subasta, enlaces y guardado, sin navegador
+python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, túnel, regalos, tu casa, día, subasta, enlaces y móvil
+node tests/tren.test.mjs       # maqueta (túneles, puentes, terreno), regalos, subasta, enlaces y guardado, sin navegador
 ```
 
 ## Clasificación global (Supabase)
