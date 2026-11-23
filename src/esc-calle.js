@@ -35,7 +35,7 @@ export class Tienda {
     for (const sd of [-1, 1]) {A(BX(10, VY1 - VY0 + 4, 11), W, sd * (VX + 5), (VY0 + VY1) / 2, 0); A(BX(5, VY1 - VY0 - 8, 2), WL, sd * (VX + 5), (VY0 + VY1) / 2, 5.6); A(BX(13, 9, 13), WL, sd * (VX + 5), VY1 + 4, 1); A(BX(12, 8, 12), WL, sd * (VX + 5), VY0 + 2, 1)}
     A(BX(VX * 2, 1.5, 2.4), WL, 0, 101, 0); for (let x = -60; x <= 60; x += 20) A(BX(1.2, 13, 2), WL, x, 107.5, 0);
     A(BX(184, 25, 9), W, 0, VY1 + 13, 0); A(BX(190, 5, 15), WL, 0, VY1 + 28, 3); A(BX(192, 4.4, 17), E.snow, 0, VY1 + 32, 3.6); for (let q = 0; q < 26; q++) A(new THREE.ConeGeometry(.9, 3 + r() * 6, 5).rotateX(Math.PI), E.ice, -92 + q * 7.4 + r() * 3, VY1 + 25 - r() * 2, 10.6); for (let x = -84; x <= 84; x += 12) A(BX(4, 4, 4), WL, x, VY1 + 24.4, 6);
-    this.rot = new THREE.Mesh(new THREE.PlaneGeometry(168, 21), new THREE.MeshBasicMaterial({map: rotuloTex(this.nombre, '', ['#123a30', '#4d101b', '#16284a'][k]), toneMapped: false, color: new THREE.Color(.8, .8, .8)})); this.rot.position.set(0, VY1 + 13, 4.8); this.g.add(this.rot);
+    
     for (const x of [-60, 0, 60]) {A(CY(.8, .8, 16, 6).rotateX(1.1), E.iron, x, VY1 + 31, 10); A(new THREE.ConeGeometry(5, 5, 12, 1, true), E.iron, x, VY1 + 27.5, 17.5, .5); A(SPH(2), E.lamp, x, VY1 + 26, 17.2)}
     // guirnalda con luces alrededor del hueco y lazos
     const yt = VY1 - 1; this.guirnalda([[-VX - 4, yt, 7], [-VX * .66, yt - 8, 8], [-VX * .33, yt, 7], [0, yt - 8, 8], [VX * .33, yt, 7], [VX * .66, yt - 8, 8], [VX + 4, yt, 7]], 2.6, 60); for (const sd of [-1, 1]) this.guirnalda([[sd * (VX + 5), yt, 7], [sd * (VX + 5.6), 70, 7.4], [sd * (VX + 5), VY0 + 8, 7]], 2.3, 34);
@@ -58,14 +58,37 @@ export class Tienda {
     const im = new THREE.InstancedMesh(new THREE.OctahedronGeometry(.95, 1), new THREE.MeshBasicMaterial({color: 0xffffff}), this.bulbs.length), P = [[1.9, .2, .2], [1.9, 1.25, .3], [.3, .8, 2], [.3, 1.7, .5], [1.9, 1.5, .9]]; o3.rotation.set(0, 0, 0); o3.scale.set(1, 1, 1); this.bulbs.forEach(([x, y, z], i) => {o3.position.set(x, y, z); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); im.setColorAt(i, new THREE.Color(...P[i % 5]))}); this.g.add(im); this.bm = im;
     // charcos de luz cálida en la acera: escaparate, farola y puerta (una sola malla)
     const gs = [[0, 52, 250, 190, .46, .28, .11], [0, 26, 170, 80, .34, .21, .08], [-H + 8, 122, 170, 170, .4, .25, .1], [122, 24, 80, 80, .4, .25, .1]].map(([x, z, w, d, r, g, b], q) => {const p = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x, .6 + q * .05, z), n = p.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.set([r, g, b], i * 3); p.setAttribute('color', new THREE.BufferAttribute(c, 3)); return p});
-    const pool = new THREE.Mesh(mergeGeometries(gs, false), CHARCO); pool.renderOrder = 2; pool.userData.cerca = true; this.g.add(pool);
+    const pool = new THREE.Mesh(mergeGeometries(gs, false), CHARCO); pool.renderOrder = 2; pool.userData.cerca = true; this.charco = pool; this.g.add(pool);
   }
   abeto(x, z, s) {this.a(CY(6 * s, 5 * s, 11 * s, 12), E.post, x, 5.5 * s, z); for (const [y, r, h] of [[17, 11, 17], [27, 8.6, 15], [36, 6, 13]]) {this.a(new THREE.ConeGeometry(r * s, h * s, 12), E.pine, x, y * s, z); this.a(new THREE.ConeGeometry(r * s * .8, h * s * .5, 12), E.snow, x, (y + h * .27) * s, z)} for (let q = 0; q < 26; q++) {const u = q / 26, a = q * 2.1; this.bulbs.push([x + Math.cos(a) * (11.4 - u * 9) * s, (12 + u * 30) * s, z + Math.sin(a) * (11.4 - u * 9) * s])} this.a(SPH(2 * s), E.gold, x, 44 * s, z)}
-  /* copia para verla a lo lejos: misma geometría y, en el hueco, una foto del escaparate */
-  copia(foto) {const g = new THREE.Group(); this.g.children.forEach(o => {if (!o.isInstancedMesh && !o.userData.cerca) g.add(o.clone())}); if (foto) g.add(foto.clone()); return g}
-  /* rótulo: el nombre de la tienda o la marca que patrocina el escaparate */
-  async setRotulo(ad) {const bg = ['#123a30', '#4d101b', '#16284a'][this.k], im = ad ? await loadImg(ad.img) : null, old = this.rot.material.map; this.rot.material.map = rotuloTex(ad ? ad.text || '' : this.nombre, ad ? ad.sub || '' : '', ad ? ad.bg : bg, im); old.dispose(); this.ad = ad || null}
+  /* copia para verla a lo lejos: misma geometría, sin bombillas ni charcos de luz */
+  copia() {const g = new THREE.Group(); this.g.children.forEach(o => {if (!o.isInstancedMesh && !o.userData.cerca) g.add(o.clone())}); return g}
 }
+
+/* ---------- papel de embalar de los escaparates que aún no se han encendido ---------- */
+const papelCache = new Map();
+export function papelTex(dia, hueco) {
+  const key = dia + (hueco ? 'h' : ''); if (papelCache.has(key)) return papelCache.get(key);
+  const c = document.createElement('canvas'), W = c.width = LOWQ ? 768 : 1280, H = c.height = Math.round(W * .593), g = c.getContext('2d'), r = rng(70 + dia), k = W / 1500;
+  for (let i = 0; i < 4; i++) {const x = i * W / 4, gr = g.createLinearGradient(x, 0, x + W / 4, 0); gr.addColorStop(0, '#9c7446'); gr.addColorStop(.5, '#b68a56'); gr.addColorStop(1, '#946c40'); g.fillStyle = gr; g.fillRect(x, 0, W / 4 + 1, H)}
+  for (let i = 0; i < 14000; i++) {g.fillStyle = r() < .5 ? 'rgba(255,236,200,.04)' : 'rgba(50,28,8,.055)'; g.fillRect(r() * W, r() * H, 1 + r() * 8, 1)}
+  for (let i = 0; i < 50; i++) {g.strokeStyle = r() < .5 ? 'rgba(255,240,210,.12)' : 'rgba(60,34,12,.16)'; g.lineWidth = (1 + r() * 3) * k; g.beginPath(); let x = r() * W, y = r() * H; g.moveTo(x, y); for (let q = 0; q < 5; q++) {x += (r() - .5) * 170 * k; y += (r() - .4) * 120 * k; g.lineTo(x, y)} g.stroke()}
+  g.fillStyle = 'rgba(240,226,190,.42)'; for (let i = 1; i < 4; i++) g.fillRect(i * W / 4 - 17 * k, 0, 34 * k, H);
+  if (dia > 0) {g.textAlign = 'center'; g.fillStyle = '#4a1210'; g.font = `400 ${250 * k}px "Alfa Slab One", Georgia, serif`; g.fillText(dia, W / 2, 360 * k); g.font = `400 ${74 * k}px Yesteryear, cursive`; g.fillText('de diciembre', W / 2, 470 * k)}
+  if (hueco) {const cx = W / 2, cy = H * .79, P = Array.from({length: 46}, (_, q) => {const a = q / 46 * 6.283, R = 104 * k * (1 + .26 * Math.sin(a * 3 + dia) + .16 * (r() - .5)); return [cx + Math.cos(a) * R * 1.25, cy + Math.sin(a) * R * .86]}), tr = d => {g.beginPath(); P.forEach(([x, y], i) => {const X = cx + (x - cx) * d, Y = cy + (y - cy) * d; i ? g.lineTo(X, Y) : g.moveTo(X, Y)}); g.closePath()}, gl = g.createRadialGradient(cx, cy, 40 * k, cx, cy, 430 * k); gl.addColorStop(0, 'rgba(255,196,96,.75)'); gl.addColorStop(1, 'rgba(255,170,70,0)'); g.fillStyle = gl; g.fillRect(0, 0, W, H); tr(1.13); g.fillStyle = '#dcc294'; g.fill(); tr(1.06); g.fillStyle = '#f0dfb8'; g.fill(); g.globalCompositeOperation = 'destination-out'; tr(1); g.fill(); g.globalCompositeOperation = 'source-over'}
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; papelCache.set(key, t); return t;
+}
+const ROTC = ['#123a30', '#4d101b', '#16284a'], rotG = new THREE.PlaneGeometry(168, 21), vanoG = new THREE.PlaneGeometry(VX * 2, VY1 - VY0);
+/* un local de la calle: fachada (la de verdad o una copia) con su rótulo, su papel y la foto de su escaparate */
+export class Local {
+  constructor(g, k) {
+    this.g = g; this.k = k; this.n = null; const B = o => new THREE.MeshBasicMaterial(o); this.rot = new THREE.Mesh(rotG, B({toneMapped: false, color: new THREE.Color(.8, .8, .8)})); this.rot.position.set(0, VY1 + 13, 4.8);
+    this.papel = new THREE.Mesh(vanoG, B({alphaTest: .5, color: new THREE.Color(.46, .4, .34)})); this.papel.position.set(0, (VY0 + VY1) / 2, -.4); this.foto = new THREE.Mesh(vanoG, B({fog: false})); this.foto.position.set(0, (VY0 + VY1) / 2, -3); g.add(this.rot, this.papel, this.foto);
+  }
+  /* pone la tienda n: rótulo (tex), papel (o null) y foto */
+  pon(n, {rot, papel, foto}) {if (rot && this.rot.material.map !== rot) {const nv = !this.rot.material.map; this.rot.material.map = rot; if (nv) this.rot.material.needsUpdate = true} this.rot.visible = !!rot; const p = this.papel.material; if (papel && p.map !== papel) {const nv = !p.map; p.map = papel; if (nv) p.needsUpdate = true} this.tapado = !!papel; const f = this.foto.material; if (foto && f.map !== foto) {const nv = !f.map; f.map = foto; if (nv) f.needsUpdate = true} this.n = n}
+}
+export const rotuloFondo = k => ROTC[((k % 3) + 3) % 3];
 
 /* huellas en la nieve: se van marcando y las viejas se borran */
 export class Huellas {

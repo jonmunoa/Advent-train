@@ -42,7 +42,7 @@ function vSleigh(t,acc,v){const s=ac.createBufferSource(),f=ac.createBiquadFilte
   tr.frequency.value=34;tg.gain.value=0.5;tr.connect(tg);const amp=ac.createGain();amp.gain.value=0.5;tg.connect(amp.gain);
   g.gain.setValueAtTime((acc?0.09:0.05)*v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);s.connect(f);f.connect(amp);amp.connect(g);g.connect(mus.out);s.start(t,Math.random()*.5,0.18);tr.start(t);tr.stop(t+0.2)}
 function musicTick(){if(!ac)return;if(!mus){if(!music)return;musInit();if(!mus)return}
-  mus.out.gain.setTargetAtTime(music?0.34+0.3*cerca:0,ac.currentTime,0.8);filt.frequency.setTargetAtTime(650+9000*cerca*cerca,ac.currentTime,0.7);
+  mus.out.gain.setTargetAtTime(music&&!callado?0.34+0.3*cerca:0,ac.currentTime,0.8);filt.frequency.setTargetAtTime(650+9000*cerca*cerca,ac.currentTime,0.7);
   if(!music){mus.start=ac.currentTime+0.5;mus.i=0;return}
   if(mus.start<ac.currentTime-0.5&&mus.i===0)mus.start=ac.currentTime+0.1;
   const hor=ac.currentTime+0.3;
@@ -53,6 +53,14 @@ setInterval(musicTick,60);
 export const pasos=k=>{if(!sfx||!ac)return;noise(.09,.028*k,1900,'bandpass');noise(.05,.018*k,5200,'highpass')};
 export const traqueteo=k=>{if(!sfx||!ac||k<.02)return;noise(.05,.03*k,420);setTimeout(()=>noise(.05,.022*k,380),110)};
 export const setCerca=v=>{cerca=v};
+/* efectos de la historia */
+let callado=false;export const silencio=v=>{callado=v};
+export const campana=(n=1)=>{for(let i=0;i<n;i++)[392,588,784,1046].forEach((f,k)=>tone(f,1.8,'sine',.06/(k+1),i*.75))};
+export const suave=()=>{[784,988,1175].forEach((f,i)=>tone(f,.9,'sine',.035,i*.11))};
+export const viento=()=>{if(!sfx||!ac)return;noise(3.4,.05,520);noise(3.8,.03,900,'bandpass')};
+export const clac=()=>{noise(.06,.16,3200,'bandpass');noise(.05,.1,900)};
+export const chuf=()=>{noise(.2,.05,900)};
+export const trenSuena=()=>{for(let i=0;i<6;i++)setTimeout(()=>noise(.18,.06,700),i*260)};
 export const sonidoOn=()=>sfx;
 export function setSonido(on){sfx=music=on;store.set('advx-sonido',on?'1':'0');if(on)au()}
 export {au,tone,noise,chime,bells,whistle};

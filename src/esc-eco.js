@@ -1,10 +1,10 @@
 // Escaparates: qué marca va en cada sitio y la petición de un sitio. Sin DOM ni red.
 import {cleanText, cleanUrl, isoDay} from './tren-eco.js';
 export {cleanText, cleanUrl, isoDay};
-export const ESC = 3, VAGONES = 4;
+export const ESC = 24, VAGONES = 4;
 /* marcas de una fecha: {escaparate: {sitio: marca}}; se valida y se limpia todo (una línea mal escrita no rompe nada) */
 export function marcasEsc(list, iso) {
-  const out = {1: {}, 2: {}, 3: {}}, re = /^\d{4}-\d\d-\d\d$/;
+  const out = Object.fromEntries(Array.from({length: ESC}, (_, i) => [i + 1, {}])), re = /^\d{4}-\d\d-\d\d$/;
   for (const m of Array.isArray(list) ? list : []) {
     if (!m || typeof m !== 'object') continue;
     const e = Math.floor(+m.escaparate), s = m.sitio === 'rotulo' ? 'rotulo' : Math.floor(+m.sitio), fin = m.hasta || m.desde;
@@ -15,7 +15,6 @@ export function marcasEsc(list, iso) {
   return out;
 }
 export const pedirTexto = (ad, sitio, escaparate, precio) => [`Quiero ${sitio === 'rotulo' ? 'el rótulo' : 'un vagón'} del escaparate ${escaparate} (${precio} € al día).`, '', `Texto: ${ad.text || '(solo imagen)'}`, ...(ad.sub ? [`Segunda línea: ${ad.sub}`] : []), ...(ad.url ? [`Enlace: ${ad.url}`] : []), `Color: ${ad.bg}`, ad.img ? 'Imagen: la adjunto a este mensaje.' : 'Sin imagen.', 'Días que me gustarían: '].join('\n');
-/* el paseo: la calle da la vuelta, así que el escaparate n (cualquier entero) es la tienda n módulo 3 */
-export const tiendaDe = n => ((n % ESC) + ESC) % ESC;
-/* dónde se coloca la tienda k para quien va por x: la copia más cercana */
-export const sitioDe = (k, x, paso) => paso * (k + ESC * Math.round((x / paso - k) / ESC));
+/* hay tres fachadas y 24 escaparates: en qué escaparate se coloca la fachada k para quien va por x (el más cercano de los suyos) */
+export const FACH = 3;
+export const sitioDe = (k, x, paso) => k + FACH * Math.round((x / paso - k) / FACH);

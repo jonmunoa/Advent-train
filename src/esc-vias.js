@@ -1,4 +1,4 @@
-/* Los tres circuitos de los escaparates, sin DOM ni WebGL: relieve, vía (con su altura), túneles, puentes y suelo adaptado.
+/* Los 24 circuitos de los escaparates (uno por día), sin DOM ni WebGL: relieve, vía (con su altura), túneles, puentes y suelo adaptado.
    Cada maqueta es un tablero de 176 × 84 (x: izquierda-derecha, z: fondo-cristal, y: altura). El cristal queda en z = +42. */
 import {CatmullRomCurve3, Vector3} from 'three';
 import {atM, kindAt, idxM, vnoise, fbm, sstep} from './tren-map.js';
@@ -19,7 +19,7 @@ const soft = (x, z, a = 1) => (fbm(x * 0.03 + 11, z * 0.03) - 0.45) * 2 * a;
 /* la nieve se dobla un poco hacia el canto del tablero y sube en rampa hacia el fondo, para que todo se vea desde el cristal */
 const rake = (z, h) => sstep(16, -40, z) * h;
 
-export const MAPS = [
+const BASE = [
   /* ================= 1 · el pueblo de Navidad ================= */
   {
     id: 'pueblo', nombre: 'El pueblo de Navidad', wagons: 4,
@@ -61,6 +61,60 @@ export const MAPS = [
       return h;
     },
   },
+];
+
+/* los tres de partida llevan su estilo (sem): 0 pueblo, 1 montaña, 2 polo. Los demás días salen de plantillas de vía con su tema */
+BASE.forEach((m, i) => {m.sem = i});
+const VIA = {
+  oval: [[-56, 34.5, 1], [0, 36, 1], [56, 34.5, 1], [76, 22, 1.4], [80, 0, 2.4], [69, -21, 3.4], [40, -32, 4], [0, -34, 4.4], [-40, -32, 4], [-69, -21, 3.2], [-80, 0, 2.2], [-76, 22, 1.4]],
+  seno: [[-58, 35, 1], [-24, 30, 1], [8, 35.5, 1], [44, 35, 1.1], [72, 26, 1.8], [81, 4, 2.8], [74, -18, 3.8], [50, -32, 4.6], [20, -33, 5], [-10, -27, 5], [-40, -32, 4.6], [-68, -24, 3.6], [-80, -4, 2.4], [-80, 18, 1.5], [-73, 30, 1]],
+  alto: [[-54, 36, 1], [-6, 37, 1], [40, 36, 1.4], [70, 27, 3], [81, 4, 5.4], [73, -18, 7.2], [46, -31, 8.4], [10, -32, 9], [-26, -32, 9], [-58, -28, 8], [-79, -9, 5.8], [-82, 13, 3.4], [-73, 30, 1.7]],
+  ocho: BASE[0].pts,
+};
+const ele = (x, z, e) => Math.hypot((x - e[0]) / e[2], (z - e[1]) / e[3]);
+/* relieve de las maquetas de plantilla: lomas, río, estanque, plaza y fábrica opcionales */
+function h0T(x, z) {
+  let h = soft(x, z, this.amp ?? 0.5) + rake(z, this.rake ?? 3.4); for (const b of this.hills) h = Math.max(h, 0) + bump(x, z, b) * 0.95;
+  if (this.river) h -= (this.hondo ?? 7) * Math.exp(-((segD(x, z, this.river) / 4.4) ** 2));
+  if (this.pond) {const e = ele(x, z, this.pond); if (e < 1.35) h = lerp(h, -1.3, sstep(1.35, 0.98, e))}
+  if (this.plaza) {const d = Math.hypot(x - this.plaza[0], z - this.plaza[1]); if (d < this.plaza[2] + 6) h = lerp(h, this.plaza[3] ?? 0.5, sstep(this.plaza[2] + 6, this.plaza[2], d))}
+  if (this.fab) {const [fx, fz, rx, rz] = this.fab, d = Math.max(Math.abs(x - fx) / rx, Math.abs(z - fz) / rz); if (d < 1.35) h = lerp(h, this.fabY ?? 2.4, sstep(1.35, 1, d))}
+  return h;
+}
+const nuevo = (id, nombre, via, o = {}) => ({id, nombre, wagons: 4, sem: 0, hills: [], pts: VIA[via], h0: h0T, ...o});
+/* la misma maqueta vista en un espejo (la vía se recorre igual) */
+function espejo(b, id, nombre, o = {}) {
+  const n = a => a && [-a[0], ...a.slice(1)], p = l => l && l.map(n);
+  return {...b, id, nombre, pts: p(b.pts).reverse(), hills: p(b.hills), river: p(b.river), pond: n(b.pond), plaza: n(b.plaza), piste: p(b.piste), lift: p(b.lift), fab: n(b.fab), gorges: b.gorges && b.gorges.map(([a, c, d, e]) => [-a, c, -d, e]), h0(x, z) {return b.h0.call(b, -x, z)}, ...o};
+}
+const loma = (x, z, rx, rz, h, k = 1.1) => [x, z, rx, rz, h, k];
+const [PUEBLO, ESQUI, POLO] = BASE;
+/* un mapa por día de diciembre (índice = día - 1) */
+export const MAPS = [
+  PUEBLO,
+  nuevo('confiteria', 'El país de los dulces', 'seno', {pond: [30, 12, 19, 8.5], hills: [loma(-52, -24, 24, 18, 9, 1.4)]}),
+  nuevo('relojeria', 'El reloj de los reyes magos', 'oval', {hills: [loma(60, -30, 34, 24, 23)], plaza: [-6, -2, 20, 1.2]}),
+  ESQUI,
+  nuevo('libreria', 'El libro abierto', 'oval', {plaza: [0, 2, 34, 1.4], hills: [loma(-64, -30, 30, 22, 21)]}),
+  nuevo('merceria', 'El valle de lana', 'seno', {hills: [loma(54, -30, 34, 24, 24), loma(-56, -10, 22, 16, 5, 1.4)]}),
+  nuevo('tiovivo', 'La feria', 'alto', {sem: 1, plaza: [-4, 2, 30, 1.2], river: [[46, -46], [42, -20], [52, 6], [60, 22]]}),
+  POLO,
+  nuevo('correos', 'La estafeta de las cartas', 'seno', {hills: [loma(-58, -30, 32, 23, 23)], plaza: [10, 0, 18, 1.2]}),
+  nuevo('ciudad', 'La ciudad de noche', 'alto', {river: [[-12, -46], [-8, -20], [2, 4], [-6, 26], [-22, 46]], hondo: 8, rake: 1.6, amp: 0.2}),
+  nuevo('panaderia', 'El molino de pan', 'oval', {hills: [loma(54, -27, 34, 24, 24)], river: [[-30, -46], [-34, -18], [-26, 6], [-34, 26], [-40, 46]], hondo: 5}),
+  nuevo('fotos', 'El estudio de fotografía', 'seno', {plaza: [0, 0, 26, 1.4], hills: [loma(62, -28, 26, 20, 18)]}),
+  espejo(ESQUI, 'nevada', 'La gran nevada'),
+  nuevo('jugueteria', 'El cuarto de los juguetes', 'ocho', {plaza: [-28, 24, 11], hills: [loma(52, -31, 36, 25, 27, 1.15)], rake: 6, amp: 0.5, pond: [33, 21, 16, 7]}),
+  nuevo('zapateria', 'La ciudad zapato', 'oval', {hills: [loma(-58, -28, 34, 24, 24)], plaza: [22, 2, 22, 1.2]}),
+  nuevo('luces', 'La fábrica de luz', 'seno', {hills: [loma(58, -30, 32, 24, 23)], plaza: [-8, 0, 24, 1.2]}),
+  espejo(POLO, 'estrellas', 'El túnel de las estrellas'),
+  {...PUEBLO, id: 'vacia', nombre: 'La Estación', h0(x, z) {return PUEBLO.h0.call(PUEBLO, x, z)}},
+  nuevo('orquesta', 'La orquesta mecánica', 'oval', {plaza: [0, -2, 34, 1.6], hills: [loma(66, -30, 26, 20, 18)]}),
+  nuevo('ropa', 'Ropa de segunda mano', 'seno', {plaza: [0, 0, 30, 1.2], hills: [loma(-62, -30, 28, 21, 20)]}),
+  nuevo('sombreros', 'El bosque de sombreros', 'oval', {hills: [loma(58, -29, 32, 23, 22), loma(-60, -26, 24, 18, 8, 1.4)]}),
+  espejo(PUEBLO, 'terminal', 'La estación de verdad'),
+  nuevo('pinturas', 'El cuadro sin acabar', 'seno', {hills: [loma(56, -30, 33, 24, 24)], pond: [-26, 8, 18, 8]}),
+  nuevo('todos', 'Todos los trenes', 'ocho', {sem: 0, hills: [loma(52, -31, 36, 25, 27, 1.15), loma(-82, -36, 26, 20, 12, 1.3)], river: [[10, -46], [4, -26], [8, -8], [18, 6], [27, 16]], pond: [33, 21, 19, 8.5], plaza: [-28, 24, 11], rake: 6, amp: 0.7}),
 ];
 
 /* vía cerrada: muestras cada medio metro con rumbo, pendiente y tipo de tramo */
