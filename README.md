@@ -36,19 +36,19 @@ El **silbato** acelera el tren unos segundos. Si cierras la página, al volver r
 
 La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
 
-## Prototipo: el tren de todos (`tren.html`)
+## Prototipo: el tren de Navidad (`tren.html`)
 
-`http://localhost:5173/tren.html` prueba otro enfoque, comunitario: **un solo tren para todo el mundo** (el nombre es provisional).
+`http://localhost:5173/tren.html` prueba otro enfoque, sin servidor ni base de datos: un tren que recorre despacio una maqueta y **crece cada día de diciembre** (el nombre es provisional).
 
-El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**: se cruza a sí misma pasando por encima por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles (por dentro, una gruta de hielo iluminada en la que la cámara entra con el tren) y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
+La **maqueta alpina** tiene la vía en forma de **ocho**: se cruza a sí misma por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles (por dentro, una gruta de hielo iluminada en la que la cámara entra con el tren) y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
 
-- **Vota por dónde va el tren**: en cada cruce hay dos caminos de verdad (túnel o bosque, orilla o puente sobre el lago, montaña o valle…). Se vota con un toque, en el panel o en los carteles de la maqueta, y el tren va por donde gana. Entre los que votan sale el **maquinista**, con su nombre sobre la locomotora hasta el siguiente cruce y el silbato en su mano. No se pide nada más: ni registro ni de dónde eres. Cada voto suma al **objetivo común del día**.
-- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces (en la demo, un día dura unos 3 minutos).
-- **Pon tu casa** junto a la vía: el tren te deja regalos cada vez que pasa y todos ven tu nombre. Las que están en uno de los dos caminos de un cruce solo los reciben si gana ese camino.
-- **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, poner un **enlace** a tu web o a tus redes, elegir color y ver cómo queda en el tren. Quien toca el vagón ve su ficha con el botón «Visitar».
-- **Cámara**: se maneja como un mapa. Arrastrar (o un dedo) mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho (o girar dos dedos) gira, subir o bajar dos dedos inclina y el doble clic acerca. Tocar un vagón lo sigue de cerca y «Volver a la maqueta» te deja donde estabas. También hay botones en pantalla y teclado (flechas, +, −, Q, E, 0).
+- **Elige por dónde va**: en cada cruce hay dos caminos de verdad (túnel o bosque, orilla o puente sobre el lago, montaña o valle…). Se elige con un toque, en el panel o en los carteles de la maqueta. Si no eliges, el tren alterna. Cuenta los caminos que has recorrido.
+- **Calendario de Adviento**: cada día llega algo (un vagón, luces, casas o un tramo de vía) y en Nochebuena hay fuegos artificiales. Es igual para todo el mundo porque sale de la fecha. Fuera de temporada se puede pasar de día con un botón; `?dia=15` enseña un día concreto.
+- **Pon tu casa** junto a la vía: el tren te deja regalos cada vez que pasa y tu nombre va también en la locomotora. Se guarda solo en tu navegador.
+- **Marcas en los vagones**: qué marca va en cada vagón y qué días se escribe a mano en `src/tren-marcas.js` (con su enlace y su imagen en `m/marcas/`). Quien quiere un vagón lo diseña en la web, ve cómo queda en el tren y manda la petición por correo; no se cobra ni se guarda nada desde la web. Quien toca el vagón ve su ficha con el botón «Visitar».
+- **Cámara**: se maneja como un mapa. Arrastrar (o un dedo) mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho (o girar dos dedos) gira, subir o bajar dos dedos inclina y el doble clic acerca. Tocar un vagón lo sigue de cerca y «Volver a la maqueta» te deja donde estabas. También hay botones en pantalla y teclado (flechas, +, −, Q, E, 0; 1 y 2 eligen camino).
 
-En la demo los demás jugadores, las pujas rivales y las noticias están simulados, y no se cobra nada. `?reiniciar` empieza de cero y `?debug` muestra fps y draw calls.
+`?reiniciar` empieza de cero y `?debug` muestra fps y draw calls.
 
 ## Controles
 
@@ -72,8 +72,8 @@ node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin na
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
-python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, túnel, votación, maquinista, tu casa, día, subasta, enlaces y móvil
-node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), votación, subasta, enlaces y guardado, sin navegador
+python tests/tren.py --shots   # tren de Navidad en Chromium: navegación, vagones, túnel, cruces, tu casa, calendario, marcas, sin red y móvil
+node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), calendario, marcas y guardado, sin navegador
 ```
 
 ## Clasificación global (Supabase)
