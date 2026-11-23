@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tren de Navidad</title>
-<meta name="description" content="Un solo tren de Navidad para todo el mundo: entre todos echamos carbón, lo mejoramos y hacemos crecer la vía hasta Nochebuena.">
+<meta name="description" content="Un solo tren de Navidad para todo el mundo recorre una maqueta nevada con montañas, túneles y pista de esquí: busca los duendes escondidos y entre todos hacéis crecer la vía hasta Nochebuena.">
 <meta name="theme-color" content="#0b1530">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,15 +13,15 @@
 <link rel="stylesheet" href="src/tren.css">
 </head>
 <body>
-<canvas id="c" aria-label="El tren de Navidad de todos en 3D: arrastra para girar la maqueta y pellizca o usa la rueda para acercarte"></canvas>
+<canvas id="c" aria-label="El tren de Navidad de todos en 3D: arrastra para girar, pellizca o usa la rueda para acercarte adonde apuntas, y toca un vagón para seguirlo"></canvas>
 
 <header class="top">
   <div class="bank">
     <div class="brand">El tren <span>de Navidad</span></div>
     <div class="row"><svg class="gift" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><rect x="2.5" y="6.5" width="19" height="3.5" rx="1"/><path d="M12 6.5v14"/><path d="M12 6.5c-1.5-3.2-5.5-3.6-5.5-1.4 0 1.3 2.3 1.4 5.5 1.4zM12 6.5c1.5-3.2 5.5-3.6 5.5-1.4 0 1.3-2.3 1.4-5.5 1.4z"/></svg><b id="gifts" class="mono" aria-live="off">0</b></div>
     <div class="cap">regalos repartidos entre todos</div>
-    <div id="rate" class="rate mono">0 echando carbón ahora</div>
-    <div class="day" aria-label="Objetivo del día"><span id="dayTxt">Día 1 de 24</span><span class="dbar"><i id="dayBar"></i></span><span id="dayPct" class="mono"></span></div>
+    <div id="rate" class="rate mono">0 buscando duendes</div>
+    <div class="day" aria-label="Objetivo del día: duendes encontrados entre todos" title="Duendes encontrados hoy entre todos"><span id="dayTxt">Día 1 de 24</span><span class="dbar"><i id="dayBar"></i></span><span id="dayPct" class="mono"></span></div>
   </div>
   <div class="tools">
     <button class="tb" id="bCam" aria-pressed="false" aria-label="Seguir al tren" title="Seguir al tren (C)"><svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -33,11 +33,11 @@
 <button id="focusX" class="pill" hidden>Volver a la maqueta</button>
 <div id="floats" aria-hidden="true"></div>
 
-<button id="coal" class="boost coal" aria-label="Echar carbón al tren (mantén pulsado)" title="Echar carbón (Espacio)">
-  <svg class="ring" viewBox="0 0 74 74" aria-hidden="true"><circle cx="37" cy="37" r="33" stroke-dasharray="207.3" stroke-dashoffset="207.3"/></svg>
-  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 13.5 13 5l2.5 2.5L7 16z"/><path d="M15.5 7.5l3-3"/><path d="M5 18.5c1.5-1.2 3.4-1.4 4.6-.4l-1.8 2.4H4.6z"/><path d="M12.5 15.5l2.6-1.4 2.6 1.2.3 2.6-2 1.8h-2.6z"/></svg>
-  <span class="lbl" id="coalLbl">Echa carbón</span>
-</button>
+<div id="card" class="adcard" hidden role="region" aria-label="Vagón">
+  <div class="ac-tx"><span class="ac-tag" id="caTag"></span><b id="caName"></b><span id="caSub"></span></div>
+  <a id="caGo" class="btn" target="_blank" rel="noopener noreferrer nofollow sponsored">Visitar <span id="caHost"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8"/><path d="M17 14v5H5V7h5"/></svg></a>
+  <button id="caFree" class="btn" type="button">Pon tu marca aquí</button>
+</div>
 
 <nav id="shop" class="shop trio" aria-label="El tren de todos"></nav>
 
@@ -62,11 +62,12 @@
       <button type="button" role="tab" id="tabMsg" aria-selected="false">Vagón con mensaje<small>3 € · 24 h</small></button>
     </div>
     <p class="lead" id="adLead"></p>
-    <canvas id="adPrev" width="1024" height="288" role="img" aria-label="Vista previa del lateral del vagón"></canvas>
+    <canvas id="adPrev" width="1024" height="352" role="img" aria-label="Vista previa del lateral del vagón"></canvas>
     <div class="ed">
       <label class="up"><input type="file" id="adFile" accept="image/png,image/jpeg,image/webp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4.5h16V15"/></svg><span id="adFileLbl">Subir imagen o logo</span></label>
       <label class="fld"><span>Texto</span><input id="adText" maxlength="32" placeholder="Tu marca o tu mensaje"></label>
-      <label class="fld"><span>Segunda línea <i>(opcional)</i></span><input id="adSub" maxlength="40" placeholder="Por ejemplo, tu web o tu ciudad"></label>
+      <label class="fld"><span>Segunda línea <i>(opcional)</i></span><input id="adSub" maxlength="40" placeholder="Por ejemplo, tu ciudad"></label>
+      <label class="fld wide"><span>Enlace <i>(opcional: tu web o una red social)</i></span><input id="adUrl" maxlength="200" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tumarca.com o instagram.com/tumarca"></label>
       <div class="fld"><span id="bgLbl">Color del vagón</span><div class="sw" id="adBg" role="radiogroup" aria-labelledby="bgLbl"></div></div>
     </div>
     <p class="err2" id="adErr" role="alert"></p>
