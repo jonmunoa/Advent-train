@@ -32,3 +32,5 @@ export function falta(hasta, now = new Date()) {
 export const tope = ab => Math.min(N - 1, ab);
 /* ropa de cada día: guantes hasta el 5, abrigo rojo hasta el 15; desde el 6 el niño lleva los guantes de ella, desde el 15 botas nuevas y desde el 17 ella lleva su bufanda */
 export const ropaDe = d => ({guantes: d < 6, abrigo: d < 16, botas: d >= 15, manoplas: d >= 6, bufandaNino: d < 17, bufandaRoja: d >= 17});
+/* con la escena del día aún por ver: la de la víspera, salvo el 16 (ya llega sin el abrigo) */
+export const ropaAntes = d => ropaDe(d === 16 ? 16 : Math.max(1, d - 1));

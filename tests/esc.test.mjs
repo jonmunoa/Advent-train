@@ -3,7 +3,7 @@
 import {strict as assert} from 'node:assert';
 import {MAPS, mapaOf, atM, BW, BD, KG, KT, KB, pondE, pisteD} from '../src/esc-vias.js';
 import {marcasEsc, pedirTexto, sitioDe, FACH, ESC, VAGONES} from '../src/esc-eco.js';
-import {N, DIAS, EXTRAS, ULTIMO, estado, previa, pedido, falta, tope, ropaDe} from '../src/esc-historia.js';
+import {N, DIAS, EXTRAS, ULTIMO, estado, previa, pedido, falta, tope, ropaDe, ropaAntes} from '../src/esc-historia.js';
 import {readFileSync} from 'node:fs';
 import {MARCAS, PRECIO_ROTULO, PRECIO_VAGON} from '../src/esc-marcas.js';
 
@@ -38,7 +38,7 @@ ok('cuánto falta se dice con palabras y la vista previa no se sale del calendar
   assert.equal(previa(7).abiertos, 7); assert.equal(previa(0).abiertos, 1); assert.equal(previa(99).extra, 'reyes'); assert.equal(previa(26).extra, 'cabalgata'); assert.equal(pedido('?dia=7', ''), 7); assert.equal(pedido('', '#dia-27'), 27); assert.equal(pedido('?dia=99', ''), 0); assert.equal(pedido('', '#otra'), 0); assert.equal(tope(0), 0); assert.equal(tope(7), 7); assert.equal(tope(24), 23);
 });
 ok('la ropa cuenta la historia: guantes hasta el 5, abrigo rojo hasta el 15 y la bufanda del niño desde el 17', () => {
-  assert.ok(ropaDe(5).guantes && !ropaDe(6).guantes && ropaDe(6).manoplas); assert.ok(ropaDe(15).abrigo && !ropaDe(16).abrigo && !ropaDe(24).abrigo); assert.ok(ropaDe(16).bufandaNino && !ropaDe(17).bufandaNino && ropaDe(17).bufandaRoja); assert.ok(!ropaDe(14).botas && ropaDe(15).botas);
+  assert.ok(!ropaAntes(16).abrigo && ropaAntes(16).bufandaNino && ropaAntes(15).abrigo && ropaAntes(17).bufandaNino && ropaAntes(6).guantes); assert.ok(ropaDe(5).guantes && !ropaDe(6).guantes && ropaDe(6).manoplas); assert.ok(ropaDe(15).abrigo && !ropaDe(16).abrigo && !ropaDe(24).abrigo); assert.ok(ropaDe(16).bufandaNino && !ropaDe(17).bufandaNino && ropaDe(17).bufandaRoja); assert.ok(!ropaDe(14).botas && ropaDe(15).botas);
 });
 ok('cada día tiene escaparate, tema y escena; los días clave van sin marca', () => {
   const es = readFileSync(new URL('../src/esc-escenas.js', import.meta.url), 'utf8'), di = readFileSync(new URL('../src/esc-dias.js', import.meta.url), 'utf8'); assert.equal(DIAS.length, N); assert.equal(ULTIMO, N + Object.keys(EXTRAS).length); for (let d = 1; d <= N; d++) assert.ok(es.includes(`*d${d}()`), `escena ${d}`); for (const x of Object.values(EXTRAS)) assert.ok(es.includes(`*${x}()`), x); for (const m of MAPS) if (!['pueblo', 'esqui', 'polo'].includes(m.id)) assert.ok(di.includes(`  ${m.id}: T(`) && di.includes(`  ${m.id}() {`), m.id); assert.deepEqual(DIAS.filter(d => d.sinMarca).map(d => d.d), [18, 20, 24]);

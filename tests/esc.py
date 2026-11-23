@@ -293,6 +293,7 @@ async def main():
         await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);__esc.step(2)})()")
         r = await pg.evaluate("({st:__esc.st,p:__esc.mundo(17).tren.g.visible})")
         check('el 18 el tren ya no está', r['st'] == 'escena' and not r['p'])
+        check('los días sin marca, los vagones van lisos', await pg.evaluate('[17,19,23].every(n=>!__esc.mundo(n).tren.ads.length)') and await pg.evaluate('__esc.mundo(6).tren.ads.length===4'))
         await pg.click('#bSaltar')
         await pg.wait_for_timeout(700)
         await pg.evaluate('__esc.step(1)')
