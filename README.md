@@ -40,10 +40,13 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 `http://localhost:5173/tren.html` prueba otro enfoque, comunitario: **un solo tren para todo el mundo** (el nombre es provisional).
 
-- **Echa carbón** (toca o mantén pulsado el botón, o Espacio): tus paladas empujan el tren y llenan el **bote común**. Cuando se llena, entre todos se compra la siguiente mejora: otro vagón, máquina más rápida o más luces.
+El tren recorre despacio una **maqueta alpina**: pueblo con plaza, colina con túnel, lago helado con patinadores, montaña del túnel grande, puentes de piedra y una estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima.
+
+- **Busca los duendes**: cada día se esconden 5 por la maqueta (en un tejado, en el lago, junto a un túnel, en el telesilla, subido en un vagón…). Tócalos para encontrarlos: cada uno suma al **objetivo común del día**. La ficha te da una pista y te lleva a la zona.
+- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y se esconden 5 duendes nuevos (en la demo, un día dura unos 3 minutos).
 - **Pon tu casa** junto a la vía: el tren te deja regalos en cada vuelta y todos ven tu nombre y tu provincia.
-- **Objetivo del día**: al repartir los regalos del día se abre un tramo nuevo de vía, con sitio para más casas (un día de Adviento; en la demo dura unos 3 minutos).
-- **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, elegir color y ver cómo queda en el tren.
+- **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, poner un **enlace** a tu web o a tus redes, elegir color y ver cómo queda en el tren. Quien toca el vagón ve su ficha con el botón «Visitar».
+- **Cámara**: la rueda o el pellizco acercan hacia donde apuntas; tocar un vagón lo sigue de cerca (y puedes girar y acercarte más); dos dedos, el botón derecho o Mayús desplazan.
 
 En la demo los demás jugadores, las pujas rivales y las noticias están simulados, y no se cobra nada. `?reiniciar` empieza de cero y `?debug` muestra fps y draw calls.
 
@@ -69,8 +72,8 @@ node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin na
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
-python tests/tren.py --shots   # tren de todos en Chromium: carbón, bote, tu casa, día, subasta, imagen y móvil
-node tests/tren.test.mjs       # economía, subasta y guardado del tren de todos, sin navegador
+python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, duendes, tu casa, día, subasta, enlaces y móvil
+node tests/tren.test.mjs       # maqueta (túneles, puentes, terreno), duendes, subasta, enlaces y guardado, sin navegador
 ```
 
 ## Clasificación global (Supabase)
