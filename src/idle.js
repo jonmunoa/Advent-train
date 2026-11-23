@@ -49,7 +49,8 @@ function save(){if(saveOff)return;st.t=Date.now();store.set(SAVE_KEY,JSON.string
 const coarse=matchMedia('(pointer:coarse)').matches;
 const canvas=$('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance',stencil:false});
-const MAXPR=Math.min(devicePixelRatio||1,coarse?1.4:1.75);let dynPR=coarse?Math.min(1.0,MAXPR):Math.min(1.5,MAXPR);
+// sin dientes de sierra: MSAA ×4 también en el móvil (en GPUs de teselas es casi gratis) y nunca por debajo de 1× la resolución CSS
+const MAXPR=Math.min(devicePixelRatio||1,2),MINPR=Math.min(1,MAXPR);let dynPR=Math.min(coarse?1.5:1.75,MAXPR);
 renderer.setPixelRatio(dynPR);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -58,7 +59,7 @@ const camera=new THREE.PerspectiveCamera(42,1,0.5,5000);
 {const es=new THREE.Scene();es.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,vertexShader:'varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec3 vP;void main(){vec3 c=mix(vec3(.16,.11,.09),vec3(.04,.04,.07),smoothstep(-.3,.6,vP.y));gl_FragColor=vec4(c,1.);}'})));
  [[-30,6,0,[9,4,1.4],7],[20,10,-20,[5,3.6,1.6],4],[0,30,0,[2.6,2,1.4],8],[18,4,26,[5,1,1.2],3],[-20,6,-25,[1,4,1.6],3],[30,12,14,[1.4,2,5],3],[10,25,-30,[1.4,2.2,3.6],6]].forEach(([x,y,z,c,r])=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,16,8),new THREE.MeshBasicMaterial({color:new THREE.Color(...c)}));m.position.set(x,y,z);es.add(m)});
  const pm=new THREE.PMREMGenerator(renderer);scene.environment=pm.fromScene(es,0.03).texture;pm.dispose();scene.environmentIntensity=0.55}
-const composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(innerWidth,innerHeight,{type:THREE.HalfFloatType,samples:coarse?0:4}));
+const composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(innerWidth,innerHeight,{type:THREE.HalfFloatType,samples:4}));
 composer.addPass(new RenderPass(scene,camera));
 const bloom=new UnrealBloomPass(new THREE.Vector2(256,256),0.75,0.55,0.86);
 const grade=new ShaderPass({uniforms:{tDiffuse:{value:null},t:{value:0},tilt:{value:0},focus:{value:.52},asp:{value:1},flash:{value:0}},
@@ -140,7 +141,7 @@ const snow=new THREE.Points(snowG,new THREE.ShaderMaterial({uniforms:snowU,trans
 /* ================= materiales ================= */
 const M={
   roadbed:new THREE.MeshStandardMaterial({color:0x5d616b,roughness:.5,side:THREE.DoubleSide}),
-  rail:new THREE.MeshStandardMaterial({color:0xe9eef5,metalness:1,roughness:.14,side:THREE.DoubleSide}),
+  rail:new THREE.MeshStandardMaterial({color:0xe9eef5,metalness:1,roughness:.28,side:THREE.DoubleSide}),// menos brillo puntual: los raíles finos parpadeaban
   sleeper:new THREE.MeshStandardMaterial({color:0x3a2a20,map:woodTex,roughness:.7}),
   snow:new THREE.MeshStandardMaterial({color:0xf3f7ff,roughness:.7,normalMap:snowNrm,normalScale:new THREE.Vector2(.4,.4)}),
   trunk:new THREE.MeshStandardMaterial({color:0x4a3020,map:woodTex,roughness:.95}),
@@ -689,10 +690,15 @@ function fx(dt,t){
   if(beam)beam.visible=!cam.follow;
 }
 /* resolución adaptativa; en el móvil, 30 fps salvo mientras tocas la pantalla */
-function adapt(raw,now,cap){fA+=raw;fN++;if(now-lastAdj<1500||fN<30)return;const avg=fA/fN;fA=0;fN=0;lastAdj=now;const tgt=cap?1/30:1/60;
-  if(avg>tgt*1.25&&dynPR>0.6){dynPR=Math.max(0.6,+(dynPR-0.15).toFixed(2));resize()}
-  else if(!cap&&avg<tgt*1.05&&dynPR<MAXPR){dynPR=Math.min(MAXPR,+(dynPR+0.1).toFixed(2));resize()}
-  if(avg>tgt*1.8&&dynPR<=0.6&&renderer.shadowMap.enabled){renderer.shadowMap.enabled=false;bloom.enabled=false;scene.traverse(o=>{if(o.material)o.material.needsUpdate=true})}}
+let slowN=0;
+function adapt(raw,now,cap){if(raw>0.2||document.hidden)return;// tirones (carga, pestaña oculta) no cuentan: no son la GPU
+  fA+=raw;fN++;if(now-lastAdj<1500||fN<30)return;const avg=fA/fN;fA=0;fN=0;lastAdj=now;const tgt=cap?1/30:1/60;
+  // si va justo: primero baja la resolución hasta 1,25×, luego quita sombras, luego baja a 1× y por último el bloom; nunca por debajo de 1×
+  if(avg>tgt*1.25){const floor=renderer.shadowMap.enabled?Math.max(MINPR,1.25):MINPR;
+    if(dynPR>floor){dynPR=Math.max(floor,+(dynPR-0.15).toFixed(2));resize()}
+    else if(++slowN>=3&&renderer.shadowMap.enabled){renderer.shadowMap.enabled=false;scene.traverse(o=>{if(o.material)o.material.needsUpdate=true})}// solo si sigue lento varios segundos
+    else if(slowN>=6&&bloom.enabled&&avg>tgt*1.5)bloom.enabled=false}
+  else{slowN=0;if(!cap&&avg<tgt*1.05&&dynPR<MAXPR){dynPR=Math.min(MAXPR,+(dynPR+0.1).toFixed(2));resize()}}}
 let uiAcc=0;
 function loop(now){requestAnimationFrame(loop);
   const cap=coarse&&!ptrs.size&&now-lastInput>1500,raw=(now-last)/1000;if(cap&&raw<1/32)return;
