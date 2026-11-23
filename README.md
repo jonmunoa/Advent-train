@@ -40,7 +40,7 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 `http://localhost:5173/tren.html` prueba otro enfoque, comunitario: **un solo tren para todo el mundo** (el nombre es provisional).
 
-El tren recorre despacio una **maqueta alpina**: pueblo con plaza, colina con túnel, lago helado con patinadores, montaña del túnel grande, puentes de piedra y una estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima.
+El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**: se cruza a sí misma pasando por encima por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
 
 - **Busca los duendes**: cada día se esconden 5 por la maqueta (en un tejado, en el lago, junto a un túnel, en el telesilla, subido en un vagón…). Tócalos para encontrarlos: cada uno suma al **objetivo común del día**. La ficha te da una pista y te lleva a la zona.
 - **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y se esconden 5 duendes nuevos (en la demo, un día dura unos 3 minutos).

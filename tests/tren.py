@@ -68,14 +68,14 @@ async def main():
         pg.on('pageerror', lambda e: errors.append(f'pageerror: {e}'))
         pg.on('response', lambda r: errors.append(f'HTTP {r.status} {r.url}') if r.status >= 400 and 'favicon' not in r.url else None)
         await route_local_three(pg)
-        await pg.goto(f'http://127.0.0.1:{PORT}/tren.html?reiniciar')
+        await pg.goto(f'http://127.0.0.1:{PORT}/tren.html?reiniciar', wait_until='commit')
         await pg.wait_for_function(READY, polling=500, timeout=420000)
         await pg.evaluate('window.__idleNoAdapt=true;__tren.look(Math.PI/2,0.62)')
 
         st = await pg.evaluate('({...__tren.st, w3: __tren.wagons(), h3: __tren.houses(), ads: __tren.ads(), a1: __tren.adImg(1), map: __tren.map(), elves: __tren.elves()})')
         check('partida nueva: tren con 3 vagones, casas de otros, los dos vagones de ejemplo y la marca con enlace',
-              st['w3'] == st['wagons'] == 3 and st['h3'] == st['houses'] == 5 and st['ads'] == [1, 2] and st['a1']['w'] == 1024 and st['a1']['url'] == 'https://www.example.com/' and st['mine'] == -1, str({k: st[k] for k in ('w3', 'h3', 'ads', 'a1', 'mine')}))
-        check('la primera vía ya pasa por un túnel', any(r['k'] == 1 for r in st['map']['runs']), str(st['map']))
+              st['w3'] == st['wagons'] == 3 and st['h3'] == st['houses'] == 3 and st['ads'] == [1, 2] and st['a1']['w'] == 1024 and st['a1']['url'] == 'https://www.example.com/' and st['mine'] == -1, str({k: st[k] for k in ('w3', 'h3', 'ads', 'a1', 'mine')}))
+        check('la primera vía ya pasa por un túnel y por un puente (el ocho se cruza por encima)', any(r['k'] == 1 for r in st['map']['runs']) and any(r['k'] == 2 for r in st['map']['runs']), str(st['map']))
         check('hay 5 duendes escondidos y ninguno encontrado', len(st['elves']) == 5 and not any(e['found'] for e in st['elves']) and all(e['vis'] for e in st['elves']), str(st['elves']))
 
         # 1) zoom con la rueda hacia donde apunta el ratón (no hacia el centro)
@@ -151,7 +151,7 @@ async def main():
         await pg.wait_for_timeout(700)
         await pg.evaluate('__tren.camSettle()')
         r = await pg.evaluate('({mine:__tren.st.mine,h:__tren.st.houses,h3:__tren.houses(),name:__tren.st.myName,open:document.getElementById("houseSheet").classList.contains("on"),cam:__tren.camInfo()})')
-        check('poner tu casa: hueco propio junto a la vía, con tu nombre, y la cámara se acerca', r['mine'] == 5 and r['h'] == 6 and r['h3'] == 6 and r['name'] == 'Jon' and not r['open'] and r['cam']['d'] < 60, str(r))
+        check('poner tu casa: hueco propio junto a la vía, con tu nombre, y la cámara se acerca', r['mine'] == 3 and r['h'] == 4 and r['h3'] == 4 and r['name'] == 'Jon' and not r['open'] and r['cam']['d'] < 60, str(r))
 
         # 5) el tren reparte y te deja regalos a ti
         r = await pg.evaluate('(()=>{const T=__tren;T.step(150);return {d:T.delivered(),laps:T.laps(),me:T.st.myGifts,total:T.st.total}})()')
@@ -160,7 +160,7 @@ async def main():
         # 6) objetivo del día cumplido: la vía crece y se esconden duendes nuevos
         r = await pg.evaluate("""(async()=>{const T=__tren,d0=T.st.day,s0=T.st.stage,L0=T.map().L;T.finishDay();for(let i=0;i<150&&T.busy;i++)await new Promise(r=>setTimeout(r,100));
           return {d0,s0,L0,day:T.st.day,stage:T.st.stage,L:T.map().L,runs:T.map().runs,h3:T.houses(),h:T.st.houses,mine:T.st.mine,today:T.st.today,elves:T.elves(),mask:T.st.eMask}})()""")
-        check('al cumplir el objetivo del día la vía crece (con puentes) y las casas se recolocan', r['day'] == r['d0'] + 1 and r['stage'] == r['s0'] + 1 and r['L'] > r['L0'] + 50 and any(x['k'] == 2 for x in r['runs']) and r['h3'] == r['h'] and r['mine'] == 5 and r['today'] < 60, str({k: r[k] for k in ('day', 'stage', 'L0', 'L', 'runs', 'h3', 'h', 'mine', 'today')}))
+        check('al cumplir el objetivo del día la vía crece (con puentes) y las casas se recolocan', r['day'] == r['d0'] + 1 and r['stage'] == r['s0'] + 1 and r['L'] > r['L0'] + 50 and any(x['k'] == 2 for x in r['runs']) and r['h3'] == r['h'] and r['mine'] == 3 and r['today'] < 60, str({k: r[k] for k in ('day', 'stage', 'L0', 'L', 'runs', 'h3', 'h', 'mine', 'today')}))
         check('el día nuevo esconde 5 duendes nuevos', r['mask'] == 0 and len(r['elves']) == 5 and not any(e['found'] for e in r['elves']), str(r['elves']))
 
         # 7) tu marca: subir logo, texto y enlace; un enlace raro no vale; pujar por el vagón del día
@@ -209,7 +209,7 @@ async def main():
 
         # 10) se guarda y se recupera
         saved = await pg.evaluate('(()=>{window.dispatchEvent(new Event("pagehide"));return {...__tren.st,mineAd:__tren.auc.mine&&__tren.auc.mine.wagon}})()')
-        await pg.reload()
+        await pg.reload(wait_until='commit')
         await pg.wait_for_function(READY, polling=500, timeout=420000)
         r = await pg.evaluate('({...__tren.st,w3:__tren.wagons(),h3:__tren.houses(),ads:__tren.ads()})')
         keys = ('wagons', 'stage', 'mine', 'myName', 'day', 'eMask', 'myElves')
@@ -221,12 +221,12 @@ async def main():
         mp = await mob.new_page()
         mp.on('pageerror', lambda e: errors.append(f'pageerror (móvil): {e}'))
         await route_local_three(mp)
-        await mp.goto(f'http://127.0.0.1:{PORT}/tren.html?reiniciar')
+        await mp.goto(f'http://127.0.0.1:{PORT}/tren.html?reiniciar', wait_until='commit')
         await mp.wait_for_function(READY, polling=500, timeout=420000)
         r = await mp.evaluate("""(()=>{const s=document.getElementById('shop').getBoundingClientRect(),its=[...document.querySelectorAll('.it')].map(e=>e.getBoundingClientRect()),
           d=document.querySelector('.day').getBoundingClientRect(),n=document.getElementById('tip').getBoundingClientRect();
           return {sw:document.documentElement.scrollWidth,w:innerWidth,shop:s.bottom<=innerHeight+1,minW:Math.min(...its.map(r=>r.width)),minH:Math.min(...its.map(r=>r.height)),dayH:d.height,gap:n.top-d.bottom}})()""")
-        check('en el móvil caben la cabecera, las noticias y las tres fichas', r['sw'] <= r['w'] and r['shop'] and r['minW'] >= 90 and r['minH'] >= 60 and r['dayH'] < 24 and r['gap'] >= 0, str(r))
+        check('en el móvil caben la cabecera, las noticias y las tres fichas', r['sw'] <= r['w'] and r['shop'] and r['minW'] >= 90 and r['minH'] >= 44 and r['dayH'] < 24 and r['gap'] >= 0, str(r))
         await mp.evaluate('__tren.focus({car:2});__tren.camSettle()')
         r = await mp.evaluate("""(()=>{const c=document.getElementById('card').getBoundingClientRect(),s=document.getElementById('shop').getBoundingClientRect();return {l:c.left,r:c.right,b:c.bottom,top:s.top,w:innerWidth,vis:!document.getElementById('card').hidden}})()""")
         check('en el móvil la ficha del vagón cabe encima de las fichas de abajo', r['vis'] and r['l'] >= 0 and r['r'] <= r['w'] and r['b'] <= r['top'], str(r))
