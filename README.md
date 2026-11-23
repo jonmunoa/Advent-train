@@ -36,6 +36,17 @@ El **silbato** acelera el tren unos segundos. Si cierras la página, al volver r
 
 La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
 
+## Prototipo: el tren de todos (`tren.html`)
+
+`http://localhost:5173/tren.html` prueba otro enfoque, comunitario: **un solo tren para todo el mundo** (el nombre es provisional).
+
+- **Echa carbón** (toca o mantén pulsado el botón, o Espacio): tus paladas empujan el tren y llenan el **bote común**. Cuando se llena, entre todos se compra la siguiente mejora: otro vagón, máquina más rápida o más luces.
+- **Pon tu casa** junto a la vía: el tren te deja regalos en cada vuelta y todos ven tu nombre y tu provincia.
+- **Objetivo del día**: al repartir los regalos del día se abre un tramo nuevo de vía, con sitio para más casas (un día de Adviento; en la demo dura unos 3 minutos).
+- **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, elegir color y ver cómo queda en el tren.
+
+En la demo los demás jugadores, las pujas rivales y las noticias están simulados, y no se cobra nada. `?reiniciar` empieza de cero y `?debug` muestra fps y draw calls.
+
 ## Controles
 
 | Acción | Teclado | Móvil |
@@ -58,6 +69,8 @@ node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin na
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
+python tests/tren.py --shots   # tren de todos en Chromium: carbón, bote, tu casa, día, subasta, imagen y móvil
+node tests/tren.test.mjs       # economía, subasta y guardado del tren de todos, sin navegador
 ```
 
 ## Clasificación global (Supabase)

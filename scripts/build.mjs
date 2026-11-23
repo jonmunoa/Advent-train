@@ -9,7 +9,7 @@ import {dirname, resolve, join} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'), out = join(root, 'dist');
-const KEEP = ['index.html', 'idle.html', 'favicon.svg', 'og.jpg', 'src', 'm'];
+const KEEP = ['index.html', 'idle.html', 'tren.html', 'favicon.svg', 'og.jpg', 'src', 'm'];
 const env = process.env;
 
 rmSync(out, {recursive: true, force: true});

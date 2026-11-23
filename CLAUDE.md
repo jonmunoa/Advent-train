@@ -43,6 +43,10 @@ idle.html, src/idle.js     prototipo idle «Mi maqueta de Navidad» (motor, sal�
 src/idle-eco.js            economía y trazado del idle, sin DOM: etapas de vía, huecos de casas, precios, guardado, ganancias sin conexión
 src/idle.css               estilos del idle (misma paleta que styles.css)
 tests/idle.py, idle.test.mjs, idle-balance.mjs   pruebas del idle (Playwright y Node) y simulador de ritmo
+tren.html, src/tren.js     prototipo «el tren de todos» (comunitario, nombre provisional); el motor y la maqueta vienen de idle.js
+src/tren-eco.js            economía del tren de todos sin DOM: bote común, mejoras, objetivo del día, subasta, comunidad simulada, guardado
+src/tren.css               estilos propios del tren de todos (se carga tras idle.css)
+tests/tren.py, tren.test.mjs   pruebas del tren de todos (Playwright y Node)
 ```
 
 Los modelos Kenney se cargan con `GLTFLoader.loadAsync` desde el mapa `MODELS` de `main.js`. Los muebles de Poly Haven usan `loadGLB` (con `MeshoptDecoder`) y se cargan sin bloquear la carga del día (`buildFurniture`, `__adv.roomReady()`). Para añadir un modelo Kenney, cópialo de `assets-src/kenney/` a `m/<kit>/` y añádelo a `MODELS`.
@@ -81,6 +85,18 @@ Reenfoque en pruebas (noviembre de 2026): Jon no estaba convencido del calendari
 - Rendimiento: las casas colocadas van unidas por material (`rebatch`); los vagones y sus regalos son `InstancedMesh` (`trainInst`). Los regalos gigantes del salón se desvanecen si tapan la maqueta. En el móvil va a 30 fps salvo mientras tocas. Con la maqueta completa: ~290 draw calls.
 - Hook de pruebas: `window.__idle` (`step(s)` sin efectos, `buy(k)`, `give(n)`, `rate()`, `offline(s)`, `look(az, el)`, `follow(on)`, `perf(n)`…). URL: `?reiniciar`, `?rapido` (monedas ×10) y `?debug`.
 - `localStorage`: `advx-idle` (partida, validada con `parseSave`) y `advx-idle-silbato`.
+
+## Prototipo comunitario: el tren de todos (`tren.html`)
+
+Siguiente reenfoque (23 de noviembre de 2026): un solo tren para todo el mundo que se mejora entre todos, con anuncios en los vagones como monetización (más afiliación). Nombre pendiente. Parte de una copia de `idle.js`: si se queda, toca sacar el motor y la maqueta a un módulo común (y retirar el idle).
+
+- Bucle: tus paladas (`coal`) suben `heat` (empuja el tren, hasta ×1,6) y llenan `st.pot`; `addPot` compra la siguiente mejora por turnos (`UP_ORDER`: vagón, máquina, vagón, luces; `upCost` = 400 × 1,3^n). El reparto suma `sacoOf` por casa a `st.today`; al llegar a `st.goal` (`goalFor`: ~170 s de reparto) pasa el día (`nextDay`) y la vía crece (`expand`).
+- Casas: las ponen los jugadores (`claimHouse`); la tuya es `st.mine` (índice de hueco), con estrella y cartel (`markMine`). Simulados: otros ponen casa cada 16–32 s dejando siempre un hueco libre si aún no tienes.
+- Anuncios: laterales de los vagones (`setAd`, canvas 1024×288 → `CanvasTexture` con anisotropía máxima y `toneMapped:false`; `drawAd` encaja la imagen sin recortarla). Vagón 1 = vagón del día (subasta: `closeAt` a las 21:00, `minBid`, rivales simulados en `auctionTick`), resto = vagones con mensaje (`msgWagon`). Las imágenes se reducen a 800 px en el navegador. Cámara centrada en un vagón o en tu casa (`setFocus`), con la distancia calculada por la proporción de la pantalla; mirando un vagón el tren va al 35 %.
+- Hook de pruebas: `window.__tren` (`step`, `coal(n)`, `pot(x)`, `claim`, `finishDay`, `rival`, `ads`, `adImg(i)`, `focus`, `camSettle`, `perf`…).
+- `localStorage`: `advx-tren` (mundo, validado con `parseWorld`), `advx-tren-subasta` (puja más alta, tu puja y tu vagón con mensaje) y `advx-tren-marca`.
+
+Antialiasing (idle y tren): MSAA ×4 en el `EffectComposer` también en el móvil y resolución entre 1× y 2× (nunca por debajo de 1×). Si va justo, `adapt` baja hasta 1,25×, luego quita sombras (solo si sigue lento varios segundos), luego baja a 1× y por último quita el bloom; los tirones de más de 0,2 s no cuentan.
 
 ## Pendientes conocidos
 
