@@ -42,9 +42,9 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**: se cruza a sí misma pasando por encima por un viaducto, sube y baja por lomas, atraviesa la colina y la montaña por túneles (por dentro, una gruta de hielo iluminada en la que la cámara entra con el tren) y cruza el río y los arroyos por puentes de piedra. Hay pueblo con plaza, lago helado con patinadores y estación de esquí con telesilla. Papá Noel saluda desde el taller y su trineo vuela por encima. En el móvil va en modo ligero (sin sombras ni posprocesado) para que vaya fluido; `?movil` lo fuerza en el ordenador.
 
-- **Manda un regalo a un amigo**: pones su nombre, eliges papel y dedicatoria y el regalo sube al tren. Sale un **enlace solo para esa persona** (WhatsApp, compartir o copiar): al abrirlo ve llegar el tren con «Para Iker», el regalo vuela a su chimenea, se abre la tarjeta y puede **devolverte otro** y quedarse la casa. Hay 3 regalos gratis al día y cada uno suma al **objetivo común del día**.
-- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y todos vuelven a tener 3 regalos (en la demo, un día dura unos 3 minutos).
-- **Pon tu casa** junto a la vía: el tren te deja regalos en cada vuelta y todos ven tu nombre y tu provincia.
+- **Vota por dónde va el tren**: en cada cruce hay dos caminos de verdad (túnel o bosque, orilla o puente sobre el lago, montaña o valle…). Se vota con un toque, en el panel o en los carteles de la maqueta, y el tren va por donde gana. Entre los que votan sale el **maquinista**, con su nombre sobre la locomotora hasta el siguiente cruce y el silbato en su mano. No se pide nada más: ni registro ni de dónde eres. Cada voto suma al **objetivo común del día**.
+- **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces (en la demo, un día dura unos 3 minutos).
+- **Pon tu casa** junto a la vía: el tren te deja regalos cada vez que pasa y todos ven tu nombre. Las que están en uno de los dos caminos de un cruce solo los reciben si gana ese camino.
 - **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, poner un **enlace** a tu web o a tus redes, elegir color y ver cómo queda en el tren. Quien toca el vagón ve su ficha con el botón «Visitar».
 - **Cámara**: se maneja como un mapa. Arrastrar (o un dedo) mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho (o girar dos dedos) gira, subir o bajar dos dedos inclina y el doble clic acerca. Tocar un vagón lo sigue de cerca y «Volver a la maqueta» te deja donde estabas. También hay botones en pantalla y teclado (flechas, +, −, Q, E, 0).
 
@@ -72,8 +72,8 @@ node tests/edge.test.mjs       # validación antitrampas y Edge Function, sin na
 python tests/perf.py           # coste por fotograma frente a tests/perf-baseline.json
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
-python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, túnel, regalos, tu casa, día, subasta, enlaces y móvil
-node tests/tren.test.mjs       # maqueta (túneles, puentes, terreno), regalos, subasta, enlaces y guardado, sin navegador
+python tests/tren.py --shots   # tren de todos en Chromium: zoom, vagones, túnel, votación, maquinista, tu casa, día, subasta, enlaces y móvil
+node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), votación, subasta, enlaces y guardado, sin navegador
 ```
 
 ## Clasificación global (Supabase)
