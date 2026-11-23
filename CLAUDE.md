@@ -48,6 +48,14 @@ src/tren-map.js            maqueta alpina sin DOM: relieve (H0), etapas de vía 
 src/tren-eco.js            calendario (qué trae cada día), agujas, marcas y partida, sin DOM ni red
 src/tren-marcas.js         lo que Jon edita a mano: contacto, precios y qué marca va en qué vagón y qué días
 src/tren.css               estilos propios del tren de Navidad (se carga tras idle.css)
+escaparates.html, src/escaparates.js   prototipo «el tren del escaparate» (nombre provisional): calle, paseo, cámara, HUD y marcas
+src/esc-vias.js            los tres circuitos sin DOM: relieve, vía con altura, túneles, puentes y suelo
+src/esc-mundos.js, esc-tren.js   las tres maquetas (decorado, animaciones, luces) y el tren de cada una
+src/esc-calle.js           tiendas, acera, nevada, huellas y las figuras del niño y la madre
+src/esc-eco.js, esc-marcas.js    reparto de marcas sin DOM ni red / lo que Jon edita a mano (contacto, precios y marcas)
+src/kit.js, musica.js      juguetes y materiales, y caja de música (sacados de tren.js)
+src/escaparates.css        estilos de los escaparates
+tests/esc.py, esc.test.mjs pruebas de los escaparates (Playwright y Node)
 tests/tren.py, tren.test.mjs   pruebas del tren de Navidad (Playwright y Node: maqueta, economía, navegación con ratón y con dedos al píxel, túnel, cruces, calendario, marcas, que no hable con ningún servidor y móvil)
 ```
 
@@ -127,6 +135,19 @@ Quinta vuelta (23 de noviembre de 2026): **sin servidor y sin base de datos**, p
 - Rendimiento. Escritorio (GPU, 1200×760, vía 2): 11 ms a 1×, ~303 draw calls (con los ramales). Perfil móvil (412×915, CPU ×4 más lenta, `?movil`): vista general ~8–11 ms y 136 draw calls (antes 28 ms y ~300), de cerca ~5–8 ms, siguiendo un vagón ~5–7 ms. No medido en un Android real.
 
 Antialiasing (idle y tren): MSAA ×4 en el `EffectComposer` también en el móvil y resolución entre 1× y 2× (nunca por debajo de 1×). Si va justo, `adapt` baja hasta 1,25×, luego quita sombras (solo si sigue lento varios segundos), luego baja a 1× y por último quita el bloom; los tirones de más de 0,2 s no cuentan.
+
+## Prototipo: el tren del escaparate (`escaparates.html`)
+
+Enfoque actual (23 de noviembre de 2026, a petición de Jon): **que los usuarios no hagan nada**. Un niño pasea de la mano de su madre por una calle nevada con tiendas; en cada escaparate hay un circuito de tren y se queda embobado mirándolo. Busca llegar al corazón del adulto que hacía eso de niño y que se quede mucho rato mirando, y mientras tanto ve la publicidad. Se quitaron los caminos elegidos de `tren.html`. Siguen sin servidor, sin base de datos, sin gente simulada y sin preguntar de dónde es nadie. No reutiliza `tren.js`: `kit.js` y `musica.js` son copias limpias; si el enfoque se queda, toca retirar `tren.html` e `idle.html`.
+
+- Tres escenas con una cámara: `calle`, `dentro` (las maquetas, con sus luces y su sombra) y `aire` (nieve, cristales, vaho). En escritorio, `EffectComposer` con tres RenderPass (los dos últimos con `clear=false`), bloom y grade; en el móvil (`LOWQ` = puntero táctil o `?movil`), render directo de las tres sin sombras y materiales estándar (`ligero`).
+- Escala: calle a 45 u por metro, una tienda cada `PASO`=340; el hueco del escaparate es x ±75, y de 25 a 114. Las tres tiendas se recolocan delante de quien pasea (`sitioDe`), así que la calle da la vuelta: `E.n` puede ser cualquier entero y `tiendaDe(n)` es n mod 3. La maqueta es un tablero de 176 × 84 a escala .88 e inclinado `TILT` hacia el cristal.
+- Estados (`E.st`): `inicio` → `paseo` → `llega` → `mira` → `sale` → `paseo`. `ir(n)` cambia de destino (en `llega` se apunta en `E.pend`). `E.u` es el acercamiento (0, los dos de espaldas y el rótulo a la vista; 1, la nariz en el cristal): sube solo hasta 0,62 (0,78 en vertical) salvo que toques. A los `AUTO`=110 s sin tocar siguen al siguiente.
+- Figuras (`Figura('madre'|'nino')`): procedurales; `aim()` lleva cada mano a un punto, así van cogidos de la mano (`manos()` < 5 u). Al mirar, el niño se adelanta al cristal, apoya las manos y sigue el tren con la cabeza, y la madre le pone la mano en el hombro. En vertical se ponen a un lado para no tapar.
+- Circuitos (`MAPS`): `pueblo` (se cruza por encima con 7,8 m de hueco), `esqui` (tres túneles) y `polo`. `buildVia` clasifica cada muestra (túnel si el monte queda `TUN` por encima, puente si queda `BR` por debajo); `mapaOf(q).h` es el suelo con la vía y `T.cap` evita que el terraplén tape los puentes. Radio mínimo > 9 y pendiente < 10,5 %. En las bocas, `terreno()` parte las caras que estorban y quita solo los trocitos del hueco.
+- Marcas: `MARCAS` de `esc-marcas.js` por escaparate y sitio (`rotulo` o vagón 1–4) y fechas, validadas con `marcasEsc`; con la lista vacía salen ejemplos. Al tocar un vagón o un rótulo sale su ficha (enlace `sponsored`); el editor enseña cómo queda y copia los datos (o abre el correo si hay `CONTACTO`).
+- Hook: `window.__esc` (`empezar`, `ir(n)`, `step(s)`, `mirar(u)`, `hold(v)`, `setCam`, `pos`, `manos`, `vagon(k, i)`, `rotulo(k)`, `queHay(x, y)`, `sitios()`, `perf(n, pr)`…). `localStorage`: solo `advx-sonido`. `window.ADVX_ESC_URL` cambia el enlace de compartir.
+- Rendimiento. Escritorio (GPU, 1200×760, 1×): 13 ms paseando (424 draw calls, dos maquetas a la vista) y 12 ms mirando (308). Perfil móvil (412×915, CPU ×4 más lenta): 9–12,5 ms entre 1× y 2×, 116–220 draw calls y 276–362k triángulos. No medido en un Android real.
 
 ## Pendientes conocidos
 

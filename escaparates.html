@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>El tren del escaparate</title>
+<meta name="description" content="Un niño pasea de la mano de su madre por una calle nevada y se queda embobado mirando los trenes de los escaparates. Acércate al cristal.">
+<meta name="theme-color" content="#0a1026">
+<link rel="icon" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Rubik:wght@400;500;600;700&family=Yesteryear&display=swap">
+<link rel="stylesheet" href="src/escaparates.css">
+</head>
+<body>
+<canvas id="c" aria-label="Una calle nevada en 3D: un niño y su madre pasean y se paran a mirar los trenes de los escaparates. Arrastra para mirar alrededor y usa la rueda o pellizca para acercarte al cristal"></canvas>
+<div id="frost" aria-hidden="true"></div>
+
+<header class="top hud">
+  <div class="brand">El tren <span>del escaparate</span></div>
+  <div class="tools">
+    <button class="tb" id="bShare" aria-label="Compartir" title="Compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.3 10.7l6.900-3.900M8.300 13.300l6.900 3.900"/></svg></button>
+    <button class="tb" id="bSon" aria-label="Sonido" title="Sonido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/><path class="of" d="M17 9l5 6M22 9l-5 6"/></svg></button>
+  </div>
+</header>
+
+<div id="toast" role="status"></div>
+
+<nav class="foot hud" id="foot" aria-label="El paseo">
+  <button class="ar" id="bPrev" aria-label="Escaparate anterior" title="Escaparate anterior (←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <div class="cap" id="cap" aria-live="polite"><b id="capN"></b><span id="capS"></span></div>
+  <button class="ar" id="bNext" aria-label="Seguir paseando" title="Seguir paseando (→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+</nav>
+<button class="marca hud" id="bAd" type="button">Tu marca aquí</button>
+
+<div id="card" class="adcard" hidden role="region" aria-label="Marca">
+  <div class="ac-tx"><span class="ac-tag" id="caTag"></span><b id="caName"></b><span id="caSub"></span></div>
+  <a id="caGo" class="btn" target="_blank" rel="noopener noreferrer nofollow sponsored">Visitar <span id="caHost"></span></a>
+  <button id="caFree" class="btn" type="button">Pon tu marca</button>
+  <button class="x" id="caX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+</div>
+<button id="prevBack" class="pill" hidden>Vista previa · Volver</button>
+
+<div id="adSheet" class="modal" role="dialog" aria-modal="true" aria-labelledby="adTtl">
+  <div class="card">
+    <button class="x" id="adX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="adTtl">Tu marca en el escaparate</h2>
+    <div class="seg" role="tablist" aria-label="Dónde">
+      <button type="button" role="tab" id="tabRot" aria-selected="true">El rótulo<small>el letrero de la tienda</small></button>
+      <button type="button" role="tab" id="tabVag" aria-selected="false">Un vagón<small>del tren del escaparate</small></button>
+    </div>
+    <p class="lead" id="adLead"></p>
+    <canvas id="adPrev" width="1024" height="352" role="img" aria-label="Vista previa"></canvas>
+    <div class="ed">
+      <label class="up"><input type="file" id="adFile" accept="image/png,image/jpeg,image/webp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4.500h16V15"/></svg><span id="adFileLbl">Subir imagen o logo</span></label>
+      <label class="fld"><span>Texto</span><input id="adText" maxlength="32" placeholder="Tu marca o tu mensaje"></label>
+      <label class="fld"><span>Segunda línea <i>(opcional)</i></span><input id="adSub" maxlength="40" placeholder="Por ejemplo, tu ciudad"></label>
+      <label class="fld wide"><span>Enlace <i>(opcional: tu web o una red social)</i></span><input id="adUrl" maxlength="200" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tumarca.com o instagram.com/tumarca"></label>
+      <div class="fld wide"><span id="bgLbl">Color</span><div class="sw" id="adBg" role="radiogroup" aria-labelledby="bgLbl"></div></div>
+    </div>
+    <p class="err" id="adErr" role="alert"></p><p class="okmsg" id="adOk" role="status" hidden></p>
+    <button class="btn" id="adAsk" type="button">Pedir este sitio</button>
+    <button class="lnk" id="adSee" type="button">Ver cómo queda</button>
+    <p class="fine">Te contestamos con los días libres y cómo pagar. Cada imagen se revisa antes de salir.</p>
+  </div>
+</div>
+
+<section id="intro" class="intro" aria-labelledby="iTtl">
+  <div class="in">
+    <h1 id="iTtl">El tren <span>del escaparate</span></h1>
+    <p>¿Te acuerdas de cuando te quedabas embobado <br>mirando pasar el tren detrás de un cristal?</p>
+    <button id="go" class="mano" type="button" disabled>Preparando la calle…</button>
+    <div class="bar" aria-hidden="true"><i id="lBar"></i></div>
+  </div>
+</section>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script>window.__boot=setTimeout(()=>{const e=document.getElementById('fatal');e.textContent='No se ha podido cargar el motor 3D. Revisa la conexión y recarga la página.';e.hidden=false},25000);</script>
+<script type="module" src="src/escaparates.js"></script>
+</body>
+</html>

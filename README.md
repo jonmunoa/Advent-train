@@ -36,6 +36,17 @@ El **silbato** acelera el tren unos segundos. Si cierras la página, al volver r
 
 La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
 
+## Prototipo: el tren del escaparate (`escaparates.html`)
+
+`http://localhost:5173/escaparates.html` es el enfoque más reciente, también sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada y se para a mirar los trenes de los escaparates. **No hay que hacer nada**: andan, llegan, el niño apoya las manos en el cristal y sigue el tren con la cabeza, la cámara se acerca despacio y, al cabo de un rato, siguen al siguiente.
+
+- **Tres escaparates, tres circuitos**: el pueblo de Navidad (mercadillo, tiovivo, noria, molino y viaducto), la montaña nevada (pista de esquí, telesilla, teleférico, trineos y lago helado) y la fábrica de Papá Noel en el Polo Norte (fábrica, casas de jengibre, palacio de hielo, pingüinos y aurora). Los tres tienen curvas, cuestas, túneles y puentes.
+- **Mirar**: arrastra para mirar alrededor, y con la rueda o un pellizco acércate hasta pegar la nariz al cristal. Las flechas (en pantalla o del teclado) llevan al escaparate anterior o al siguiente. Los controles se esconden si no tocas nada.
+- **Sonido**: caja de música y traqueteo, que se oyen más cuanto más cerca estás del cristal.
+- **Marcas** en el rótulo de cada tienda y en los cuatro vagones de cada tren. Qué marca va en cada sitio y qué días se escribe a mano en `src/esc-marcas.js` (con su enlace y su imagen en `m/marcas/`). Quien quiere un sitio lo diseña en la web, ve cómo queda y manda la petición; no se cobra ni se guarda nada desde la web.
+
+`?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
+
 ## Prototipo: el tren de Navidad (`tren.html`)
 
 `http://localhost:5173/tren.html` prueba otro enfoque, sin servidor ni base de datos: un tren que recorre despacio una maqueta y **crece cada día de diciembre** (el nombre es provisional).
@@ -73,6 +84,8 @@ python tests/perf.py           # coste por fotograma frente a tests/perf-baselin
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
 python tests/tren.py --shots   # tren de Navidad en Chromium: navegación, vagones, túnel, cruces, tu casa, calendario, marcas, sin red y móvil
+python tests/esc.py --shots    # escaparates en Chromium: paseo, manos, tres escaparates, marcas, sin red y móvil
+node tests/esc.test.mjs        # circuitos de los escaparates (curvas, cuestas, túneles, puentes) y marcas, sin navegador
 node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), calendario, marcas y guardado, sin navegador
 ```
 

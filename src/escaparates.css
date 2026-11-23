@@ -1,0 +1,111 @@
+/* El tren del escaparate: interfaz mínima sobre la calle nevada. Misma paleta que el resto (papel crema, rojo, oro). */
+:root{color-scheme:dark;--night:#0a1026;--paper:#f1e6cc;--ink:#2b1a12;--ink2:#6d5642;--cream:#fbf3df;--red:#c41e2e;--red2:#8e1220;--green:#1b5a40;--gold:#e0ad45;--gold2:#a8771f;
+  --ease-out:cubic-bezier(.23,1,.32,1);--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;background:var(--night);color:var(--cream);font:16px/1.4 Rubik,system-ui,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#c.dr{cursor:grabbing}#c.pt{cursor:pointer}
+button{font:inherit;color:inherit;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+:focus-visible{outline:3px solid #fff;outline-offset:3px}
+/* escarcha en los bordes del cristal al acercarse */
+#frost{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:
+  radial-gradient(120% 90% at 50% 46%,transparent 62%,rgba(214,230,255,.30) 88%,rgba(236,244,255,.62) 100%)}
+body.lowq::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 95% at 50% 46%,transparent 55%,rgba(4,6,16,.55) 100%)}
+
+.hud{transition:opacity 500ms ease}
+body.quieto .hud{opacity:.28}
+body.espera .hud{opacity:0;pointer-events:none}
+.top{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:calc(12px + var(--safe-t)) 16px 0;pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{font:400 17px/1 'Alfa Slab One',Georgia,serif;color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.5);pointer-events:none}
+.brand span{font:400 21px/1 Yesteryear,cursive;color:var(--cream)}
+.tools{display:flex;gap:8px}
+.tb{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(224,173,69,.6);background:rgba(10,16,38,.6);display:grid;place-items:center;cursor:pointer;color:var(--gold);transition:transform 160ms var(--ease-out)}
+.tb:active,.ar:active{transform:scale(.94)}
+.tb svg,.ar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tb.off{opacity:.55}.tb.off .on{display:none}.tb:not(.off) .of{display:none}
+
+.foot{position:fixed;left:50%;bottom:calc(18px + var(--safe-b));z-index:10;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:8px;border-radius:999px;background:rgba(10,16,38,.62);border:1px solid rgba(224,173,69,.35);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ar{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:var(--gold);color:var(--ink);display:grid;place-items:center;cursor:pointer;transition:transform 160ms var(--ease-out)}
+.ar svg{stroke-width:2.6}
+.cap{min-width:200px;text-align:center;line-height:1.2}
+.cap b{display:block;font:400 17px/1.15 'Alfa Slab One',Georgia,serif;color:var(--cream)}
+.cap span{font-size:12.5px;color:#cfd6ea}
+.marca{position:fixed;right:16px;bottom:calc(30px + var(--safe-b));z-index:10;padding:9px 14px;border:1px solid rgba(224,173,69,.5);border-radius:999px;background:rgba(10,16,38,.62);color:var(--gold);font-weight:600;font-size:13px;cursor:pointer;transition:transform 160ms var(--ease-out),opacity 500ms ease}
+.marca:active{transform:scale(.96)}
+#toast{position:fixed;left:50%;top:calc(70px + var(--safe-t));z-index:12;transform:translate(-50%,-6px);max-width:calc(100% - 32px);padding:9px 16px;border-radius:999px;background:rgba(10,16,38,.86);border:1px solid var(--gold);font-size:14px;opacity:0;pointer-events:none;transition:opacity 200ms var(--ease-out),transform 200ms var(--ease-out)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.pill{position:fixed;left:50%;top:calc(70px + var(--safe-t));z-index:13;transform:translateX(-50%);padding:10px 18px;border:0;border-radius:999px;background:var(--gold);color:var(--ink);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 0 var(--gold2);transition:transform 160ms var(--ease-out)}
+.pill:active{transform:translateX(-50%) scale(.96)}
+
+.adcard{position:fixed;left:50%;bottom:calc(96px + var(--safe-b));z-index:11;transform:translateX(-50%);width:min(540px,calc(100% - 24px));display:flex;align-items:center;gap:12px;padding:12px 44px 12px 16px;border-radius:14px;background:var(--paper);color:var(--ink);box-shadow:0 3px 0 rgba(43,26,18,.25),0 14px 30px rgba(0,0,0,.45);transition:opacity 200ms var(--ease-out),transform 200ms var(--ease-out)}
+@starting-style{.adcard{opacity:0;transform:translateX(-50%) translateY(8px)}}
+.adcard .x{position:absolute;right:6px;top:6px;width:34px;height:34px}
+.ac-tx{flex:1;display:flex;flex-direction:column;gap:2px}
+.ac-tag{font:700 10.5px/1.2 Rubik,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--red2)}
+.ac-tx b{font:400 17px/1.2 'Alfa Slab One',Georgia,serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#caSub{font-size:13px;color:var(--ink2)}#caSub:empty{display:none}
+.adcard .btn{flex:none;width:auto;margin:0;padding:11px 14px;text-decoration:none;white-space:nowrap}
+#caHost{font-weight:500;opacity:.9}
+
+.btn{width:100%;margin-top:16px;padding:13px 16px;border:0;border-radius:10px;background:var(--red);color:var(--cream);font-weight:700;font-size:16px;cursor:pointer;box-shadow:0 3px 0 var(--red2);transition:transform 160ms var(--ease-out)}
+.btn:active{transform:scale(.97)}
+.modal{position:fixed;inset:0;z-index:30;display:none;place-items:center;padding:16px;background:rgba(4,8,20,.6);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.modal.on{display:grid}
+.modal .card{width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;padding:22px 22px 16px;border-radius:18px;background:var(--paper);color:var(--ink);transition:opacity 220ms var(--ease-out),transform 220ms var(--ease-out)}
+@starting-style{.modal.on .card{opacity:0;transform:scale(.96)}}
+.card h2{margin:0;padding-right:40px;font:400 24px/1.15 'Alfa Slab One',Georgia,serif;color:var(--red2)}
+.x{width:40px;height:40px;border:0;border-radius:50%;background:rgba(43,26,18,.08);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.card .x{position:sticky;float:right;top:0;margin:-8px -6px 0 0}
+.x svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px;padding:4px;border-radius:12px;background:rgba(43,26,18,.08)}
+.seg button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 6px;border:0;border-radius:9px;background:none;color:var(--ink2);font-weight:700;font-size:14px;cursor:pointer;transition:background-color 160ms ease,color 160ms ease}
+.seg small{font-weight:500;font-size:11.5px;opacity:.85}
+.seg button[aria-selected="true"]{background:var(--cream);color:var(--red2);box-shadow:0 1px 0 rgba(43,26,18,.15),0 2px 8px rgba(43,26,18,.12)}
+.lead{margin:12px 0 0;font-size:14px;line-height:1.45;color:var(--ink2)}.lead b{color:var(--ink)}
+#adPrev{display:block;width:100%;height:auto;margin-top:12px;border-radius:10px;box-shadow:0 6px 18px rgba(43,26,18,.25)}
+.ed{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.ed .up,.ed .wide{grid-column:1/-1}
+.up{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px;border:1.5px dashed rgba(43,26,18,.4);border-radius:10px;background:#fffaf0;color:var(--ink);font-weight:700;font-size:15px;cursor:pointer}
+.up input{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer}
+.up svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fld{display:flex;flex-direction:column;gap:5px;margin-top:12px;font-size:13px;font-weight:600;color:var(--ink2)}.fld i{font-style:normal;font-weight:400}
+.fld input{width:100%;padding:11px 12px;border:1.5px solid rgba(43,26,18,.25);border-radius:9px;background:#fffaf0;color:var(--ink);font:500 16px/1.2 Rubik,system-ui,sans-serif}
+.fld input:focus{outline:none;border-color:var(--red)}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw button{width:34px;height:34px;border-radius:50%;border:2px solid rgba(43,26,18,.2);background:var(--c);cursor:pointer}
+.sw button[aria-checked="true"]{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ink)}
+.err,.okmsg{margin:10px 0 0;font-size:13.5px;font-weight:600;color:var(--red2)}.err:empty{display:none}.okmsg{color:var(--green)}
+.lnk{display:block;margin:10px auto 0;padding:8px 12px;border:0;background:none;color:var(--ink2);font-weight:600;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.fine{margin:10px 0 0;font-size:12.5px;line-height:1.4;color:var(--ink2);opacity:.85}
+
+/* portada: se ve la calle detrás */
+.intro{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;text-align:center;background:linear-gradient(180deg,rgba(6,10,26,.82),rgba(6,10,26,.35) 45%,rgba(6,10,26,.78));transition:opacity 900ms ease,visibility 0s linear 900ms}
+.intro .in{max-width:640px}
+@media (min-aspect-ratio:5/4){.intro .in{transform:translateX(15vw)}.intro{background:linear-gradient(90deg,rgba(6,10,26,.18),rgba(6,10,26,.5) 38%,rgba(6,10,26,.74))}}
+@media (max-aspect-ratio:4/5){.intro{place-items:start center;padding-top:13vh;background:linear-gradient(180deg,rgba(6,10,26,.86),rgba(6,10,26,.5) 45%,rgba(6,10,26,.05) 62%)}}
+.intro.ido{opacity:0;visibility:hidden;pointer-events:none}
+.intro.carga{background:#070c1e}.intro.carga .in{transform:none}
+.intro h1{margin:0;font:400 clamp(44px,11vw,92px)/.95 'Alfa Slab One',Georgia,serif;color:var(--cream);text-shadow:3px 4px 0 var(--red),7px 9px 0 rgba(0,0,0,.35);text-wrap:balance}
+.intro h1 span{display:block;margin:.02em 0 0 .6em;font:400 .82em/1 Yesteryear,cursive;color:var(--gold);text-shadow:0 3px 14px rgba(0,0,0,.6);transform:rotate(-3deg)}
+.intro p{margin:26px 0 0;font-size:clamp(16px,2.4vw,20px);line-height:1.5;color:#f4ead2;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.mano{margin-top:30px;padding:16px 34px;border:0;border-radius:999px;background:var(--red);color:var(--cream);font:400 20px/1 'Alfa Slab One',Georgia,serif;cursor:pointer;box-shadow:0 4px 0 var(--red2),0 14px 34px rgba(0,0,0,.45);transition:transform 160ms var(--ease-out),background-color 200ms ease}
+.mano:active{transform:scale(.97)}
+.mano:disabled{background:rgba(251,243,223,.14);box-shadow:none;font:500 15px/1 Rubik,sans-serif;cursor:default}
+.bar{width:min(240px,60vw);height:4px;margin:18px auto 0;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden;transition:opacity 200ms ease}
+.bar i{display:block;height:100%;background:var(--gold);transform-origin:left;transform:scaleX(0);transition:transform 200ms linear}
+.intro:not(.carga) .bar{opacity:0}
+.fatal{position:fixed;left:16px;right:16px;top:16px;z-index:60;padding:14px;border-radius:12px;background:var(--red);font-weight:600;text-align:center}
+#dbg{position:fixed;left:50%;bottom:4px;z-index:60;transform:translateX(-50%);font:700 11px/1.3 monospace;color:#9effa0}
+
+@media (max-width:560px){
+  .brand{font-size:14px}.brand span{font-size:17px}.tb{width:40px;height:40px}
+  .foot{gap:8px;bottom:calc(14px + var(--safe-b));width:calc(100% - 24px);justify-content:space-between}
+  .cap{flex:1;min-width:0}.cap b{font-size:15.5px}
+  .marca{right:auto;left:50%;bottom:calc(88px + var(--safe-b));transform:translateX(-50%);padding:7px 14px;font-size:12.5px}.marca:active{transform:translateX(-50%) scale(.96)}
+  .adcard{bottom:calc(130px + var(--safe-b));gap:8px;padding-left:14px}#caHost{display:none}
+  .ed{grid-template-columns:1fr}.modal .card{padding:18px 16px 12px}
+  .intro p br{display:none}
+}
+@media (prefers-reduced-motion:reduce){.hud,.intro,.adcard,.modal .card,#toast{transition-duration:1ms}}
