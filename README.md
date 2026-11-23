@@ -46,7 +46,7 @@ El tren recorre despacio una **maqueta alpina** con la vía en forma de **ocho**
 - **Objetivo del día**: cuando entre todos se cumple, la vía crece (4 tramos), llega otro vagón o se encienden más luces, y todos vuelven a tener 3 regalos (en la demo, un día dura unos 3 minutos).
 - **Pon tu casa** junto a la vía: el tren te deja regalos en cada vuelta y todos ven tu nombre y tu provincia.
 - **Tu marca en el tren**: el primer vagón se **subasta** cada día (cierra a las 21:00 y sale todo el día siguiente) y el resto se venden como **vagones con mensaje** (3 €, 24 h). Se puede subir una imagen o logo, escribir dos líneas, poner un **enlace** a tu web o a tus redes, elegir color y ver cómo queda en el tren. Quien toca el vagón ve su ficha con el botón «Visitar».
-- **Cámara**: la rueda o el pellizco acercan hacia donde apuntas; tocar un vagón lo sigue de cerca (y puedes girar y acercarte más); dos dedos, el botón derecho o Mayús desplazan.
+- **Cámara**: se maneja como un mapa. Arrastrar (o un dedo) mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho (o girar dos dedos) gira, subir o bajar dos dedos inclina y el doble clic acerca. Tocar un vagón lo sigue de cerca y «Volver a la maqueta» te deja donde estabas. También hay botones en pantalla y teclado (flechas, +, −, Q, E, 0).
 
 En la demo los demás jugadores, las pujas rivales y las noticias están simulados, y no se cobra nada. `?reiniciar` empieza de cero y `?debug` muestra fps y draw calls.
 
