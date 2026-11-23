@@ -1,8 +1,8 @@
 /* El tren de Navidad · prototipo comunitario (nombre provisional).
    Un solo tren para todo el mundo recorre una maqueta alpina (tren-map.js): pueblo con plaza, colina con túnel,
-   lago helado, montaña del túnel grande y estación de esquí con telesilla. Cada día se esconden 5 duendes por la
-   maqueta: cada uno que encuentras suma al objetivo común del día y, al cumplirlo, la vía crece, llega otro vagón
-   o se encienden más luces. Cada jugador puede poner su casa junto a la vía, y los furgones llevan marcas o mensajes
+   lago helado, montaña del túnel grande y estación de esquí con telesilla. Cada jugador manda regalos a sus amigos por
+   el tren: viajan en el vagón de regalos hasta su casa y al amigo le llega un enlace para verlo llegar (y devolverlo).
+   Los regalos de todos suman al objetivo común del día; al cumplirlo la vía crece, llega otro vagón o más luces. Cada jugador puede poner su casa junto a la vía, y los furgones llevan marcas o mensajes
    con enlace: el primero se subasta cada día y el resto se venden. En la demo los demás jugadores están simulados
    (tren-eco.js). El motor, el salón y las casas vienen de idle.js; si este enfoque se queda, toca sacarlos a un módulo común. */
 import * as THREE from 'three';
@@ -17,7 +17,7 @@ import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {rng, wrapA} from './sim.js';
 import {mapOf, atM, kindAt, F, BOARD, GAUGE as GA, KT, KB, LAKE_Y, pisteD, lakeE, TRAIN_V, STAGE_NAMES, nearTrack, otherNear} from './tren-map.js';
-import {TKEY, DAYS, CLOSE_H, MSG_PRICE, BIZ, NAMES, PROVS, CAP, ELVES, WAGON_MAX, newWorld, parseWorld, sacoOf, addElves, nextDay, online, crowdElves, closeAt, showDay, minBid, cleanText, cleanUrl, elfKinds, elfFound, foundCount, ELF_HINT} from './tren-eco.js';
+import {TKEY, DAYS, CLOSE_H, MSG_PRICE, BIZ, NAMES, PROVS, KIN, CAP, FREE_GIFTS, WAGON_MAX, newWorld, parseWorld, sacoOf, addSent, giftsLeft, sendGift, nextDay, online, crowdGifts, closeAt, showDay, minBid, cleanText, cleanUrl, cleanGift, encodeGift, decodeGift} from './tren-eco.js';
 clearTimeout(window.__boot);
 THREE.Cache.enabled = true;
 
@@ -197,7 +197,7 @@ function disposeObj(root){const keepM=new Set([...Object.values(M),...Object.val
 const train=new THREE.Group();scene.add(train);
 const GAUGE=GA,RT=0.75,WB=0.78,WS=0.42;// carriles, cabeza del carril y radio de las ruedas motrices y pequeñas
 const WLEN=7.2,WHALF=1.42,WTOP=4.62,PANEL_Y=2.95,PANEL_W=5.96,PANEL_H=2.05;// furgón: el panel de la marca ocupa casi todo el costado
-const cars=[],WAG=[null],WL=[];let OFFS=[0],spot=null,beam=null,LOCO=null,wheelT=0,WIM=null;// cars: máquina, ténder, furgones y cola; WAG[i]: furgón i
+const cars=[],WAG=[null],WL=[];let OFFS=[0],spot=null,beam=null,LOCO=null,GIFTCAR=null,wheelT=0,WIM=null;// cars: máquina, ténder, furgones y cola; WAG[i]: furgón i
 const WCOL=['#8f1d24','#16492f','#1f3a6b','#e6d8b8','#5b2a5e','#9a6a1f'];
 const TM={
   lac:new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.3,clearcoat:1,clearcoatRoughness:.06}),// laca: el color va por furgón
@@ -277,22 +277,33 @@ function buildCaboose(){const L=[],g=new THREE.Group();
   fuse(L,g);
   const W=[];for(const x of[-1.9,-0.9,0.9,1.9])for(const sd of[-1,1])W.push({x,y:RT+WS,z:sd*GAUGE,big:false});
   g.userData={len:6.0,top:5.2,wheels:W};return g}
+/* vagón de regalos: plataforma con barandilla dorada y un montón de paquetes; aquí viajan los regalos entre amigos */
+function buildGiftCar(){const L=[],g=new THREE.Group();
+  part(L,BX(6.6,0.3,2.3),TM.black,0,1.42,0);for(const x of[-2.2,2.2])part(L,BX(2.0,0.34,2.12),TM.black,x,1.17,0);
+  part(L,BX(6.8,0.35,2.9),TM.green,0,1.75,0);part(L,BX(6.84,0.06,2.94),TM.brass,0,1.95,0);
+  for(const sd of[-1,1]){part(L,BX(6.6,0.06,0.06),TM.brass,0,2.62,sd*1.4);for(let k=-3;k<=3;k++)part(L,BX(0.06,0.66,0.06),TM.brass,k*1.05,2.29,sd*1.4)}
+  for(const x of[-3.3,3.3])part(L,BX(0.06,0.66,2.86),TM.brass,x,2.29,0);
+  fuse(L,g);
+  const pile=new THREE.Group();[['presA',1.3,-2.3,-0.5],['presB',1.1,-1.1,0.6],['presC',1.0,-2.0,0.6],['presD',1.2,1.6,0.5],['presA',1.0,2.5,-0.4],['presB',0.9,1.4,-0.6],['presC',0.8,-0.9,-0.6]].forEach(([q,h,x,z],k)=>{const o=obj(q,h);o.position.set(x,1.98,z);o.rotation.y=k*1.3;pile.add(o)});
+  pile.updateMatrixWorld(true);mergeMeshes([...pile.children]).forEach(m=>{m.castShadow=true;m.material=m.material.clone();/* sin cutMat: los regalos del vagón no se recortan */g.add(m)});
+  const W=[];for(const x of[-2.7,-1.7,1.7,2.7])for(const sd of[-1,1])W.push({x,y:RT+WS,z:sd*GAUGE,big:false});
+  g.userData={len:7.0,top:4.0,wheels:W};return g}
 /* furgones y ruedas: mallas instanciadas (un draw call por pieza, no uno por coche) */
 function trainInit(){const wg=wagonGeos(),bw=bigWheelGeos(),sw=smallWheelGeos(),mk=(geo,mat,n)=>{const m=new THREE.InstancedMesh(geo,mat,n);m.count=0;m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;scene.add(m);return m};
   WIM={wag:[mk(wg.lac,TM.lac,WAGON_MAX),mk(wg.blk,TM.black,WAGON_MAX),mk(wg.gld,TM.brass,WAGON_MAX)],big:[mk(bw.body,TM.red,6),mk(bw.tire,TM.steel,6)],small:[mk(sw.body,TM.red,140),mk(sw.tire,TM.steel,140)]};
   for(let i=0;i<WAGON_MAX;i++)WIM.wag[0].setColorAt(i,new THREE.Color(WCOL[i%WCOL.length]));WIM.wag[0].instanceColor.needsUpdate=true;
-  if(LOWQ){WIM.blob=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false,opacity:.55,polygonOffset:true,polygonOffsetFactor:-2}),WAGON_MAX+4);WIM.blob.frustumCulled=false;WIM.blob.renderOrder=1;scene.add(WIM.blob)}}
+  if(LOWQ){WIM.blob=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false,opacity:.55,polygonOffset:true,polygonOffsetFactor:-2}),WAGON_MAX+5);WIM.blob.frustumCulled=false;WIM.blob.renderOrder=1;scene.add(WIM.blob)}}
 function makeWagon(i){const W=new THREE.Group();W.userData={len:WLEN+0.2,top:WTOP,c:0,i,wheels:[-2.95,-1.95,1.95,2.95].flatMap(x=>[-1,1].map(sd=>({x,y:RT+WS,z:sd*GAUGE,big:false})))};return W}
 function layoutTrain(){OFFS=[0];for(let i=1;i<cars.length;i++)OFFS.push(OFFS[i-1]-(cars[i-1].userData.len/2+cars[i].userData.len/2+0.55));
   WL.length=0;cars.forEach((c,ci)=>c.userData.wheels.forEach(w=>WL.push({c:ci,...w})))}
 function buildTrain(n){train.clear();cars.length=0;WAG.length=1;if(!WIM)trainInit();
-  LOCO=buildLoco();cars.push(LOCO,buildTender());for(let i=1;i<=n;i++){const W=makeWagon(i);WAG.push(W);cars.push(W)}cars.push(buildCaboose());
+  LOCO=buildLoco();cars.push(LOCO,buildTender());for(let i=1;i<=n;i++){const W=makeWagon(i);WAG.push(W);cars.push(W)}GIFTCAR=buildGiftCar();cars.push(GIFTCAR,buildCaboose());
   cars.forEach(c=>train.add(c));layoutTrain();
   const lp=LOCO.userData.lamp,lens=new THREE.Mesh(SPH(0.21,14,10),M.lamp);lens.position.copy(lp);LOCO.add(lens);
   spot=new THREE.SpotLight(0xffe2a8,240,95,0.45,0.55,1.25);spot.position.copy(lp);
   {const cg=new THREE.ConeGeometry(4.2,24,24,1,true);cg.translate(0,-12,0);cg.rotateZ(Math.PI/2);beam=new THREE.Mesh(cg,new THREE.MeshBasicMaterial({map:coneTex,color:new THREE.Color(.2,.16,.09),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false}));beam.position.set(lp.x+0.2,lp.y,lp.z);LOCO.add(beam)}
   const tg=new THREE.Object3D();tg.position.set(30,0,0);LOCO.add(tg);spot.target=tg;if(!LOWQ)LOCO.add(spot)}// en el móvil la luz de foco cuesta ~5 ms por fotograma
-function addWagon(){const i=WAG.length,W=makeWagon(i);WAG.push(W);cars.splice(cars.length-1,0,W);train.add(W);layoutTrain();W.userData.pop=0;W.scale.setScalar(0.6);fillWagon(W);setAd(i,null);poseTrain(dist)}
+function addWagon(){const i=WAG.length,W=makeWagon(i);WAG.push(W);cars.splice(cars.indexOf(GIFTCAR),0,W);train.add(W);layoutTrain();W.userData.pop=0;W.scale.setScalar(0.6);fillWagon(W);setAd(i,null);poseTrain(dist)}
 function fillWagon(W){W.userData.c=CAP}
 function poseCar(c,s){const p=atM(T,s),q=atM(T,s+2),b=atM(T,s-2),yaw=Math.atan2(q.z-b.z,q.x-b.x),pit=Math.atan2(q.y-b.y,Math.hypot(q.x-b.x,q.z-b.z));c.position.set(p.x,p.y,p.z);c.rotation.set(0,-yaw,pit,'YZX')}
 function poseTrain(d){if(!T)return;cars.forEach((c,i)=>poseCar(c,d+OFFS[i]));train.updateMatrixWorld(true)}
@@ -382,6 +393,13 @@ function downgrade(root){if(!LOWQ)return;root.traverse(o=>{const m=o.material;if
   if(!n){n=new THREE.MeshStandardMaterial();for(const k of['color','emissive'])n[k].copy(m[k]);for(const k of['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','roughness','metalness','envMapIntensity','side','transparent','opacity','vertexColors','flatShading','alphaTest','depthWrite','polygonOffset','polygonOffsetFactor','polygonOffsetUnits'])n[k]=m[k];n.normalScale.copy(m.normalScale);n.roughness=Math.min(1,m.roughness+0.08);lite.set(m,n)}
   o.material=n})}
 
+/* los abetos y juguetes que quedan entre la cámara y el coche que sigues no se dibujan (un cono que descarta sus píxeles) */
+const CUT={a:{value:new THREE.Vector3()},b:{value:new THREE.Vector3()},r:{value:0}};let cutK=0,cutK2=0,fadeOp=0;
+function cutMat(m){if(m.userData.cut)return;m.userData.cut=1;m.onBeforeCompile=sh=>{sh.uniforms.cutA=CUT.a;sh.uniforms.cutB=CUT.b;sh.uniforms.cutR=CUT.r;
+  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vCutP;').replace('#include <project_vertex>','#include <project_vertex>\n{vec4 cp=vec4(transformed,1.);\n#ifdef USE_INSTANCING\ncp=instanceMatrix*cp;\n#endif\nvCutP=(modelMatrix*cp).xyz;}');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vCutP;uniform vec3 cutA,cutB;uniform float cutR;').replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif(cutR>.01){vec3 ab=cutB-cutA;float t=clamp(dot(vCutP-cutA,ab)/dot(ab,ab),0.,1.);if(t<.985&&length(vCutP-cutA-ab*t)<cutR*(.25+.75*t))discard;}')};
+  m.needsUpdate=true}
+
 /* ================= maqueta alpina (se rehace al ampliar la vía) ================= */
 let world=null,MP=null,T=null,SL=[],STN=null,treeParts=[],roomTree=null,anims=[],decoG=null,arches=[],eaveLights=[],GIANTS=[],GR=null,SKI=null,LIFT=null,SKATE=null,SLEIGH=null,SANTA=null,PIERS=[],TREES=[];
 const BCX=(BOARD.x0+BOARD.x1)/2,BCZ=(BOARD.z0+BOARD.z1)/2;
@@ -395,7 +413,7 @@ const stoneTex=rep(canvasTex(256,256,(g,w,h)=>{g.fillStyle='#4a4744';g.fillRect(
 Object.assign(M,{
   stone:new THREE.MeshStandardMaterial({map:stoneTex,roughness:.92}),
   stone2:new THREE.MeshStandardMaterial({map:stoneTex,color:0xe6dccb,roughness:.85}),
-  tunnel:new THREE.MeshStandardMaterial({color:0x14110f,roughness:1,side:THREE.DoubleSide}),
+  cave:new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}),// la luz de la gruta va pintada en los vértices: se ve igual en el móvil y no cuesta nada
   ice:new THREE.MeshLambertMaterial({color:0xbcd6ec,emissive:0x0c1626}),// sin reflejos: desde ángulos rasantes reflejaba el salón oscuro y salía negro
   fascia:new THREE.MeshPhysicalMaterial({color:0x4a2c1a,map:woodTex,roughness:.45,clearcoat:.7,clearcoatRoughness:.2,side:THREE.DoubleSide}),
   terrain:(()=>{const gm=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85,roughnessMap:phTex('snow_02_rough',1),normalMap:phTex('snow_02_nor',1),normalScale:new THREE.Vector2(.85,.85)});
@@ -458,9 +476,44 @@ function buildBridges(){for(const r of T.runs){if(r.k!==KB)continue;const i0=r.i
   for(let q=10;q<r.n-6;q+=18){const k=(r.i+q)%T.N,x=T.x[k],z=T.z[k],top=T.y[k]-1.15,gy=groundAt(x,z)-0.8,hh=top-gy;if(hh<0.8||otherNear(MP.G,k,x,z,5.5))continue;// ninguna pila encima de la vía de abajo
     const p=new THREE.Mesh(boxU(1.9,hh,4.7),M.stone);p.position.set(x,gy+hh/2,z);p.rotation.y=-T.a[k];p.castShadow=p.receiveShadow=true;p.userData.st=true;world.add(p);
     const ft=new THREE.Mesh(boxU(2.6,0.9,5.4),M.stone2);ft.position.set(x,gy+0.45,z);ft.rotation.y=-T.a[k];ft.userData.st=true;world.add(ft);PIERS.push({x,z,y:gy+0.8,a:T.a[k]})}}}
-/* túneles: bóveda oscura por dentro y boca de piedra con arco en cada extremo */
-function buildTunnels(){const prof=[[-3.1,-0.15]];for(let q=0;q<=12;q++){const a=Math.PI-q/12*Math.PI;prof.push([Math.cos(a)*3.1,3.3+Math.sin(a)*3.1])}prof.push([3.1,-0.15],[-3.1,-0.15]);// bóveda y suelo: dentro de la montaña no hay terreno debajo
-  for(const r of T.runs){if(r.k!==KT)continue;const tb=ext3(prof,r.i,r.n,2,M.tunnel);tb.castShadow=true;world.add(tb);// la bóveda hace sombra: dentro no entra la luna
+/* túneles: por dentro, una gruta de hielo con farolillos, tan ancha como deje la montaña; en cada extremo, boca de piedra con arco */
+let CAVES=[];
+const caveY=(W,H,o)=>H*Math.pow(Math.max(0,1-(o/W)**2),0.375);// altura del techo a o metros del eje
+function caveDims(r){const n=Math.ceil(r.n/2),W0=new Float32Array(n+1),W=new Float32Array(n+1),H=new Float32Array(n+1);
+  for(let q=0;q<=n;q++){const k=(r.i+Math.min(r.n-1,q*2))%T.N,lx=-Math.sin(T.a[k]),lz=Math.cos(T.a[k]);let w=8;
+    for(;w>3.6;w-=0.4){let fits=true;const h=6.9+(w-3.6)*0.48;for(let o=-w;o<=w&&fits;o+=w/6)if(groundAt(T.x[k]+lx*o,T.z[k]+lz*o)-T.y[k]<caveY(w,h,o)+0.9)fits=false;if(fits)break}
+    W0[q]=Math.max(3.6,Math.min(w,3.6+Math.max(0,Math.min(q,n-q)*2*T.ds-1)*0.7))}
+  for(let q=0;q<=n;q++){let m=9,a=0,c=0;for(let d=-2;d<=2;d++){const v=W0[clamp(q+d,0,n)];m=Math.min(m,v);a+=v;c++}W[q]=Math.max(3.6,(m+a/c)/2);H[q]=6.9+(W[q]-3.6)*0.48}
+  return {i:r.i,n:r.n,m:n,W,H}}
+/* ancho de la gruta en s (0 si ahí no hay túnel) */
+function caveW(s){const i=Math.floor((((s%T.L)+T.L)%T.L)/T.ds)%T.N;for(const c of CAVES){const q=((i-c.i)%T.N+T.N)%T.N;if(q<c.n)return c.W[Math.min(c.m,Math.round(q/2))]}return 0}
+/* s de la cámara dentro de la gruta: nunca en la boca de piedra (a 3,5 m como poco de los extremos) */
+function caveClamp(s0,sc){const L=T.L,m=x=>((x%L)+L)%L;for(const c of CAVES){const a=c.i*T.ds,len=c.n*T.ds,u=m(s0+3-a);if(u<len+6)return a+clamp(u-3+(sc-s0),3.5,len-3.5)}return sc}
+function buildCave(r){const C=caveDims(r),{m,W,H}=C,ring=22,P=[],lamps=[],rnd=rng(77+r.i);CAVES.push(C);
+  const frame=q=>{const k=(r.i+Math.min(r.n-1,q*2))%T.N;return {x:T.x[k],y:T.y[k],z:T.z[k],lx:-Math.sin(T.a[k]),lz:Math.cos(T.a[k])}};
+  for(let q=0;q<=m;q++){const f=frame(q),row=[],rough=sstep(3.7,5.5,W[q]);
+    for(let j=0;j<=ring;j++){const fl=j>ring-5,ph=j/(ring-5)*Math.PI;let o,h;if(fl){o=lerp(W[q],-W[q],(j-(ring-5))/5);h=-0.14}else{const k2=1-rough*0.11*vnoise(q*0.55+r.i,j*0.8);o=-Math.cos(ph)*W[q]*k2;h=-0.14+H[q]*Math.pow(Math.sin(ph),0.75)*k2}
+      row.push(new THREE.Vector3(f.x+f.lx*o,f.y+h,f.z+f.lz*o))}
+    P.push(row);
+    if(q>2&&q<m-2&&q%5===0){const sd=(q/5)%2?1:-1,o=sd*W[q]*0.76;lamps.push(new THREE.Vector3(f.x+f.lx*o,f.y+caveY(W[q],H[q],o)*0.86,f.z+f.lz*o))}}
+  // color pintado: hielo azul, más claro arriba, con charcos de luz cálida junto a los farolillos y cada cara con su tono
+  const pos=[],col=[],c=new THREE.Vector3(),e1=new THREE.Vector3(),e2=new THREE.Vector3(),deep=new THREE.Color('#16305c'),ice=new THREE.Color('#6fa3d6'),snowC=new THREE.Color('#a9bfe0'),warm=new THREE.Color(1,.6,.26),cc=new THREE.Color();
+  const tri=(a,b,d,floor)=>{c.copy(a).add(b).add(d).multiplyScalar(1/3);e1.subVectors(b,a);e2.subVectors(d,a);e1.cross(e2).normalize();const n=0.5+0.5*e1.dot(UPV)*-1;cc.copy(deep).lerp(floor?snowC:ice,floor?0.55:0.25+0.45*n+0.3*rnd());
+    let g=0;for(const l of lamps)g+=Math.exp(-l.distanceToSquared(c)/7);cc.multiplyScalar(0.42);cc.r+=warm.r*g*0.5;cc.g+=warm.g*g*0.5;cc.b+=warm.b*g*0.5;
+    for(const v of[a,b,d]){pos.push(v.x,v.y,v.z);col.push(Math.min(.78,cc.r),Math.min(.78,cc.g),Math.min(.8,cc.b))}};
+  for(let q=0;q<m;q++)for(let j=0;j<ring;j++){const a=P[q][j],b=P[q+1][j],d=P[q+1][j+1],e=P[q][j+1],fl=j>=ring-5;tri(a,b,d,fl);tri(a,d,e,fl)}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  world.add(new THREE.Mesh(g,M.cave));
+  // farolillos, guirnalda de luces de colores por el techo y carámbanos
+  const inst3=(geo,mat,list,fn)=>{if(!list.length)return;const im=new THREE.InstancedMesh(geo,mat,list.length);list.forEach((v,i)=>{o3.rotation.set(0,0,0);o3.scale.set(1,1,1);fn(v,i,im);o3.updateMatrix();im.setMatrixAt(i,o3.matrix)});o3.scale.set(1,1,1);if(im.instanceColor)im.instanceColor.needsUpdate=true;world.add(im)};
+  inst3(new THREE.SphereGeometry(0.26,12,8),M.lamp,lamps,v=>o3.position.copy(v));
+  const fairy=[],ics=[],pal=[[2.4,.4,.5],[2.4,1.8,.5],[.5,1.2,2.6],[.6,2.4,.8]];
+  for(let q=1;q<m;q++){const f=frame(q);for(const sd of[-1,1]){const o=sd*W[q]*0.6;fairy.push(new THREE.Vector3(f.x+f.lx*o,f.y+caveY(W[q],H[q],o)*0.84-0.1+Math.sin(q*1.3)*0.16,f.z+f.lz*o))}
+    if(W[q]>4.6&&rnd()<0.8){const o=(rnd()-.5)*W[q]*1.3;ics.push({x:f.x+f.lx*o,y:f.y+caveY(W[q],H[q],o)*0.95,z:f.z+f.lz*o,l:0.4+rnd()*0.9})}}
+  inst3(new THREE.SphereGeometry(0.1,8,6),new THREE.MeshBasicMaterial({color:0xffffff}),fairy,(v,i,im)=>{o3.position.copy(v);im.setColorAt(i,new THREE.Color(...pal[i%4]))});
+  const ig=new THREE.ConeGeometry(0.17,1,6);ig.rotateX(Math.PI);ig.translate(0,-0.5,0);inst3(ig,M.icicle,ics,v=>{o3.position.set(v.x,v.y,v.z);o3.scale.set(1,v.l,1)})}
+function buildTunnels(){CAVES=[];
+  for(const r of T.runs){if(r.k!==KT)continue;buildCave(r);
     for(const end of[0,1]){const k=end?(r.i+r.n-1)%T.N:r.i,x=T.x[k],y=T.y[k],z=T.z[k],a=T.a[k],dx=Math.cos(a),dz=Math.sin(a),lx=-Math.sin(a),lz=Math.cos(a),into=end?-1:1,hw=8.5;
       let step=0;for(let o=-hw;o<=hw;o+=1.5)step=Math.max(step,groundAt(x+dx*into*1.4+lx*o,z+dz*into*1.4+lz*o)-y);const hh=clamp(step+0.6,7.6,15);
       const s=new THREE.Shape();s.moveTo(-hw,-0.8);s.lineTo(-3.1,-0.8);s.lineTo(-3.1,3.3);s.absarc(0,3.3,3.1,Math.PI,0,true);s.lineTo(3.1,-0.8);s.lineTo(hw,-0.8);s.lineTo(hw,hh*0.82);s.quadraticCurveTo(hw*0.55,hh,0,hh);s.quadraticCurveTo(-hw*0.55,hh,-hw,hh*0.82);s.closePath();
@@ -641,7 +694,6 @@ function house(r,bm){
   const door=new THREE.Mesh(new THREE.PlaneGeometry(1.1,2.1),M.door);door.position.set(0,1.05,d/2+0.02);g.add(door);
   const wr=new THREE.Mesh(new THREE.TorusGeometry(0.32,0.11,8,16),M.green);wr.position.set(0,1.5,d/2+0.08);g.add(wr);
   g.userData.eaves=[[-w/2-0.5,w/2+0.5,h+0.05,d/2+0.55],[-w/2-0.5,w/2+0.5,h+0.05,-d/2-0.55]];
-  g.userData.ridge=new THREE.Vector3(-w*0.22,h+0.12+h*0.6*(1-w*0.22/(w/2+0.6))+0.12,d*0.2);// en el tejado, para un duende
   return g;
 }
 const townG=new THREE.Group();scene.add(townG);
@@ -649,7 +701,7 @@ let HS=[],townBatch=[],popQ=[],needBatch=false;const giftQ=[];
 function makeHouse(i){const sl=SL[i],r=rng(9001+i*131),g=house(r,HMAT[(i*5+st.stage)%6]);g.position.set(sl.x,sl.y,sl.z);g.rotation.y=Math.atan2(-sl.nx,-sl.nz);g.updateMatrixWorld(true);
   const chim=g.localToWorld(g.userData.chim.clone()),ev=[],ice=[],v=new THREE.Vector3();
   g.userData.eaves.forEach(([x0,x1,y,z])=>{for(let x=x0;x<=x1;x+=0.42){v.set(x,y,z);g.localToWorld(v);ev.push(v.clone());if(r()<0.7){const u=v.clone();u.y-=0.05;ice.push([u,0.25+r()*0.55])}}});
-  return {g,chim,ev,ice,i,pop:1,landed:true,y0:sl.y,ridge:g.localToWorld(g.userData.ridge.clone())}}
+  return {g,chim,ev,ice,i,pop:1,landed:true,y0:sl.y}}
 function clearTown(){townBatch.forEach(m=>{townG.remove(m);m.geometry.dispose();if(m.isInstancedMesh)m.dispose()});townBatch=[];eaveLights=[];HS.forEach(h=>{if(h.g.parent)townG.remove(h.g);disposeObj(h.g)});HS=[];popQ=[]}
 function placeTown(anim){clearTown();for(let i=0;i<Math.min(st.houses,SL.length);i++){const h=makeHouse(i);HS.push(h);if(anim&&!FASTSTEP){h.pop=-i*0.05;h.landed=false;h.g.visible=false;townG.add(h.g);popQ.push(h)}}rebatch()}
 function addHouse(){const h=makeHouse(HS.length);HS.push(h);if(FASTSTEP){rebatch();return}h.pop=0;h.landed=false;townG.add(h.g);popQ.push(h)}
@@ -734,7 +786,7 @@ $('bMusic').onclick=()=>{music=!music;store.set('advx-music',music?'1':'0');setT
 $('bSfx').onclick=()=>{sfx=!sfx;store.set('advx-sfx',sfx?'1':'0');setTog();au()};
 addEventListener('pointerdown',au,{passive:true});addEventListener('keydown',au);
 
-/* ================= simulación: el tren reparte y la comunidad (simulada) busca duendes ================= */
+/* ================= simulación: el tren reparte y la comunidad (simulada) manda regalos ================= */
 const flyers=[],flyQ=[];let burstBudget=0,noneT=0,claimT=12;
 function flyGift(from,to,dur,arc,onEnd){let f=flyers.find(x=>!x.visible);if(!f){if(flyers.length>=16){onEnd&&onEnd();return}f=obj(['presB','presC','presD','presA'][flyers.length%4],1.2);f.castShadow=false;scene.add(f);flyers.push(f)}
   f.visible=true;f.position.copy(from);flyQ.push({f,from:from.clone(),to:to.clone(),t:0,dur,arc,onEnd})}
@@ -749,21 +801,22 @@ function atHouse(i){const h=HS[i];if(!h)return;let W=null;for(let k=WAG.length-1
       if(me){burst(h.chim,70,8,[4,3,.8]);floatAt(h.chim,'¡Para ti! +'+fmtN(val),'me');kaching()}
       else{if(burstBudget>0){burstBudget--;burst(h.chim,24,5,[4,3,.8])}floatAt(h.chim,'+'+fmtN(val),'');chime()}})}}
 function celebrate(){if(FASTSTEP)return;const P=treeParts[0];if(P){confettiBurst(P.top.clone(),24);bells()}}
-/* objetivo del día cumplido: mañana (en la demo, ahora) llega la mejora y se esconden duendes nuevos */
+/* objetivo del día cumplido: mañana (en la demo, ahora) llega la mejora y vuelven los regalos gratis */
 function dayDone(){const d=st.day,rw=nextDay(st);save();
-  news(`Día ${st.day}: se han escondido ${ELVES} duendes nuevos por la maqueta`,true);
-  news({via:`¡Objetivo del día ${d} cumplido entre todos! La vía llega a ${STAGE_NAMES[st.stage].toLowerCase()}`,vagon:`¡Objetivo del día ${d} cumplido entre todos! El tren estrena otro vagón`,luces:`¡Objetivo del día ${d} cumplido entre todos! Se encienden más luces`}[rw]||`¡Objetivo del día ${d} cumplido entre todos!`,true);
-  if(tiles.tElf)tiles.tElf.seen=false;
+  news(`Día ${st.day}: ya puedes mandar ${FREE_GIFTS} regalos más`,true);
+  news({via:`¡Objetivo del día ${d} cumplido entre todos! La vía llega ${('a '+STAGE_NAMES[st.stage].toLowerCase()).replace(/^a el /,'al ')}`,vagon:`¡Objetivo del día ${d} cumplido entre todos! El tren estrena otro vagón`,luces:`¡Objetivo del día ${d} cumplido entre todos! Se encienden más luces`}[rw]||`¡Objetivo del día ${d} cumplido entre todos!`,true);
+  if(tiles.tGift)tiles.tGift.seen=false;
   if(rw==='via'){expand();return}
   if(rw==='vagon')addWagon();else if(rw==='luces')buildDeco();
-  placeElves();celebrate();uiShop()}
+  celebrate();uiShop()}
 function sim(dt){
   if(busy||!T)return;
   simClock+=dt;vCur+=(TRAIN_V-vCur)*(1-Math.exp(-1.5*dt));
-  if(addElves(st,crowdElves(simClock,st.day)*dt)){dayDone();if(busy)return}
+  if(addSent(st,crowdGifts(simClock,st.day)*dt)){dayDone();if(busy)return}
   const prev=dist;dist+=vCur*dt;wheelT+=vCur*dt;const L=T.L;
   if(Math.floor(prev/L)!==Math.floor(dist/L))atStation();
   for(let i=0;i<HS.length;i++){const e=SL[i].s;if(Math.floor((prev-e)/L)!==Math.floor((dist-e)/L))atHouse(i)}
+  giftTick(prev);
   if(dist>L*1e6)dist-=L*1e6;
   // otros jugadores ponen su casa de vez en cuando (siempre queda un hueco para ti)
   claimT-=dt;if(claimT<=0&&!busy){claimT=16+Math.random()*16;const free=SL.length-st.houses;
@@ -773,57 +826,81 @@ function sim(dt){
 }
 const person=()=>({name:NAMES[Math.random()*NAMES.length|0],prov:PROVS[Math.random()*PROVS.length|0]});
 
-/* ================= duendes: cinco escondidos cada día por la maqueta, los mismos para todo el mundo ================= */
-let ELF=[],elfGeo=null;const elfMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55});
-function makeElfGeo(){const L=[],put=(g,c,x,y,z,rx=0,ry=0,rz=0)=>{_m.compose(_p.set(x,y,z),_q.setFromEuler(_e.set(rx,ry,rz)),ONE);g.applyMatrix4(_m);g=geoOnly(g);const n=g.attributes.position.count,a=new Float32Array(n*3),cc=new THREE.Color(c);for(let i=0;i<n;i++)a.set([cc.r,cc.g,cc.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));L.push(g)};
-  const G=0x1f9a52,R=0xd0182c,S=0xf2c7a5,W=0xf6f3ee,K=0x1b1b1f,Y=0xe8b64a;
-  for(const z of[-0.12,0.12]){put(CY(0.08,0.09,0.5,8),R,0,0.3,z);put(BX(0.34,0.13,0.15),0x175a2e,0.07,0.07,z)}
-  put(CY(0.17,0.4,0.72,12),G,0,0.88,0);put(CY(0.27,0.27,0.08,12),K,0,0.74,0);put(BX(0.06,0.1,0.12),Y,0.27,0.74,0);put(CY(0.22,0.17,0.1,12),R,0,1.27,0);
-  for(const sd of[-1,1])put(CY(0.055,0.06,0.46,6),G,0.05,1.05,sd*0.3,sd*0.45,0,0);
-  put(SPH(0.22,14,10),S,0,1.5,0);put(SPH(0.05,6,5),0xe0907a,0.21,1.48,0);
-  for(const sd of[-1,1])put(new THREE.ConeGeometry(0.06,0.26,6),S,0,1.55,sd*0.25,sd*Math.PI/2*0.8,0,0);
-  put(new THREE.ConeGeometry(0.21,0.72,12),R,-0.06,1.95,0,0,0,0.32);put(TOR(0.2,0.05,14),W,0,1.64,0,Math.PI/2,0,0);put(SPH(0.08,8,6),W,-0.18,2.3,0);
-  elfGeo=mergeGeometries(L,false)}
-/* dónde se esconde cada uno (posición en el mundo o dentro del vagón que lo lleva) */
-function elfSpot(k,r){const v=(x,y,z)=>new THREE.Vector3(x,y,z),gp=(x,z,dy=0)=>v(x,groundAt(x,z)+dy,z);
-  if(k==='vagon'){const n=WAG.length-1;if(n<1)return null;const i=n>=2?2+Math.floor(r()*(n-1)):1;return {par:WAG[i],p:v((r()<.5?-1:1)*(WLEN/2-1.1),WTOP-0.04,(r()-.5)*0.6),ry:r()*6,wag:i}}
-  if(k==='tunel'){const runs=T.runs.filter(q=>q.k===KT);if(!runs.length)return null;const q=runs[Math.floor(r()*runs.length)],end=r()<.5,i=end?(q.i+q.n-1)%T.N:q.i,a=T.a[i],out=end?1:-1,sd=r()<.5?-1:1;
-    const x=T.x[i]+Math.cos(a)*out*1.8-Math.sin(a)*sd*4.4,z=T.z[i]+Math.sin(a)*out*1.8+Math.cos(a)*sd*4.4;return {p:gp(x,z),ry:-a+(out>0?0:Math.PI)}}
-  if(k==='tejado'){const c=HS.filter(h=>h.i!==st.mine&&h.ridge);if(!c.length)return null;const h=c[Math.floor(r()*c.length)];return {p:h.ridge.clone(),ry:r()*6}}
-  if(k==='plaza'){const P=F.plaza,a=r()*Math.PI*2;return {p:gp(P.x+Math.cos(a)*4.7,P.z+Math.sin(a)*4.7,0.25),ry:-a+Math.PI}}
-  if(k==='taller'){return STN?{p:STN.pileWorld.clone().add(v(r()*2-1,-1.0,r()*2-1)),ry:r()*6}:null}
-  if(k==='lago'){const L=F.lake,a=r()*Math.PI*2;return {p:v(L.x+Math.cos(a)*L.rx*0.78,LAKE_Y,L.z+Math.sin(a)*L.rz*0.78),ry:r()*6}}
-  if(k==='esqui'){if(!SKI)return null;const q=SKI.at(SKI.L*(0.3+r()*0.5)),sd=r()<.5?-1:1,x=q.x-q.dz*sd*7.8,z=q.z+q.dx*sd*7.8;return {p:gp(x,z),ry:-Math.atan2(q.dz,q.dx)}}
-  if(k==='telesilla'){return LIFT?{chair:Math.floor(r()*LIFT.n/2)*2+1,p:v(0,0,0),ry:0}:null}
-  if(k==='cumbre'){let b=null;for(let t=0;t<240;t++){const x=F.tm.x+(r()-.5)*44,z=F.tm.z+(r()-.5)*40,y=groundAt(x,z);if(!b||y>b.y)b={x,y,z}}return {p:v(b.x,b.y-0.1,b.z),ry:r()*6}}
-  if(k==='bosque'){const c=TREES.filter(o=>o.y<20&&o.z>-40);if(!c.length)return null;const o=c[Math.floor(r()*c.length)];return {p:gp(o.x+1.5,o.z-1.3),ry:r()*6}}
-  if(k==='puente'){if(!PIERS.length)return null;const q=PIERS[Math.floor(r()*PIERS.length)],sd=r()<.5?-1:1;const x=q.x-Math.sin(q.a)*sd*3.6,z=q.z+Math.cos(q.a)*sd*3.6;return {p:gp(x,z),ry:r()*6}}
-  return null}
-function placeElves(){ELF.forEach(e=>{if(e.o.parent)e.o.parent.remove(e.o)});ELF=[];if(!elfGeo)makeElfGeo();if(st.eDay!==st.day){st.eDay=st.day;st.eMask=0}
-  const kinds=elfKinds(st.day,st.stage),r=rng(st.day*131+st.stage*17+7);
-  kinds.forEach((k0,i)=>{let k=k0,sp=elfSpot(k,r);if(!sp){k='bosque';sp=elfSpot(k,r)}if(!sp){k='plaza';sp=elfSpot(k,r)}
-    const o=new THREE.Mesh(elfGeo,elfMat);o.castShadow=true;o.position.copy(sp.p);o.rotation.y=sp.ry||0;(sp.par||scene).add(o);
-    const found=!!(st.eMask>>i&1);o.visible=!found;ELF.push({i,k,o,found,y:sp.p.y,ph:r()*6,chair:sp.chair,wag:sp.wag,pop:0})})}
-const nextElf=()=>ELF.find(e=>!e.found);
-function foundElf(e){if(e.found||!ready)return false;if(!elfFound(st,e.i))return false;e.found=true;e.pop=1;
-  const p=e.o.getWorldPosition(new THREE.Vector3()),n=foundCount(st);
-  if(!FASTSTEP){burst(p.clone().setY(p.y+1.4),60,6,[4,3.2,1]);kaching();chime();floatAt(p,n>=ELVES?`¡Los ${ELVES} duendes!`:`¡Duende! ${n} de ${ELVES}`,'me');if(n>=ELVES){confettiBurst(p.clone(),18);bells()}}
-  news(n>=ELVES?`¡Has encontrado los ${ELVES} duendes de hoy! Mañana se esconden otros ${ELVES}`:`¡Bien! Era el duende que ${ELF_HINT[e.k]}. Llevas ${n} de ${ELVES}`,true);
-  const done=addElves(st,1);save();uiShop();if(done)dayDone();return true}
-/* pista: te lleva a la zona del siguiente duende (no justo encima) */
-function hint(){const e=nextElf();if(tiles.tElf)tiles.tElf.seen=true;
-  if(!e){news(`Ya has encontrado los ${ELVES} duendes de hoy. Mañana se esconden otros ${ELVES}`,true);return}
-  news('Pista: hay uno que '+ELF_HINT[e.k],true);
-  if(e.k==='vagon'){setFocus({car:e.wag+1});return}
-  const p=e.chair!==undefined?new THREE.Vector3((F.lift[0][0]+F.lift[1][0])/2,0,(F.lift[0][1]+F.lift[1][1])/2):e.o.getWorldPosition(new THREE.Vector3()),a=Math.random()*Math.PI*2;
-  flyTo(p.x+Math.cos(a)*10,p.z+Math.sin(a)*10,e.chair!==undefined?70:58)}
+/* ================= regalos entre amigos: viajan en el vagón de regalos hasta la casa del amigo ================= */
+/* GIFT: el regalo que va ahora en el tren. 'env' = lo mandas tú (da una vuelta y Papá Noel se lo lleva en el trineo);
+   'rec' = te lo han mandado (el tren lo lleva a tu casa y se abre al llegar a la chimenea) */
+let GIFT=null,RECV_TAG=null;
+const WRAP_COL=[['#b3162a','#f6e7c8'],['#1c6b45','#e8c35a'],['#f3efe6','#c4192d'],['#c8962d','#8a1422'],['#1d3a78','#e9f0fb'],['#6e1a5a','#f0c75a']];// fondo y dibujo de cada papel (WRAPS)
+function giftBox(w){const g=new THREE.Group(),m=new THREE.MeshStandardMaterial({map:WRAPS[w],roughness:.4}),rb=new THREE.MeshStandardMaterial({color:0xe8c35a,metalness:.7,roughness:.25}),s=1.6;
+  box(s,s*0.8,s,m,0,s*0.4,0,g);box(s+0.06,s*0.8+0.04,s*0.17,rb,0,s*0.4,0,g);box(s*0.17,s*0.8+0.04,s+0.06,rb,0,s*0.4,0,g);
+  for(const a of[0.7,-0.7]){const t=new THREE.Mesh(new THREE.TorusGeometry(0.24,0.08,8,16),rb);t.position.set(Math.sin(a)*0.2,s*0.8+0.18,0);t.rotation.set(0,Math.PI/2,a);g.add(t)}
+  return g}
+function tagSprite(text,bg){const t=canvasTex(512,128,(c,w,hh)=>{c.fillStyle=bg||'rgba(122,16,32,.92)';rrect(c,6,10,w-12,hh-20,40);c.fill();c.strokeStyle='#e0ad45';c.lineWidth=5;rrect(c,6,10,w-12,hh-20,40);c.stroke();
+    c.fillStyle='#fbf3df';c.textAlign='center';c.textBaseline='middle';c.font='700 46px Rubik, system-ui, sans-serif';c.fillText(text,w/2,hh/2+2,w-60)});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,toneMapped:false,depthTest:false,transparent:true,color:new THREE.Color(.82,.82,.82)}));sp.scale.set(5,1.25,1);sp.renderOrder=6;return sp}// por debajo del umbral del bloom: texto nítido
+const dropObj=o=>{if(o.parent)o.parent.remove(o);o.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map&&!WRAPS.includes(c.material.map))c.material.map.dispose();c.material.dispose()}})};
+function clearGift(){if(!GIFT)return;dropObj(GIFT.o);dropObj(GIFT.tag);GIFT=null}
+function loadGift(g,mode,house){clearGift();const o=giftBox(g.w);o.position.set(0.3,2.95,0);o.scale.setScalar(0.01);GIFTCAR.add(o);
+  const tag=tagSprite('Para '+g.p);tag.position.set(0.3,5.6,0);GIFTCAR.add(tag);GIFT={g,o,tag,mode,house,lap:laps,m:0,pop:0}}
+/* el regalo sale volando: a la chimenea (al recibirlo) o al trineo de Papá Noel (al mandarlo) */
+function launchGift(to,arc,onEnd){const o=GIFT.o;GIFT.tag.visible=false;if(FASTSTEP||!o.parent){onEnd();return}scene.attach(o);GIFT.flying=true;flyQ.push({f:o,from:o.position.clone(),to:to.clone(),t:0,dur:1.1,arc,onEnd,keep:true})}
+function giftTick(prev){if(!GIFT||GIFT.flying)return;const gi=cars.indexOf(GIFTCAR),L=T.L;GIFT.m+=dist-prev;
+  if(GIFT.mode==='env'&&laps>GIFT.lap&&GIFT.m>110){const g=GIFT.g;launchGift(SLEIGH?SLEIGH.position:GIFTCAR.position.clone().setY(80),14,()=>{if(SLEIGH&&!FASTSTEP){burst(SLEIGH.position.clone(),60,6,[4,3.2,1]);bells()}news(`Papá Noel se lleva en su trineo tu regalo para ${g.p}`,true);clearGift()});return}
+  if(GIFT.mode==='rec'){const hs=SL[GIFT.house].s,a=prev+OFFS[gi],b=dist+OFFS[gi];if(Math.floor((a-hs)/L)!==Math.floor((b-hs)/L)){const h=HS[GIFT.house],g=GIFT.g,hi=GIFT.house;if(!h){clearGift();return}
+    const to=h.chim.clone();to.y+=0.3;launchGift(to,7,()=>{if(!FASTSTEP){puff(h.chim.clone().setY(h.chim.y+1),new THREE.Vector3(0,3,0),2.4,.45,1.2);confettiBurst(h.chim.clone(),14);burst(h.chim.clone(),80,7,[4,3,.8]);kaching();bells()}clearGift();reveal(g,hi)})}}}
+/* mandar un regalo */
+let gw=0;
+$('gWrap').innerHTML=WRAPS.map((t,i)=>`<button type="button" role="radio" aria-checked="${i===0}" aria-label="Papel ${i+1}" data-i="${i}" style="--c:${WRAP_COL[i][0]};--d:${WRAP_COL[i][1]}"></button>`).join('');
+$('gWrap').onclick=e=>{const b=e.target.closest('button');if(!b)return;gw=+b.dataset.i;$('gWrap').querySelectorAll('button').forEach(x=>x.setAttribute('aria-checked',x===b))};
+function openGiftSheet(to,from){const left=giftsLeft(st);if(to!==undefined)$('gTo').value=to;$('gFrom').value=from||$('gFrom').value||st.myName||store.get('advx-tren-de')||'';
+  $('gLeft').textContent=left?`Hoy te quedan ${left} regalo${left===1?'':'s'} gratis. Cada uno suma al objetivo del día.`:`Hoy ya has mandado tus ${FREE_GIFTS} regalos. Mañana, ${FREE_GIFTS} más.`;
+  $('gGo').disabled=!left;$('gErr').textContent='';if(tiles.tGift)tiles.tGift.seen=true;openModal('giftSheet');setTimeout(()=>$($('gTo').value?'gMsg':'gTo').focus(),60)}
+$('giftForm').addEventListener('submit',e=>{e.preventDefault();const g=cleanGift({d:$('gFrom').value,p:$('gTo').value,w:gw,m:$('gMsg').value});
+  if(!g){$('gErr').textContent='Escribe para quién es y de parte de quién.';shake($($('gTo').value.trim()?'gFrom':'gTo'));return}
+  if(!sendGift(st)){$('gErr').textContent=`Hoy ya has mandado tus ${FREE_GIFTS} regalos. Mañana, ${FREE_GIFTS} más.`;return}
+  store.set('advx-tren-de',g.d);const done=addSent(st,1);save();loadGift(g,'env');closeModal('giftSheet');kaching();
+  news(`Tu regalo para ${g.p} ya va en el vagón de regalos`,true);openShare(g);uiShop();if(done)dayDone()});
+$('gX').onclick=()=>closeModal('giftSheet');
+/* compartir el enlace del regalo */
+let SHARE=null;
+const giftLink=g=>(window.ADVX_TREN_URL||location.origin+location.pathname)+'#regalo-'+encodeGift(g);// sin parámetros (?reiniciar borraría la partida del amigo); ADVX_TREN_URL: dirección pública si la página va dentro de un marco
+function openShare(g){const link=giftLink(g),txt=`🎁 ${g.d} te ha mandado un regalo por el Tren de Navidad 🚂 Ábrelo y mira cómo te llega a casa: ${link}`;SHARE={g,link};
+  $('sLead').textContent=`Mándale este enlace a ${g.p}: al abrirlo verá cómo el tren le lleva tu regalo hasta su casa, y podrá mandarte otro.`;
+  $('sLink').value=link;$('sWa').href='https://wa.me/?text='+encodeURIComponent(txt);$('sPreview').textContent=`Ver lo que verá ${g.p}`;$('sCopy').textContent='Copiar';openModal('shareSheet')}
+$('sCopy').onclick=()=>{const v=$('sLink').value,ok=()=>{$('sCopy').textContent='¡Copiado!'},sel=()=>{$('sLink').focus();$('sLink').select()};
+  try{navigator.clipboard.writeText(v).then(ok,sel)}catch(e){sel()}};
+$('sPreview').onclick=()=>{closeModal('shareSheet');openRecv(SHARE.g,true)};
+$('sFollow').onclick=()=>{closeModal('shareSheet');setFocus({car:cars.indexOf(GIFTCAR)})};
+$('sX').onclick=()=>closeModal('shareSheet');
+/* recibir un regalo (al abrir un enlace #regalo-…, también si la página ya estaba abierta) */
+function checkGiftHash(){if(!/^#regalo-/i.test(location.hash))return;const g=decodeGift(location.hash);if(g)openRecv(g);else news('Ese enlace de regalo no es válido',true)}
+addEventListener('hashchange',()=>{if(ready)checkGiftHash()});
+let RECV=null,RECV_PRE=false;// RECV_PRE: lo estás viendo tú antes de mandarlo
+function openRecv(g,pre){RECV=g;RECV_PRE=!!pre;$('rLead').textContent=`${g.d} te ha mandado un regalo por el Tren de Navidad. Viaja en el vagón de regalos hasta tu casa.`;openModal('recvSheet')}
+$('rGo').onclick=()=>{closeModal('recvSheet');if(RECV)receive(RECV)};
+function receive(g){if(!ready||busy)return;clearGift();if(RECV_TAG){dropObj(RECV_TAG);RECV_TAG=null}
+  let hi=st.mine>=0?st.mine:st.prov;// tu casa; si aún no tienes, una provisional (siempre la misma)
+  if(hi<0||!HS[hi]){if(st.houses<SL.length){st.houses++;addHouse();hi=HS.length-1;st.prov=hi}else hi=HS.length?Math.floor(Math.random()*HS.length):-1}
+  if(hi<0){reveal(g,-1);return}
+  if(hi!==st.mine){const h=HS[hi];RECV_TAG=tagSprite('Casa de '+g.p,'rgba(11,21,48,.86)');RECV_TAG.position.set(h.chim.x,h.chim.y+5.5,h.chim.z);scene.add(RECV_TAG)}
+  loadGift(g,'rec',hi);GIFT.o.scale.setScalar(1);
+  // el tren se coloca para que el vagón de regalos llegue a la casa en unos 12 s
+  const gi=cars.indexOf(GIFTCAR);dist=((SL[hi].s-OFFS[gi]-TRAIN_V*12)%T.L+T.L)%T.L;poseTrain(dist);
+  setFocus({car:gi});cam.fdT=20;news(`${g.d} te ha mandado un regalo: ¡mira cómo llega!`,true);save()}
+function reveal(g,hi){$('gcTo').textContent=`Para ${g.p}`;$('gcMsg').textContent=g.m||'¡Feliz Navidad!';$('gcFrom').textContent=`De ${g.d}`;
+  $('gcHouse').hidden=RECV_PRE||!(hi>=0&&hi===st.prov&&st.mine<0);$('gcSend').textContent=RECV_PRE?'Mandar otro regalo':`Mándale tú uno a ${g.d}`;$('giftCard').dataset.h=hi;$('giftCard').dataset.to=g.d;$('giftCard').dataset.me=g.p;$('giftCard').hidden=false;
+  if(hi===st.mine)st.myGifts++;save();uiShop()}
+$('gcHouse').onclick=()=>{const hi=+$('giftCard').dataset.h,name=$('giftCard').dataset.me;if(hi!==st.prov||st.mine>=0)return;st.mine=hi;st.prov=-1;st.myName=cleanText(name,14);save();
+  if(RECV_TAG){dropObj(RECV_TAG);RECV_TAG=null}markMine();$('gcHouse').hidden=true;kaching();news(`¡Esta casa ya es tuya, ${st.myName}! El tren te traerá regalos en cada vuelta`,true);uiShop()};
+$('gcSend').onclick=()=>{const c=$('giftCard');c.hidden=true;setFocus(null);if(RECV_PRE)openGiftSheet('');else openGiftSheet(c.dataset.to,c.dataset.me)};
+$('gcX').onclick=()=>{$('giftCard').hidden=true};
 
 /* ================= cámara: órbita libre con zoom hacia el dedo o el ratón, o pegada a un vagón ================= */
 const CTR=new THREE.Vector3(BCX,4,BCZ+40),HOME={w:300,d:260};// vista de inicio: encuadra la vía de la etapa
 const cam={az:Math.PI/2,el:0.62,d:300,dT:300,tgt:CTR.clone(),tgtT:CTR.clone(),azT:null,vaz:0,vel:0,follow:false,focus:null,faz:Math.PI/2,fel:0.3,fd:17,fdT:17};
 const camPos=new THREE.Vector3();
 const ptrs=new Map();let pinch0=0,mid0=null,lastInput=-1e9,tap=null;
-const tanH=()=>Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+const FOV=42,tanH=()=>Math.tan(THREE.MathUtils.degToRad(FOV/2));
 const portrait=()=>camera.aspect<0.8,homeEl=()=>portrait()?0.86:0.62;
 const defD=()=>{const v=tanH();return clamp(Math.max(HOME.w/2/(v*camera.aspect),(HOME.d*0.36+18)/v),110,430)},maxD=()=>clamp(defD()*1.5,300,560);
 function clampTgt(){const t=cam.tgtT;t.x=clamp(t.x,BOARD.x0+10,BOARD.x1-10);t.z=clamp(t.z,BOARD.z0+40,BOARD.z1-5);t.y=clamp(t.y,-1,60)}
@@ -841,14 +918,14 @@ function zoomAt(sx,sy,f){lastInput=performance.now();cam.azT=null;
   cam.dT=d1;clampTgt()}
 function flyTo(x,z,d,az){if(cam.focus)setFocus(null);setFollow(false);cam.tgtT.set(x,Math.max(0,groundAt(x,z))+2,z);cam.dT=d;if(az!==undefined)cam.azT=az;clampTgt();lastInput=performance.now()}
 canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,sh:e.shiftKey});
-  tap=ptrs.size===1?{id:e.pointerId,x:e.clientX,y:e.clientY,t:performance.now()}:null;
+  tap=ptrs.size===1?{id:e.pointerId,x:e.clientX,y:e.clientY,t:e.timeStamp}:null;
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);mid0={x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
   cam.vaz=cam.vel=0;lastInput=performance.now()});
 canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;lastInput=performance.now();
-  if(tap){if(Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<8)return;tap=null}
+  if(tap){if(Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<(e.pointerType==='touch'?12:8))return;tap=null}
   if(ptrs.size===1){if(p.b===2||p.sh||e.shiftKey)pan(dx,dy);else rotate(dx,dy)}
   else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};if(pinch0>0&&d>0)zoomAt(m.x,m.y,pinch0/d);if(mid0&&!(cam.focus&&cam.focus.car!==undefined))pan(m.x-mid0.x,m.y-mid0.y);pinch0=d;mid0=m}});
-['pointerup','pointercancel'].forEach(ev=>canvas.addEventListener(ev,e=>{const was=ev==='pointerup'&&tap&&tap.id===e.pointerId&&performance.now()-tap.t<550;ptrs.delete(e.pointerId);if(ptrs.size<2){pinch0=0;mid0=null}tap=null;if(was)pick(e.clientX,e.clientY)}));
+['pointerup','pointercancel'].forEach(ev=>canvas.addEventListener(ev,e=>{const was=ev==='pointerup'&&tap&&tap.id===e.pointerId&&e.timeStamp-tap.t<550;/* hora del gesto, no la del fotograma: un tirón no se come el toque */ptrs.delete(e.pointerId);if(ptrs.size<2){pinch0=0;mid0=null}tap=null;if(was)pick(e.clientX,e.clientY)}));
 canvas.addEventListener('lostpointercapture',e=>{ptrs.delete(e.pointerId);if(ptrs.size<2){pinch0=0;mid0=null}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(clamp(e.deltaY,-120,120)*0.0016))},{passive:false});
@@ -863,11 +940,21 @@ function updateCam(dt){const idle=(performance.now()-lastInput)/1000,s=1-Math.ex
   else{cam.d=lerp(cam.d,cam.dT,s);cam.tgt.lerp(cam.tgtT,s);const ce=Math.cos(cam.el);px=cam.tgt.x+Math.cos(cam.az)*ce*cam.d;py=cam.tgt.y+Math.sin(cam.el)*cam.d;pz=cam.tgt.z+Math.sin(cam.az)*ce*cam.d}
   const gy=groundAt(px,pz)+1.4;if(py<gy)py=gy;
   if(cam.follow&&!fc)camPos.lerp(tmpV2.set(px,py,pz),1-Math.exp(-4*dt));else camPos.set(px,py,pz);
-  camera.position.copy(camPos);camera.lookAt(cam.tgt);camera.updateMatrixWorld();
+  // en un túnel, la cámara entra con el tren: un fundido corto y va por dentro de la gruta, mirando el costado del coche
+  const fcar=fc?cam.focus.car:(cam.follow?0:-1);let inT=false;
+  if(fcar>=0&&T){const s0=dist+OFFS[fcar];inT=kindAt(T,s0+2.5)===KT||kindAt(T,s0-2.5)===KT}
+  cutK=fcar<0?0:inT?Math.min(1,cutK+dt/0.5):Math.max(0,cutK-dt/0.5);const inside=fcar>=0&&cutK>=0.5;
+  if(inside){const s0=dist+OFFS[fcar],side=Math.sin(cam.faz)>=0?1:-1,sc=caveClamp(s0,s0+(fc?(portrait()?7.5:3.5):11)),q=atM(T,sc),w=caveW(sc)||4,lat=side*clamp(w-1.1,2.2,fc?6.4:3.2),lk=atM(T,fc?s0:s0-1);
+    camera.position.set(q.x-Math.sin(q.a)*lat,q.y+2.9,q.z+Math.cos(q.a)*lat);camera.lookAt(lk.x,lk.y+2.7,lk.z)}
+  else{camera.position.copy(camPos);camera.lookAt(cam.tgt)}
+  const fov=inside?(portrait()?66:48):FOV;if(camera.fov!==fov){camera.fov=fov;camera.updateProjectionMatrix()}
+  if(snow.visible===inside){snow.visible=!inside;key.intensity=inside?0.4:1.25;hemi.intensity=inside?1:0.42}camera.updateMatrixWorld();
+  {const op=Math.round(Math.min(1,(1-Math.abs(2*cutK-1))*1.6)*50)/50;if(op!==fadeOp){fadeOp=op;$('tunFade').style.opacity=op}}
+  cutK2=lerp(cutK2,fcar>=0&&!inside?1:0,1-Math.exp(-5*dt));CUT.r.value=cutK2<0.02?0:cutK2*5;if(CUT.r.value>0&&fcar>=0){const c=cars[fcar];CUT.a.value.copy(camera.position);CUT.b.value.set(c.position.x,c.position.y+2.4,c.position.z)}// los abetos no tapan el coche que sigues
   grade.uniforms.tilt.value=lerp(grade.uniforms.tilt.value,coarse||fc||cam.follow?0:0.85*sstep(70,220,cam.d),1-Math.exp(-3*dt));grade.uniforms.focus.value=0.5}
 function setFollow(on){cam.follow=on;$('bCam').classList.toggle('on',on);$('bCam').setAttribute('aria-pressed',on);$('bCam').title=on?'Ver la maqueta (C)':'Seguir al tren (C)';if(!on){cam.tgtT.copy(cam.tgt);cam.dT=cam.d=clamp(camera.position.distanceTo(cam.tgt),9,maxD())}}
 function snapCam(){cam.d=cam.dT;cam.tgt.copy(cam.tgtT);updateCam(0)}
-/* tocar: un duende (se cuenta), un vagón (la cámara se pega a él) o tu casa */
+/* tocar: un vagón (la cámara se pega a él) o tu casa */
 const RC=new THREE.Raycaster(),NDC=new THREE.Vector2(),_inv=new THREE.Matrix4(),_box=new THREE.Box3(),_ray=new THREE.Ray();
 function rayAt(sx,sy){NDC.set(sx/innerWidth*2-1,-(sy/innerHeight)*2+1);RC.setFromCamera(NDC,camera);return RC.ray}
 /* distancia hasta el suelo a lo largo del rayo (marcha sobre la rejilla de alturas y afina por bisección) */
@@ -875,14 +962,9 @@ function groundT(R,max=1800){const o=R.origin,d=R.direction;if(o.y<groundAt(o.x,
   while(t<max){t+=step;const y=o.y+d.y*t;if(y<groundAt(o.x+d.x*t,o.z+d.z*t)){let a=t-step,b=t;for(let k=0;k<14;k++){const m=(a+b)/2;if(o.y+d.y*m<groundAt(o.x+d.x*m,o.z+d.z*m))b=m;else a=m}return (a+b)/2}
     if(y<-3&&d.y<0)return null;step=Math.max(0.8,t*0.012)}return null}
 function pickGround(sx,sy){const R=rayAt(sx,sy),t=groundT(R);return t===null?null:R.at(t,new THREE.Vector3())}
-function pick(sx,sy){if(!ready||busy)return;au();const R=rayAt(sx,sy),tg=groundT(R)??1e9,w=new THREE.Vector3();
-  // duendes: la zona de toque crece con la distancia para que se puedan tocar con el dedo
-  let best=null,bt=1e9;
-  for(const e of ELF){if(e.found||!e.o.visible)continue;e.o.getWorldPosition(w);w.y+=0.9;const t=w.clone().sub(R.origin).dot(R.direction);if(t<=0)continue;
-    const dd=R.at(t,tmpV).distanceTo(w),rr=Math.max(1.3,t*(coarse?0.028:0.017));if(dd<rr&&t<tg+2.5&&t<bt){bt=t;best=e}}
-  if(best){foundElf(best);return}
+function pick(sx,sy){if(!ready||busy)return;au();const R=rayAt(sx,sy),tg=groundT(R)||1e9;let bt=1e9;// 0: la cámara está dentro de la montaña (en un túnel)
   // coches del tren
-  let bc=-1;bt=1e9;cars.forEach((c,ci)=>{_inv.copy(c.matrixWorld).invert();_ray.copy(R).applyMatrix4(_inv);const L=c.userData.len/2;_box.min.set(-L,0.3,-1.7);_box.max.set(L,c.userData.top,1.7);
+  let bc=-1;cars.forEach((c,ci)=>{_inv.copy(c.matrixWorld).invert();_ray.copy(R).applyMatrix4(_inv);const L=c.userData.len/2;_box.min.set(-L,0.3,-1.7);_box.max.set(L,c.userData.top,1.7);
     const p=_ray.intersectBox(_box,tmpV2);if(p){const t=p.applyMatrix4(c.matrixWorld).distanceTo(R.origin);if(t<bt&&t<tg+1){bt=t;bc=ci}}});
   if(bc>=0){setFocus({car:bc});return}
   // tu casa
@@ -949,23 +1031,23 @@ function hideCard(){$('card').hidden=true}
 const ICON={
   casa:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/>',
   marca:'<path d="M3.5 10v4h3l8 4.5v-13L6.5 10z"/><path d="M17.5 9.5a3.5 3.5 0 0 1 0 5M19.8 7a7 7 0 0 1 0 10"/>',
-  duende:'<path d="M7.5 20.5h9"/><path d="M8.6 20.5 10 15h4l1.4 5.5"/><circle cx="12" cy="12.3" r="2.6"/><path d="M9.3 10.6 13.6 3.4l3.7 6.3"/><circle cx="17.6" cy="10.6" r="1.1"/><path d="M9.4 12.4 7.6 11.6M14.6 12.4l1.8-.8"/>',
+  regalo:'<rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><rect x="2.5" y="6.5" width="19" height="3.5" rx="1"/><path d="M12 6.5v14"/><path d="M12 6.5c-1.5-3.2-5.5-3.6-5.5-1.4 0 1.3 2.3 1.4 5.5 1.4zM12 6.5c1.5-3.2 5.5-3.6 5.5-1.4 0 1.3-2.3 1.4-5.5 1.4z"/>',
 };
 const tiles={};
 function buildShop(){$('shop').innerHTML=
-  `<button class="it" id="tElf"><span class="flag">¡Nuevo día!</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.duende}</svg></span><span class="nm"><span class="lg">Busca los duendes</span><span class="sm">Duendes</span></span><span class="fx"></span><span class="pr mono"><b></b></span></button>`+
+  `<button class="it" id="tGift"><span class="flag">¡Nuevo!</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.regalo}</svg></span><span class="nm"><span class="lg">Manda un regalo</span><span class="sm">Regalo</span></span><span class="fx"></span><span class="pr mono"><b></b></span></button>`+
   `<button class="it" id="tHouse"><span class="flag">¡Libre!</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.casa}</svg></span><span class="nm"></span><span class="fx"></span><span class="pr mono"><b></b></span></button>`+
   `<button class="it" id="tAd"><span class="flag">Nuevo</span><span class="lv mono"></span><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.marca}</svg></span><span class="nm">Tu marca</span><span class="fx">En un vagón 24 h, con enlace</span><span class="pr mono"><b></b></span></button>`;
-  for(const id of ['tElf','tHouse','tAd']){const b=$(id);tiles[id]={b,lv:b.querySelector('.lv'),ic:b.querySelector('.ic svg'),nm:b.querySelector('.nm'),fx:b.querySelector('.fx'),pr:b.querySelector('.pr b'),c:{}}}
+  for(const id of ['tGift','tHouse','tAd']){const b=$(id);tiles[id]={b,lv:b.querySelector('.lv'),ic:b.querySelector('.ic svg'),nm:b.querySelector('.nm'),fx:b.querySelector('.fx'),pr:b.querySelector('.pr b'),c:{}}}
   if(!store.get('advx-tren-marca'))$('tAd').classList.add('hot');
-  $('tElf').onclick=()=>{au();hint();uiShop()};
+  $('tGift').onclick=()=>{au();openGiftSheet()};
   $('tHouse').onclick=()=>{au();if(st.mine<0)openHouse();else focusHouse()};
   $('tAd').onclick=()=>{au();openAd()}}
 const setTxt=(E,k,el,v)=>{if(E.c[k]!==v){E.c[k]=v;el.textContent=v}};
 const fmtLeft=ms=>{const m=Math.max(0,Math.round(ms/60000));return m<60?m+' min':Math.floor(m/60)+' h '+(m%60)+' min'};
-function uiShop(){const E=tiles.tElf;if(!E)return;const n=foundCount(st),nx=nextElf();
-  setTxt(E,'lv',E.lv,`${n}/${ELVES}`);setTxt(E,'fx',E.fx,nx?'Pista: '+ELF_HINT[nx.k]:'¡Los has encontrado todos!');setTxt(E,'pr',E.pr,n>=ELVES?`Mañana, ${ELVES} más`:'Ver pista');
-  const ec='it'+(n<ELVES?' ok':'')+(n===0&&!E.seen?' hot':'');if(E.c.cls!==ec){E.c.cls=ec;E.b.className=ec}
+function uiShop(){const E=tiles.tGift;if(!E)return;const left=giftsLeft(st);
+  setTxt(E,'lv',E.lv,`${left}/${FREE_GIFTS} hoy`);setTxt(E,'fx',E.fx,'El tren se lo lleva a su casa');setTxt(E,'pr',E.pr,left?'Mándalo ya':`Mañana, ${FREE_GIFTS} más`);
+  const ec='it'+(left?' ok':'')+(left===FREE_GIFTS&&!E.seen?' hot':'');if(E.c.cls!==ec){E.c.cls=ec;E.b.className=ec}
   const H=tiles.tHouse,slots=SL.length,free=slots-st.houses;
   if(st.mine<0){setTxt(H,'nm',H.nm,'Pon tu casa');setTxt(H,'fx',H.fx,free>0?'El tren te traerá regalos':'Vía llena: espera al tramo nuevo');setTxt(H,'pr',H.pr,free>0?`${free} libre${free===1?'':'s'}`:'Llena')}
   else{setTxt(H,'nm',H.nm,'Tu casa');setTxt(H,'fx',H.fx,`${st.myName}${st.myProv?' · '+st.myProv:''}`);setTxt(H,'pr',H.pr,`${fmtN(st.myGifts)} regalos`)}
@@ -975,7 +1057,7 @@ function uiShop(){const E=tiles.tElf;if(!E)return;const n=foundCount(st),nx=next
   const dr=Math.round(D*400)/400;if(dayE.c.f!==dr){dayE.c.f=dr;$('dayBar').style.transform=`scaleX(${dr})`}}
 const dayE={c:{}};
 async function expand(){busy=true;if(!FASTSTEP){grade.uniforms.flash.value=0.45;bells()}
-  await buildWorld(st.stage);buildDeco();placeTown(true);markMine();downgrade(scene);dist=2;WAG.slice(1).forEach(W=>fillWagon(W));poseTrain(dist);placeElves();
+  await buildWorld(st.stage);buildDeco();placeTown(true);markMine();downgrade(scene);dist=2;WAG.slice(1).forEach(W=>fillWagon(W));poseTrain(dist);if(GIFT&&GIFT.mode==='rec')clearGift();if(RECV_TAG){dropObj(RECV_TAG);RECV_TAG=null}
   if(!cam.focus&&!cam.follow){cam.tgtT.copy(CTR);cam.dT=defD();cam.el=homeEl();cam.az=Math.PI/2}
   if(!FASTSTEP&&treeParts[0]){confettiBurst(treeParts[0].top.clone(),30);for(let i=0;i<6;i++)fwQ.push({at:performance.now()/1000+0.3+i*0.35,p:new THREE.Vector3(BCX+(Math.random()-.5)*120,70+Math.random()*30,BCZ+40+(Math.random()-.5)*80)})}
   busy=false;uiShop()}
@@ -1045,19 +1127,19 @@ $('caFree').onclick=()=>{au();openAd(+$('card').dataset.w===1?'bid':'msg')};
 /* noticias de la comunidad (simuladas en la demo) */
 const newsQ=[];let newsT=0;
 function news(t,hi){if(FASTSTEP)return;if(hi){newsQ.unshift({t,hi});newsT=Math.min(newsT,0.2)}else newsQ.push({t,hi});if(newsQ.length>5)newsQ.length=5}
-function chatter(){const p=person(),r=Math.random(),e=ELF[Math.random()*ELF.length|0];
-  if(r<0.5&&e)return `${p.name} (${p.prov}) ha encontrado el duende que ${ELF_HINT[e.k]}`;
-  if(r<0.65)return `${p.name} (${p.prov}) ya ha encontrado los ${ELVES} duendes de hoy`;
-  if(r<0.85)return `${p.name} (${p.prov}) ha recibido ${fmtN(sacoOf(st))} regalos en su casa`;
+function chatter(){const p=person(),q=person(),r=Math.random();
+  if(r<0.42)return `${p.name} (${p.prov}) le ha mandado un regalo a ${KIN[Math.random()*KIN.length|0]}`;
+  if(r<0.64)return `A ${q.name} (${q.prov}) le ha llegado en el tren un regalo de ${p.name}`;
+  if(r<0.82)return `${p.name} (${p.prov}) ha recibido ${fmtN(sacoOf(st))} regalos en su casa`;
   return `Puja más alta por el vagón de mañana: ${auc.top.amt} €`}
 let newsCur='';
 function uiNews(dt){newsT-=dt;if(newsT>0)return;const n=newsQ.shift()||{t:chatter()};newsT=n.hi?5:3.4;if(n.t===newsCur)return;newsCur=n.t;
   const el=$('newsTxt');el.textContent=n.t;$('tip').classList.toggle('hi',!!n.hi);if(!REDUCED)el.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.23,1,.32,1)'})}
-/* contador de regalos de todos y gente buscando duendes */
+/* contador de regalos de todos y gente mandando regalos */
 let dispG=st.total,lastRate='';
 function uiBank(dt){dispG=Math.abs(st.total-dispG)<1?st.total:lerp(dispG,st.total,1-Math.exp(-8*dt));const t=fmtN(dispG);if($('gifts').textContent!==t)$('gifts').textContent=t;
-  const r=`${NF.format(online(simClock))} buscando duendes`;if(r!==lastRate){lastRate=r;$('rate').textContent=r}}
-/* números que salen de las chimeneas y de los duendes */
+  const r=`${NF.format(online(simClock))} mandando regalos`;if(r!==lastRate){lastRate=r;$('rate').textContent=r}}
+/* números que salen de las chimeneas */
 const FL=[];let flI=0;
 function floatAt(p,text,cls){if(FASTSTEP)return;tmpV.copy(p);tmpV.y+=2.5;tmpV.project(camera);if(tmpV.z>1||Math.abs(tmpV.x)>1.1||Math.abs(tmpV.y)>1.1)return;
   let e=FL[flI];if(!e){e=document.createElement('div');e.className='fl';e.innerHTML='<span></span>';$('floats').appendChild(e);FL[flI]=e}flI=(flI+1)%14;
@@ -1074,9 +1156,9 @@ function setFocus(f){if(!f&&previewOf)endPreview();const was=cam.focus;
   const pill=$('focusX');pill.hidden=!f;if(f)pill.textContent=f.preview?'Vista previa · Volver':'Volver a la maqueta'}
 $('focusX').onclick=()=>{const wasPrev=previewOf;setFocus(null);if(wasPrev)openAd()};
 $('bCam').onclick=()=>{au();setFocus(null);setFollow(!cam.follow)};
-addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Escape'){const m=anyModal();if(m)closeModal(m.id);else if(cam.focus)setFocus(null);return}
+addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Escape'){const m=anyModal();if(m)closeModal(m.id);else if(!$('giftCard').hidden)$('giftCard').hidden=true;else if(cam.focus)setFocus(null);return}
   if(anyModal()||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  if(!e.repeat&&(e.key==='c'||e.key==='C')){setFocus(null);setFollow(!cam.follow)}else if(!e.repeat&&(e.key==='p'||e.key==='P'))hint()});
+  if(!e.repeat&&(e.key==='c'||e.key==='C')){setFocus(null);setFollow(!cam.follow)}else if(!e.repeat&&(e.key==='r'||e.key==='R'))openGiftSheet()});
 new ResizeObserver(()=>document.documentElement.style.setProperty('--shop-h',$('shop').offsetHeight+'px')).observe($('shop'));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&ready)save()});
 addEventListener('pagehide',()=>{if(ready)save()});
@@ -1107,7 +1189,7 @@ function fx(dt,t){
     else if(a.k==='snowman'){o.rotation.z=Math.sin(t*1.4+a.ph)*0.06}
     else if(a.k==='ginger'){o.getWorldPosition(tmpV);const d=tmpV.distanceTo(tp);const hop=d<28?Math.abs(Math.sin(t*9+a.ph))*1.3:0;o.position.y=a.y+hop;o.rotation.z=d<28?Math.sin(t*9+a.ph)*0.25:0}});
   // regalos volando (taller → vagón, vagón → chimenea)
-  for(let k=flyQ.length-1;k>=0;k--){const q=flyQ[k];q.t+=dt/q.dur;const e=Math.min(1,q.t);q.f.position.lerpVectors(q.from,q.to,e);q.f.position.y+=Math.sin(e*Math.PI)*q.arc;q.f.rotation.y+=dt*8;if(q.t>=1){q.f.visible=false;flyQ.splice(k,1);q.onEnd&&q.onEnd()}}
+  for(let k=flyQ.length-1;k>=0;k--){const q=flyQ[k];q.t+=dt/q.dur;const e=Math.min(1,q.t);q.f.position.lerpVectors(q.from,q.to,e);q.f.position.y+=Math.sin(e*Math.PI)*q.arc;q.f.rotation.y+=dt*8;if(q.keep)q.f.scale.setScalar(1-0.5*e);if(q.t>=1){q.f.visible=false;flyQ.splice(k,1);q.onEnd&&q.onEnd()}}
   // vagones nuevos
   for(let i=1;i<WAG.length;i++){const W=WAG[i];if(W.userData.pop===undefined||W.userData.pop>=1)continue;W.userData.pop=Math.min(1,W.userData.pop+dt/0.45);const p=W.userData.pop;W.scale.setScalar((0.6+0.4*(1-Math.pow(1-p,3)))*(1+Math.sin(p*Math.PI*2)*(1-p)*0.12));if(p===1){W.scale.setScalar(1);puff(W.position.clone().setY(W.position.y+1.5),new THREE.Vector3(0,2,0),3,.4,1.2)}}
   // casas que aparecen: caen un poco con rebote y luego se unen al resto
@@ -1140,10 +1222,9 @@ function fx(dt,t){
     o3.position.set(x,LAKE_Y,z);o3.rotation.set(0.1,-Math.atan2(dz,dx),0,'YXZ');o3.updateMatrix();S.jm.setMatrixAt(i,o3.matrix);S.rm.setMatrixAt(i,o3.matrix)});o3.rotation.set(0,0,0);S.jm.instanceMatrix.needsUpdate=true;S.rm.instanceMatrix.needsUpdate=true}
   // el trineo de Papá Noel, por encima de todo
   if(SLEIGH){const a=t*0.05,rx=175,rz=150;SLEIGH.position.set(BCX+Math.cos(a)*rx,96+Math.sin(t*0.7)*5,BCZ+Math.sin(a)*rz);SLEIGH.rotation.set(0,-Math.atan2(Math.cos(a)*rz,-Math.sin(a)*rx),Math.sin(t*0.7)*0.06)}
-  // duendes: saltitos; el del telesilla va en su silla; al encontrarlo salta, gira y desaparece
-  for(const e of ELF){if(!e.o.visible)continue;if(e.chair!==undefined&&LIFT&&LIFT.pos[e.chair]){const c=LIFT.pos[e.chair];e.o.position.set(c.x+0.1,c.y+0.06,c.z);e.o.rotation.y=-c.yaw;e.y=c.y+0.06}
-    if(e.pop>0){e.pop=Math.max(0,e.pop-dt/0.9);const p=1-e.pop;e.o.scale.setScalar(p<0.35?1+p*1.2:Math.max(0.01,1.42*(1-(p-0.35)/0.65)));e.o.position.y=e.y+Math.sin(Math.min(1,p*2)*Math.PI)*2.2;e.o.rotation.y+=dt*14;if(e.pop===0)e.o.visible=false;continue}
-    e.o.position.y=e.y+Math.max(0,Math.sin(t*2.6+e.ph))**8*0.35}
+  // el regalo que se sube al vagón de regalos: aparece con un rebote
+  if(GIFT&&!GIFT.flying&&GIFT.pop<1){GIFT.pop=Math.min(1,GIFT.pop+dt/0.5);const p=GIFT.pop;GIFT.o.scale.setScalar(Math.max(0.01,(1-Math.pow(1-p,3))*(1+Math.sin(p*Math.PI*2)*(1-p)*0.25)))}
+  if(GIFT&&GIFT.tag.visible){const c=cutK>=0.5;GIFT.tag.position.y=c?1.75:5.6+Math.sin(t*2.4)*0.2;GIFT.tag.scale.set(c?3:5,c?0.75:1.25,1)}/* en el túnel, pegado al costado */
 }
 /* resolución adaptativa; en el móvil, 30 fps salvo mientras tocas la pantalla */
 let slowN=0;
@@ -1178,17 +1259,18 @@ async function boot(){
   prog(4,'Sacando los juguetes de la caja…');
   const fontP=document.fonts?Promise.all(['400 80px "Alfa Slab One"','500 40px Rubik','700 46px Rubik'].map(f=>document.fonts.load(f))).catch(()=>{}):null;
   await loadModels(p=>prog(4+p*52));
-  maxAniso=renderer.capabilities.getMaxAnisotropy();
+  maxAniso=renderer.capabilities.getMaxAnisotropy();toyCache.forEach(m=>cutMat(m));
   buildTrain(st.wagons);
   prog(60,'Montando el salón…');await tick();
   buildRoom();room.traverse(o=>{if(o.isMesh&&!o.material.isShaderMaterial)o.userData.st=true});batchStatic(room);freeze(room);if(!LOWQ)buildFurniture();loadEnv();roomTree=buildTree(room,BCX,-1.2,-330,2.6);buildSleigh();
   prog(70,'Levantando las montañas…');await tick();
   await buildWorld(st.stage);buildDeco();placeTown(false);
   WAG.slice(1).forEach(W=>fillWagon(W));poseTrain(dist);vCur=TRAIN_V;
-  await fontP;markMine();await applyAds();placeElves();downgrade(scene);
+  await fontP;markMine();await applyAds();downgrade(scene);
   cam.tgtT.copy(CTR);cam.dT=defD();cam.el=homeEl();snapCam();trainInst();
   prog(100,'');ready=true;$('load').classList.add('done');uiShop();
-  news(`Busca los ${ELVES} duendes escondidos: cada uno suma al objetivo del día`,true);
+  news('Manda un regalo a quien quieras: el tren se lo lleva a su casa',true);
+  checkGiftHash();
   save();
 }
 boot().catch(e=>{console.error(e);const el=$('err');el.textContent='No se ha podido montar la maqueta. Recarga la página.';el.style.display='block'});
@@ -1198,7 +1280,7 @@ requestAnimationFrame(loop);
 const scr=w=>{w.project(camera);return {x:(w.x*.5+.5)*innerWidth,y:(-w.y*.5+.5)*innerHeight,z:w.z}};
 window.__tren={get st(){return st},get ready(){return ready},get busy(){return busy},get auc(){return auc},
   step(sec){FASTSTEP=true;try{let n=Math.ceil(sec/0.05);while(n-->0)sim(0.05)}finally{FASTSTEP=false}},
-  claim:claimHouse,finishDay:()=>{if(addElves(st,Math.max(0,st.goal-st.today)))dayDone()},
+  claim:claimHouse,finishDay:()=>{if(addSent(st,Math.max(0,st.goal-st.today)))dayDone()},
   rival:()=>{rivalT=0;const r=Math.random;Math.random=()=>0;try{auctionTick(0)}finally{Math.random=r}},
   houses:()=>HS.length,wagons:()=>WAG.length-1,delivered:()=>delivered,starve:()=>starve,laps:()=>laps,
   ads:()=>Object.keys(ADS).filter(i=>ADS[i].ad).map(Number),adImg:i=>ADS[i]&&ADS[i].ad?{w:ADS[i].tex.image.width,h:ADS[i].tex.image.height,text:ADS[i].ad.text||'',img:!!ADS[i].ad.img,url:ADS[i].ad.url||''}:null,
@@ -1206,16 +1288,13 @@ window.__tren={get st(){return st},get ready(){return ready},get busy(){return b
   camInfo:()=>({p:camera.position.toArray().map(v=>+v.toFixed(1)),t:cam.tgt.toArray().map(v=>+v.toFixed(1)),d:+cam.d.toFixed(1),fd:+cam.fd.toFixed(1)}),
   follow:setFollow,perf,get scene(){return scene},settle:()=>snapCam(),
   look:(az,el,d,x,z)=>{setFocus(null);setFollow(false);cam.az=az;cam.el=el;cam.dT=cam.d=d||defD();if(x!==undefined)cam.tgtT.set(x,Math.max(0,groundAt(x,z))+2,z);else cam.tgtT.copy(CTR);lastInput=performance.now()+1e9;snapCam()},
-  // duendes y toques: se proyecta un punto a la pantalla y se toca ahí, como haría un dedo
-  elves:()=>ELF.map(e=>({k:e.k,found:e.found,vis:e.o.visible})),
-  elfAt:i=>{const e=ELF[i];if(!e)return null;const w=e.o.getWorldPosition(new THREE.Vector3());return w.toArray().map(v=>+v.toFixed(2))},
-  elfScreen:i=>{const e=ELF[i];if(!e)return null;const w=e.o.getWorldPosition(new THREE.Vector3());w.y+=0.9;return scr(w)},
+  // toques: se proyecta un punto a la pantalla y se toca ahí, como haría un dedo
   carScreen:i=>{const c=cars[i];if(!c)return null;return scr(c.localToWorld(new THREE.Vector3(0,2.9,0)))},
-  lookAtElf:(i,az=Math.PI/2,el=0.55,d=18)=>{const e=ELF[i];if(!e)return false;const w=e.o.getWorldPosition(new THREE.Vector3());setFocus(null);setFollow(false);cam.az=az;cam.el=el;cam.tgtT.copy(w);cam.dT=d;lastInput=performance.now()+1e9;snapCam();return true},
+  giftCar:()=>cars.indexOf(GIFTCAR),offs:i=>OFFS[i],gift:()=>GIFT&&{mode:GIFT.mode,p:GIFT.g.p,d:GIFT.g.d,onCar:GIFT.o.parent===GIFTCAR,house:GIFT.house},decode:decodeGift,receive:g=>receive(g),prov:()=>st.prov,inside:()=>cutK>=0.5,
   lookP:(x,y,z,d,az,el)=>{setFocus(null);setFollow(false);cam.az=az;cam.el=el;cam.tgtT.set(x,y,z);cam.dT=d;lastInput=performance.now()+1e9;snapCam()},
   sleigh:()=>SLEIGH&&SLEIGH.position.toArray(),hold:on=>{HOLD=!!on},
   cpu:(n=60)=>{const t0=performance.now();for(let i=0;i<n;i++){sim(1/60);fx(1/60,i/60);trainInst();updateCam(1/60)}return +((performance.now()-t0)/n).toFixed(2)},
-  tap:(x,y)=>pick(x,y),zoomAt:(x,y,f)=>zoomAt(x,y,f),hint,ground:groundAt,
+  tap:(x,y)=>pick(x,y),zoomAt:(x,y,f)=>zoomAt(x,y,f),ground:groundAt,
   map:()=>({L:+T.L.toFixed(1),runs:T.runs.map(r=>({k:r.k,s:+(r.i*T.ds).toFixed(1),len:+(r.n*T.ds).toFixed(1)})),slots:SL.length,stage:st.stage}),
   card:()=>({hidden:$('card').hidden,name:$('caName').textContent,href:$('caGo').hidden?null:$('caGo').href}),
   kindAt:s=>kindAt(T,s),get dist(){return dist},set dist(v){dist=v;poseTrain(dist)}};

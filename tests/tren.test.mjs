@@ -2,8 +2,8 @@
 //   node tests/tren.test.mjs
 import {strict as assert} from 'node:assert';
 import {STAGES, MAXSTAGE, KT, KB, KG, mapOf, atM, H0, F, BOARD, lakeE, pisteD, nearTrack, TUN_DY} from '../src/tren-map.js';
-import {DAYS, ELVES, WAGON_MAX, BID_MIN, CLOSE_H, newWorld, addElves, elfFound, foundCount, nextDay, rewardOf, goalFor, crowdElves, online, elfKinds, ELF_SPOTS, ELF_HINT,
-  closeAt, showDay, minBid, cleanText, cleanUrl, parseWorld} from '../src/tren-eco.js';
+import {DAYS, FREE_GIFTS, GIFT_MAX, WRAP_NAMES, WAGON_MAX, BID_MIN, CLOSE_H, newWorld, addSent, sendGift, giftsLeft, nextDay, rewardOf, goalFor, crowdGifts, online,
+  closeAt, showDay, minBid, cleanText, cleanUrl, cleanGift, encodeGift, decodeGift, parseWorld} from '../src/tren-eco.js';
 
 let fails = 0;
 const ok = (name, fn) => {try {fn(); console.log('  ok   ' + name)} catch (e) {fails++; console.log('  FALLO ' + name + '\n        ' + e.message)}};
@@ -50,32 +50,36 @@ ok('atM interpola posición, altura y rumbo a lo largo de la vía (y da la vuelt
 });
 
 /* ---------- la economía ---------- */
-ok('la partida empieza con tren, casas de otros, huecos libres y 5 duendes por encontrar', () => {
+ok('la partida empieza con tren, casas de otros, huecos libres y los regalos gratis del día', () => {
   const w = newWorld(0);
-  assert.ok(w.wagons >= 2 && w.houses < mapOf(0).SL.length); assert.equal(w.mine, -1); assert.equal(foundCount(w), 0); assert.ok(w.goal > 0);
+  assert.ok(w.wagons >= 2 && w.houses < mapOf(0).SL.length); assert.equal(w.mine, -1); assert.equal(giftsLeft(w), FREE_GIFTS); assert.ok(w.goal > 0);
 });
-ok('cada duende se cuenta una vez y suma al objetivo común', () => {
+ok('cada jugador manda como mucho los regalos gratis del día, y vuelven al día siguiente', () => {
   const w = newWorld(0);
-  assert.ok(elfFound(w, 0)); assert.ok(!elfFound(w, 0), 'repetido'); assert.ok(!elfFound(w, 7), 'fuera de rango'); assert.ok(elfFound(w, 4));
-  assert.equal(foundCount(w), 2); assert.equal(w.myElves, 2);
-  assert.equal(addElves(w, 1), false); assert.equal(addElves(w, w.goal), true);
+  for (let i = 0; i < FREE_GIFTS; i++) assert.ok(sendGift(w));
+  assert.ok(!sendGift(w), 'uno de más'); assert.equal(giftsLeft(w), 0); assert.equal(w.sent, FREE_GIFTS);
+  nextDay(w); assert.equal(giftsLeft(w), FREE_GIFTS); assert.ok(sendGift(w));
 });
 ok('el objetivo del día cuesta unos minutos con la gente que hay', () => {
-  const w = newWorld(0); let t = 0, sec = 0; while (w.today < w.goal && sec < 2000) {addElves(w, crowdElves(t, w.day) * 0.5); t += 0.5; sec += 0.5}
-  assert.ok(sec > 120 && sec < 400, `${sec} s`); for (let t2 = 0; t2 < 3600; t2 += 7) assert.ok(online(t2) >= 12);
+  const w = newWorld(0); let t = 0, sec = 0; while (w.today < w.goal && sec < 2000) {addSent(w, crowdGifts(t, w.day) * 0.5); t += 0.5; sec += 0.5}
+  assert.ok(sec > 120 && sec < 400, `${sec} s`); assert.equal(goalFor(w), w.goal); for (let t2 = 0; t2 < 3600; t2 += 7) assert.ok(online(t2) >= 12);
 });
 ok('cumplir objetivos abre toda la vía, llena el tren de vagones y enciende las luces', () => {
-  const w = newWorld(0), got = []; elfFound(w, 1);
-  for (let d = 1; d < DAYS; d++) {const g0 = w.goal; got.push(nextDay(w)); assert.ok(w.goal >= g0, 'el objetivo no baja'); assert.equal(w.today, 0); assert.equal(foundCount(w), 0, 'duendes nuevos')}
+  const w = newWorld(0), got = [];
+  for (let d = 1; d < DAYS; d++) {const g0 = w.goal; assert.equal(addSent(w, w.goal), true); got.push(nextDay(w)); assert.ok(w.goal >= g0, 'el objetivo no baja'); assert.equal(w.today, 0)}
   assert.equal(w.stage, MAXSTAGE); assert.equal(w.day, DAYS); assert.equal(got.filter(r => r === 'via').length, MAXSTAGE);
-  assert.ok(got.slice(0, 7).includes('vagon') && got.includes('luces')); assert.equal(w.wagons, WAGON_MAX); assert.equal(rewardOf({...w, day: 24}) === null || w.day === DAYS, true);
-  assert.equal(addElves(w, 1e9) && w.day <= DAYS, true);
+  assert.ok(got.slice(0, 7).includes('vagon') && got.includes('luces')); assert.equal(w.wagons, WAGON_MAX); assert.equal(rewardOf({...w, lights: 3}), null);
 });
-ok('los escondites del día son 5 distintos, iguales para todos y con uno en el tren los días impares', () => {
-  for (let d = 1; d <= DAYS; d++) {const a = elfKinds(d, 0), b = elfKinds(d, 0);
-    assert.deepEqual(a, b); assert.equal(new Set(a).size, ELVES); assert.ok(a.every(k => ELF_SPOTS.includes(k) && ELF_HINT[k]));
-    assert.equal(a.includes('vagon'), d % 2 === 1); assert.ok(!a.includes('puente'), 'sin puentes en la primera vía')}
-  assert.notDeepEqual(elfKinds(2, 3), elfKinds(4, 3));
+ok('un regalo va y vuelve en el enlace, con tildes y eñes, solo con letras y números', () => {
+  const g = {d: 'Begoña', p: 'Iñaki', w: 4, m: '¡Felices fiestas, campeón! 🎄'}, c = encodeGift(g);
+  assert.match(c, /^[a-z2-7]+$/); assert.ok(c.length < 300, `${c.length} letras`); assert.deepEqual(decodeGift('#regalo-' + c), g); assert.deepEqual(decodeGift(c.toUpperCase()), g);
+  assert.deepEqual(decodeGift(encodeGift({...g, m: ''})), {...g, m: ''});
+  for (let i = 0; i < WRAP_NAMES.length; i++) assert.equal(decodeGift(encodeGift({...g, w: i})).w, i);
+});
+ok('un enlace de regalo roto o manipulado no vale, y lo que trae se limpia y se acota', () => {
+  for (const bad of ['', '#regalo-', '#regalo-!!!', 'zzzz', 'a'.repeat(900), '#regalo-' + encodeGift({d: 'Ane', p: 'Iker', w: 0, m: ''}).slice(0, -6)]) assert.equal(decodeGift(bad), null, bad.slice(0, 30));
+  assert.equal(cleanGift({d: '', p: 'Iker', w: 0}), null); assert.equal(cleanGift({d: 'Ane', p: '  ', w: 0}), null); assert.equal(cleanGift({d: 'Ane', p: 'Iker', w: 9}), null); assert.equal(cleanGift({d: 'Ane', p: 'Iker', w: 'x'}), null);
+  const g = cleanGift({d: 'x'.repeat(50), p: '<b>Iker</b>', w: 1, m: 'y'.repeat(200)}); assert.equal(g.d.length, GIFT_MAX.name); assert.ok(!/[<>]/.test(g.p)); assert.equal(g.m.length, GIFT_MAX.msg);
 });
 ok(`la subasta cierra a las ${CLOSE_H}:00 y el vagón sale el día siguiente`, () => {
   const am = new Date(2026, 11, 3, 10, 0).getTime(), pm = new Date(2026, 11, 3, 22, 30).getTime();
@@ -93,11 +97,11 @@ ok('el enlace de una marca solo vale si es una web (http o https) con dominio', 
   for (const bad of ['javascript:alert(1)', 'data:text/html,hola', 'mailto:a@b.es', 'localhost:3000', 'https://intranet', 'https://user:pw@tumarca.com', 'https://' + 'a'.repeat(200) + '.com']) assert.equal(cleanUrl(bad), null, bad);
 });
 ok('el guardado roto o manipulado no rompe la partida', () => {
-  assert.equal(parseWorld(null), null); assert.equal(parseWorld('{'), null); assert.equal(parseWorld('{"v":1}'), null, 'versión vieja');
-  const w = parseWorld(JSON.stringify({v: 2, stage: 99, wagons: 0, houses: 999, mine: 3, myName: '', lights: 'x', today: -4, day: 40, eMask: 999}));
+  assert.equal(parseWorld(null), null); assert.equal(parseWorld('{'), null); assert.equal(parseWorld('{"v":2}'), null, 'versión vieja');
+  const w = parseWorld(JSON.stringify({v: 3, stage: 99, wagons: 0, houses: 999, mine: 3, prov: 999, myName: '', lights: 'x', today: -4, day: 40, sToday: 999}));
   assert.equal(w.stage, MAXSTAGE); assert.equal(w.wagons, 1); assert.equal(w.houses, mapOf(MAXSTAGE).SL.length);
-  assert.equal(w.mine, -1, 'sin nombre no hay casa propia'); assert.equal(w.lights, 0); assert.equal(w.today, 0); assert.equal(w.day, DAYS); assert.equal(w.eMask, 31);
-  const a = newWorld(5); a.mine = 2; a.myName = 'Jon'; a.stage = 1; a.houses = 7; a.eMask = 5; a.myElves = 2; assert.deepEqual(parseWorld(JSON.stringify(a)), a);
+  assert.equal(w.mine, -1, 'sin nombre no hay casa propia'); assert.equal(w.lights, 0); assert.equal(w.today, 0); assert.equal(w.day, DAYS); assert.equal(w.sToday, FREE_GIFTS); assert.equal(w.prov, w.houses - 1);
+  const a = newWorld(5); a.mine = 2; a.myName = 'Jon'; a.stage = 1; a.houses = 7; a.prov = 4; a.sToday = 2; a.sent = 9; assert.deepEqual(parseWorld(JSON.stringify(a)), a);
 });
 
 console.log(fails ? `\n${fails} FALLO(S)` : '\nTodo OK');

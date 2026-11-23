@@ -1,6 +1,7 @@
 /* Tren compartido (prototipo): se carga después de idle.css y solo añade o ajusta lo propio */
 
 /* ---------- cabecera: regalos de todos y objetivo del día ---------- */
+.top::before{content:"";position:absolute;left:0;top:0;width:460px;max-width:100%;height:230px;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 0 0,rgba(9,12,28,.78),rgba(9,12,28,.42) 45%,transparent 72%)}
 .bank .row .gift{width:.82em;height:.82em;fill:none;stroke:var(--gold);stroke-width:1.8;stroke-linejoin:round;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
 .cap{margin-top:4px;font-size:12px;line-height:1.2;color:var(--cream);opacity:.85;text-shadow:0 1px 0 rgba(0,0,0,.7)}
 .rate{margin-top:2px}
@@ -18,7 +19,7 @@
   box-shadow:0 3px 0 var(--gold2),0 10px 24px rgba(0,0,0,.35);transition:transform 160ms var(--ease-out)}
 .pill:active{transform:translateX(-50%) scale(.96)}
 
-/* ---------- abajo: duendes, tu casa y tu marca ---------- */
+/* ---------- abajo: regalos, tu casa y tu marca ---------- */
 .shop.trio{grid-template-columns:repeat(3,minmax(0,1fr));max-width:720px}
 .it#tElf .lv,.it#tAd .lv{right:auto;left:50%;transform:translateX(-50%);white-space:nowrap}
 .it .pr b{font-weight:700}
@@ -55,6 +56,8 @@ body.lowq::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none
 .fld i{font-style:normal;font-weight:400}
 .fld input{width:100%;padding:11px 12px;border:1.5px solid rgba(43,26,18,.25);border-radius:9px;background:#fffaf0;color:var(--ink);font:500 16px/1.2 Rubik,system-ui,sans-serif;transition:border-color 160ms ease}
 .fld input:focus{outline:none;border-color:var(--red)}
+.fld textarea{width:100%;padding:11px 12px;border:1.5px solid rgba(43,26,18,.25);border-radius:9px;background:#fffaf0;color:var(--ink);font:500 16px/1.3 Rubik,system-ui,sans-serif;resize:none;transition:border-color 160ms ease}
+.fld textarea:focus{outline:none;border-color:var(--red)}
 .lnk{display:block;margin:10px auto 0;padding:8px 12px;border:0;background:none;color:var(--ink2);font-weight:600;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .x{position:sticky;float:right;top:0;margin:-8px -6px 0 0;width:40px;height:40px;border:0;border-radius:50%;background:rgba(43,26,18,.08);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
 .x svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
@@ -114,3 +117,27 @@ body.lowq::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none
   .flag{top:6px;left:6px;width:7px;height:7px}
   .adcard{bottom:calc(var(--shop-h) + 8px)}
 }
+
+/* ---------- regalos entre amigos ---------- */
+.sw.wraps button{width:40px;height:40px;border-radius:9px;background:radial-gradient(circle at 30% 30%,var(--d) 0 3px,transparent 3.5px) 0 0/12px 12px,var(--c)}
+.linkrow{display:flex;gap:8px;margin-top:14px}
+.linkrow input{flex:1;min-width:0;padding:11px 12px;border:1.5px solid rgba(43,26,18,.25);border-radius:9px;background:#fffaf0;color:var(--ink2);font:500 14px/1.2 'JetBrains Mono',monospace}
+.linkrow .btn{flex:none;width:auto;margin:0;padding:11px 16px}
+.btn.wa{display:flex;align-items:center;justify-content:center;margin-top:10px;background:#1f8f4e;box-shadow:0 3px 0 #136637;text-decoration:none}
+.card.gift{text-align:center}
+.giftico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 6px;border-radius:50%;background:var(--red);color:var(--cream);box-shadow:0 4px 0 var(--red2)}
+.giftico svg{width:38px;height:38px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+.giftcard{position:fixed;left:50%;bottom:calc(var(--shop-h) + 14px);z-index:12;transform:translateX(-50%);width:min(420px,calc(100% - 24px));display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 18px 10px;border-radius:16px;background:var(--paper);color:var(--ink);text-align:center;
+  box-shadow:0 3px 0 rgba(43,26,18,.25),0 18px 40px rgba(0,0,0,.45);transition:opacity 220ms var(--ease-out),transform 220ms var(--ease-out)}
+@starting-style{.giftcard{opacity:0;transform:translateX(-50%) translateY(10px) scale(.97)}}
+.giftcard[hidden],.giftcard [hidden]{display:none!important}
+.giftcard b{font:400 22px/1.15 'Alfa Slab One',Georgia,serif;color:var(--red2)}
+.giftcard p{margin:4px 0 0;font:400 22px/1.3 Yesteryear,cursive;color:var(--ink)}
+#gcFrom{font-size:13px;font-weight:600;color:var(--ink2)}
+.gcbtns{display:flex;gap:8px;width:100%;margin-top:10px}
+.gcbtns .btn{flex:1;margin:0;padding:11px 10px;font-size:14.5px}
+.btn.alt{background:var(--green);box-shadow:0 3px 0 #0c3a26}
+@media (prefers-reduced-motion:reduce){.giftcard{transition:none}}
+
+/* fundido al entrar y salir de un túnel */
+#tunFade{position:fixed;inset:0;z-index:2;background:#05060c;opacity:0;pointer-events:none}
