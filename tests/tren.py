@@ -2,9 +2,9 @@
 """Prueba end-to-end del tren de todos (tren.html, prototipo) con Playwright.
 
 Partida nueva en la maqueta alpina: mover, acercar y girar la vista con ratón y con dedos, tocar un vagón para
-seguirlo (ficha con la marca y su enlace), la cámara dentro de los túneles, mandar un regalo a un amigo
-(con su enlace) y recibirlo en otro navegador, poner tu casa, reparto, objetivo del día que amplía la vía,
-subir un logo con enlace y pujar, enlace no válido, rival que te supera, vista previa en el tren, vagón con
+seguirlo (ficha con la marca y su enlace), la cámara dentro de los túneles, votar por dónde va el tren (panel y
+carteles), que el tren tome el camino que gana, el maquinista, poner tu casa, reparto, objetivo del día que amplía
+la vía, subir un logo con enlace y pujar, enlace no válido, rival que te supera, vista previa en el tren, vagón con
 mensaje, guardado y versión móvil. Falla si hay errores de JavaScript, recursos 404 o alguna comprobación no se cumple.
 
 Uso:
@@ -240,7 +240,7 @@ async def nav_touch(ctx, pg):
     await touch('touchEnd', [])
     check('subir dos dedos a la vez inclina la vista', a['el'] < 0.65 and abs(a['az'] - 1.57) < 0.01, f"el {a['el']}")
 
-    await pg.evaluate('__tren.look(1.57,0.8,250,-10,30);__tren.hold(true)')
+    await pg.evaluate('__tren.dist=12;__tren.look(1.57,0.8,250,-10,30);__tren.hold(true)')
     await frames(pg)
     c = await pg.evaluate('__tren.carScreen(2)')
     await pg.touchscreen.tap(c['x'] + 10, c['y'] + 9)
@@ -321,7 +321,7 @@ async def main():
         check('«Volver a la maqueta» suelta el vagón y esconde la ficha', not r['f'] and r['card']['hidden'], str(r))
 
         # 3) túnel: la cámara entra con el vagón (y la marca se sigue viendo) y vuelve a salir
-        r = await pg.evaluate("""(()=>{const T=__tren,u=T.map().runs.find(q=>q.k===1);T.hold(true);T.dist=u.s-40-T.offs(2);T.focus({car:2});T.camSettle();const a=T.inside();
+        r = await pg.evaluate("""(()=>{const T=__tren,u=T.map().runs.find(q=>q.k===1);T.route(0);T.hold(true);T.dist=u.s-40-T.offs(2);T.focus({car:2});T.camSettle();const a=T.inside();
           T.dist=u.s+u.len/2-T.offs(2);T.camSettle();const b=T.inside(),p=T.camInfo().p,g=T.ground(p[0],p[2]),c=T.carScreen(2);
           T.dist=u.s+u.len+30-T.offs(2);T.camSettle();return {a,b,under:p[1]<g-3,c,x:innerWidth,y:innerHeight,d:T.inside()}})()""")
         check('en un túnel la cámara entra en la gruta con el vagón centrado, y al salir vuelve fuera', not r['a'] and r['b'] and r['under'] and 0.25 * r['x'] < r['c']['x'] < 0.75 * r['x'] and 0.2 * r['y'] < r['c']['y'] < 0.8 * r['y'] and not r['d'], str(r))
@@ -331,85 +331,80 @@ async def main():
             await pg.screenshot(path=str(OUT / 'tren-4-tunel.png'), timeout=120000)
         await pg.evaluate('__tren.hold(false);__tren.focus(null)')
 
-        # 3b) mandar un regalo a un amigo: va en el vagón de regalos, suma al día y sale un enlace para compartir
+        # 3b) votar: con el panel, con los carteles de la maqueta y con el teclado
+        await pg.evaluate('__tren.goHome();__tren.camSettle();__tren.dist=__tren.forks()[0].s-150')
+        await pg.wait_for_timeout(400)
+        r = await pg.evaluate("({p:__tren.poll(),n:[0,1].map(i=>document.querySelector('#po'+i+' .pn').textContent),t:document.getElementById('pTime').textContent,s:[0,1].map(i=>!!__tren.sign(i))})")
+        check('hay una votación abierta para el próximo cruce, con sus dos caminos, cuenta atrás y carteles en la maqueta', r['p']['state'] == 'open' and r['n'] == r['p']['opts'] and len(set(r['n'])) == 2 and r['t'].startswith('0:2') and all(r['s']), str(r))
         t0 = await pg.evaluate('__tren.st.today')
-        await pg.click('#tGift')
-        await pg.fill('#gTo', '')
-        await pg.fill('#gFrom', 'Jon')
-        await pg.evaluate("document.getElementById('giftForm').noValidate=true")
-        await pg.click('#gGo')
-        r = await pg.evaluate("({err:document.getElementById('gErr').textContent,sent:__tren.st.sent})")
-        check('sin nombre no se manda el regalo', r['err'] and r['sent'] == 0, str(r))
-        await pg.fill('#gTo', 'Iker')
-        await pg.click('#gWrap button:nth-child(5)')
-        await pg.fill('#gMsg', '¡Feliz Navidad, campeón!')
-        await pg.click('#gGo')
-        r = await pg.evaluate("({g:__tren.gift(),sent:__tren.st.sent,today:__tren.st.today,left:document.querySelector('#tGift .lv').textContent,open:document.getElementById('shareSheet').classList.contains('on'),link:document.getElementById('sLink').value,wa:document.getElementById('sWa').href})")
-        dec = await pg.evaluate("l=>__tren.decode(l.split('#')[1])", r['link'])
-        check('el regalo sube al vagón de regalos, gasta uno de los 3 del día y suma al objetivo', r['g'] and r['g']['p'] == 'Iker' and r['g']['onCar'] and r['sent'] == 1 and r['today'] >= t0 + 1 and r['left'] == '2/3 hoy', str(r['g']))
-        check('sale un enlace con el regalo dentro y un botón de WhatsApp con ese enlace', r['open'] and dec == {'d': 'Jon', 'p': 'Iker', 'w': 4, 'm': '¡Feliz Navidad, campeón!'} and r['wa'].startswith('https://wa.me/?text=') and '%23regalo-' in r['wa'] and '?' not in r['link'], str(dec))
+        await pg.evaluate('__tren.setVotes(10,13)')
+        await pg.click('#po0')
+        r = await pg.evaluate("({p:__tren.poll(),v:__tren.st.votes,today:__tren.st.today,pr:document.getElementById('po0').getAttribute('aria-pressed'),t:document.getElementById('pTitle').textContent,ask:document.getElementById('pAsk').href,askOn:!document.getElementById('pAsk').hidden})")
+        check('un toque vota: suma al camino y al objetivo del día, y te dice cómo va tu voto', r['p']['mine'] == 0 and r['p']['votes'][0] == 11 and r['v'] == 1 and r['today'] >= t0 + 1 and r['pr'] == 'true' and r['t'].startswith('Tu voto pierde por'), str(r))
+        check('después de votar sale «Pide votos», con el camino y la dirección sin parámetros', r['askOn'] and r['ask'].startswith('https://wa.me/?text=') and 'reiniciar' not in r['ask'] and 'tren.html' in r['ask'], r['ask'][:140])
+        s1 = await pg.evaluate('__tren.sign(1)')
+        await pg.mouse.click(s1['x'], s1['y'] - 24)
+        r = await pg.evaluate('({p:__tren.poll(),v:__tren.st.votes,f:__tren.focused})')
+        check('tocar un cartel cambia el voto (no cuenta dos veces)', r['p']['mine'] == 1 and r['v'] == 1 and abs(r['p']['votes'][0] - 10) <= 1 and not r['f'], str(r))
+        await pg.keyboard.press('1')
+        check('la tecla 1 vota el camino de la izquierda', (await pg.evaluate('__tren.poll().mine')) == 0)
         if SHOTS:
-            await pg.screenshot(path=str(OUT / 'tren-9-compartir.png'), timeout=120000)
-        await pg.click('#sFollow')
-        await pg.evaluate('__tren.camSettle()')
-        r = await pg.evaluate('({f:__tren.focused,gc:__tren.giftCar()})')
-        check('«Seguir mi regalo» pega la cámara al vagón de regalos', r['f'] and r['f']['car'] == r['gc'], str(r))
-        await pg.evaluate('__tren.focus(null);for(let i=0;i<7;i++){__tren.st.today=0;__tren.step(14)}')
-        check('a la vuelta, Papá Noel se lleva el regalo y el vagón queda libre', await pg.evaluate('__tren.gift()===null'))
-        link = await pg.evaluate("document.getElementById('sLink').value")
+            await pg.wait_for_timeout(600)
+            await pg.screenshot(path=str(OUT / 'tren-9-votar.png'), timeout=120000)
+        await pg.click('#pGo' if not await pg.evaluate("document.getElementById('pGo').hidden") else '#nHome')
+        # el tren toma el camino que gana (por los dos lados), con todos los coches detrás por la misma vía
+        for side in (0, 1):
+            r = await pg.evaluate("""side=>{const T=__tren;T.hold(true);T.dist=T.forks()[0].s-30;const p=T.poll();T.setVotes(side===0?30:5,side===0?5:30);T.step(3.6);const c=T.poll();T.step(3);const b=T.bits();T.step(3);
+              let gap=0;for(let i=0;i<T.wagons()+3;i++){const a=T.carPos(i),q=T.carPos(i+1);if(!q)break;const d=Math.hypot(a[0]-q[0],a[2]-q[2])-Math.abs(T.offs(i+1)-T.offs(i));gap=Math.max(gap,Math.abs(d))}
+              T.hold(false);return {p,closed:c.state,won:c.won,b,exp:p.route[side],gap,after:T.poll().state}}""", side)
+            check(f"cuando gana el camino de la {'izquierda' if side == 0 else 'derecha'}, el tren va por ahí y los vagones le siguen", r['closed'] == 'closed' and r['won'] == side and r['b'] == r['exp'] and r['gap'] < 1.2, str(r))
+        # con la máquina ya en el ramal, la cola sigue por donde pasó y la vuelta se cierra sin saltos
+        r = await pg.evaluate("""(()=>{const T=__tren;let worst=0;T.dist=T.forks()[0].s-20;T.setVotes(T.poll().route[0]===1?40:1,T.poll().route[0]===1?1:40);let prev=[...Array(T.wagons()+3).keys()].map(i=>T.carPos(i)),laps=T.laps();
+          for(let k=0;k<1500&&T.laps()<laps+1;k++){T.st.today=0;T.step(0.05);const now=prev.map((_,i)=>T.carPos(i));now.forEach((q,i)=>{worst=Math.max(worst,Math.hypot(q[0]-prev[i][0],q[2]-prev[i][2]))});prev=now}
+          return {worst,laps:T.laps()-laps}})()""")
+        check('una vuelta entera por el ramal, sin que ningún coche dé un salto', r['laps'] >= 1 and r['worst'] < 0.5, str(r))
 
-        # 3c) el amigo abre el enlace en su navegador: ve llegar el tren, se abre la tarjeta y puede quedarse la casa
-        fr = await (await b.new_context(viewport={'width': 1200, 'height': 760})).new_page()
-        fr.on('pageerror', lambda e: errors.append(f'pageerror (amigo): {e}'))
-        await route_local_three(fr)
-        await fr.goto(link, wait_until='commit')
-        await fr.wait_for_function(READY, polling=500, timeout=420000)
-        r = await fr.evaluate("({on:document.getElementById('recvSheet').classList.contains('on'),t:document.getElementById('rLead').textContent})")
-        check('al abrir el enlace sale el aviso con el nombre de quien lo manda', r['on'] and 'Jon' in r['t'], str(r))
-        h0 = await fr.evaluate('__tren.houses()')
-        await fr.click('#rGo')
-        r = await fr.evaluate('({g:__tren.gift(),f:__tren.focused,gc:__tren.giftCar(),h:__tren.houses(),prov:__tren.prov()})')
-        check('el regalo va en el tren hacia su casa (una provisional si no tiene) y la cámara lo sigue', r['g'] and r['g']['mode'] == 'rec' and r['f']['car'] == r['gc'] and r['h'] == h0 + 1 and r['prov'] == h0 and r['g']['house'] == h0, str(r))
+        # 3c) maquinista: el nombre va en la locomotora; si te toca a ti, pones tu nombre, tocas el silbato y lo compartes
+        r = await pg.evaluate('(()=>{const a=__tren.driver();__tren.drive();return a})()')
+        check('siempre hay un maquinista con su nombre sobre la locomotora', r and r['name'] and r['tag'] and not r['me'], str(r))
+        r = await pg.evaluate("({c:!document.getElementById('drvCard').hidden,d:__tren.driver(),row:!document.getElementById('drvNameRow').hidden})")
+        check('si te toca, sale la tarjeta y pide el nombre solo entonces', r['c'] and r['d']['me'] and r['row'], str(r))
         if SHOTS:
-            await fr.wait_for_timeout(6000)
-            await fr.screenshot(path=str(OUT / 'tren-10-regalo.png'), timeout=120000)
-        await fr.wait_for_function("!document.getElementById('giftCard').hidden", timeout=120000)
-        r = await fr.evaluate("({to:document.getElementById('gcTo').textContent,m:document.getElementById('gcMsg').textContent,d:document.getElementById('gcFrom').textContent,keep:!document.getElementById('gcHouse').hidden})")
-        check('al pasar por su casa se abre la tarjeta con la dedicatoria', r == {'to': 'Para Iker', 'm': '¡Feliz Navidad, campeón!', 'd': 'De Jon', 'keep': True}, str(r))
-        if SHOTS:
-            await fr.wait_for_timeout(500)
-            await fr.screenshot(path=str(OUT / 'tren-11-tarjeta.png'), timeout=120000)
-        await fr.click('#gcHouse')
-        await fr.click('#gcSend')
-        r = await fr.evaluate("({mine:__tren.st.mine,name:__tren.st.myName,to:document.getElementById('gTo').value,d:document.getElementById('gFrom').value,on:document.getElementById('giftSheet').classList.contains('on')})")
-        check('puede quedarse la casa y devolver un regalo a quien se lo mandó', r['mine'] == h0 and r['name'] == 'Iker' and r['on'] and r['to'] == 'Jon' and r['d'] == 'Iker', str(r))
-        await fr.goto(link.split('#')[0] + '#regalo-esto0no1vale', wait_until='commit')
-        await fr.wait_for_timeout(600)
-        check('un enlace de regalo estropeado no abre nada', not await fr.evaluate("document.getElementById('recvSheet').classList.contains('on')"))
-        await fr.context.close()
+            await pg.wait_for_timeout(400)
+            await pg.screenshot(path=str(OUT / 'tren-10-maquinista.png'), timeout=120000)
+        await pg.fill('#drvName', '  <b>Jon</b> ')
+        await pg.click('#drvForm button[type=submit]')
+        await pg.click('#drvToot')
+        await pg.evaluate("document.getElementById('drvShare').addEventListener('click',e=>e.preventDefault())")
+        await pg.click('#drvShare')
+        r = await pg.evaluate("({d:__tren.driver(),n:__tren.st.myName,row:document.getElementById('drvNameRow').hidden,h:document.getElementById('drvShare').href})")
+        check('tu nombre (limpio) va en la locomotora, y «Presumir» lleva la dirección', r['d']['name'] == 'bJon/b' and r['n'] == 'bJon/b' and r['row'] and r['h'].startswith('https://wa.me/?text=') and 'tren.html' in r['h'], str(r))
+        await pg.click('#drvSee')
+        check('«Ver mi locomotora» sigue a la máquina', (await pg.evaluate('__tren.focused'))['car'] == 0)
+        await pg.evaluate('__tren.focus(null)')
+        await pg.click('#drvX')
 
         # 4) poner tu casa desde el formulario; la cámara va a verla
         await pg.evaluate('__tren.look(Math.PI/2,0.62)')
         h0 = await pg.evaluate('__tren.st.houses')
         await pg.click('#tHouse')
         await pg.fill('#hName', 'Jon')
-        await pg.fill('#hProv', 'Bizkaia')
         await pg.click('#houseForm button[type=submit]')
         await pg.wait_for_timeout(700)
         await pg.evaluate('__tren.camSettle()')
         r = await pg.evaluate('({mine:__tren.st.mine,h:__tren.st.houses,h3:__tren.houses(),name:__tren.st.myName,open:document.getElementById("houseSheet").classList.contains("on"),cam:__tren.camInfo()})')
         check('poner tu casa: hueco propio junto a la vía, con tu nombre, y la cámara se acerca', h0 <= r['mine'] < r['h'] and r['h3'] == r['h'] and r['name'] == 'Jon' and not r['open'] and r['cam']['d'] < 60, str(r))
 
-        # 5) el tren reparte y te deja regalos a ti
+        # 5) el tren reparte y te deja regalos a ti (si tu casa está en un ramal, se vota por él)
         mine = r['mine']
-        r = await pg.evaluate('(()=>{const T=__tren;for(let i=0;i<10;i++){T.st.today=0;T.step(15)}return {d:T.delivered(),laps:T.laps(),me:T.st.myGifts,total:T.st.total}})()')
+        r = await pg.evaluate("""(()=>{const T=__tren;const sl=T.slot(T.st.mine);for(let i=0;i<60;i++){const p=T.poll();if(p&&p.state==='open'&&p.f===sl.f){const a=p.route[0]===sl.side1;T.setVotes(a?50:0,a?0:50)}T.st.today=0;T.step(2.5)}return {f:sl.f,d:T.delivered(),laps:T.laps(),me:T.st.myGifts,total:T.st.total}})()""")
         check('el tren reparte en las casas y también en la tuya', r['d'] > 5 and r['laps'] >= 1 and r['me'] > 0, str(r))
 
-        # 6) objetivo del día cumplido: la vía crece y vuelven los regalos gratis
+        # 6) objetivo del día cumplido: la vía crece
         r = await pg.evaluate("""(async()=>{const T=__tren,d0=T.st.day,s0=T.st.stage,L0=T.map().L;T.finishDay();for(let i=0;i<150&&T.busy;i++)await new Promise(r=>setTimeout(r,100));
-          return {d0,s0,L0,day:T.st.day,stage:T.st.stage,L:T.map().L,runs:T.map().runs,h3:T.houses(),h:T.st.houses,mine:T.st.mine,today:T.st.today,left:document.querySelector('#tGift .lv').textContent}})()""")
+          return {d0,s0,L0,day:T.st.day,stage:T.st.stage,L:T.map().L,runs:T.map().runs,h3:T.houses(),h:T.st.houses,mine:T.st.mine,today:T.st.today,poll:T.poll()}})()""")
         check('al cumplir el objetivo del día la vía crece (con puentes) y las casas se recolocan', r['day'] == r['d0'] + 1 and r['stage'] == r['s0'] + 1 and r['L'] > r['L0'] + 50 and any(x['k'] == 2 for x in r['runs']) and r['h3'] == r['h'] and r['mine'] == mine and r['today'] < 60, str({k: r[k] for k in ('day', 'stage', 'L0', 'L', 'runs', 'h3', 'h', 'mine', 'today')}))
-        check('el día nuevo devuelve los 3 regalos gratis', r['left'] == '3/3 hoy', r['left'])
+        check('con la vía nueva hay más cruces y la votación sigue', len(await pg.evaluate('__tren.forks()')) == 2 and r['poll']['state'] == 'open', str(r['poll']))
 
         # 7) tu marca: subir logo, texto y enlace; un enlace raro no vale; pujar por el vagón del día
         await pg.click('#tAd')
@@ -460,9 +455,9 @@ async def main():
         await pg.reload(wait_until='commit')
         await pg.wait_for_function(READY, polling=500, timeout=420000)
         r = await pg.evaluate('({...__tren.st,w3:__tren.wagons(),h3:__tren.houses(),ads:__tren.ads()})')
-        keys = ('wagons', 'stage', 'mine', 'myName', 'day', 'sent', 'sToday', 'sDay')
+        keys = ('wagons', 'stage', 'mine', 'myName', 'day', 'votes', 'wins', 'drives')
         same = all(r[k] == saved[k] for k in keys)
-        check('al recargar sigue el mismo tren, tu casa, tus regalos y tu vagón con mensaje', same and r['w3'] == saved['wagons'] and saved['mineAd'] in r['ads'], f"{ {k: r[k] for k in keys} } / { {k: saved[k] for k in keys} }")
+        check('al recargar sigue el mismo tren, tu casa, tus votos y tu vagón con mensaje', same and r['w3'] == saved['wagons'] and saved['mineAd'] in r['ads'], f"{ {k: r[k] for k in keys} } / { {k: saved[k] for k in keys} }")
 
         # 11) móvil: todo cabe y se puede tocar
         mob = await b.new_context(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
@@ -471,12 +466,13 @@ async def main():
         await route_local_three(mp)
         await mp.goto(f'http://127.0.0.1:{PORT}/tren.html?reiniciar', wait_until='commit')
         await mp.wait_for_function(READY, polling=500, timeout=420000)
-        r = await mp.evaluate("""(()=>{const s=document.getElementById('shop').getBoundingClientRect(),its=[...document.querySelectorAll('.it')].map(e=>e.getBoundingClientRect()),
+        r = await mp.evaluate("""(()=>{const s=document.getElementById('shop').getBoundingClientRect(),its=[...document.querySelectorAll('.it,.po')].map(e=>e.getBoundingClientRect()),
           d=document.querySelector('.day').getBoundingClientRect(),n=document.getElementById('tip').getBoundingClientRect();
-          return {sw:document.documentElement.scrollWidth,w:innerWidth,shop:s.bottom<=innerHeight+1,minW:Math.min(...its.map(r=>r.width)),minH:Math.min(...its.map(r=>r.height)),dayH:d.height,gap:n.top-d.bottom}})()""")
-        check('en el móvil caben la cabecera, las noticias y las tres fichas', r['sw'] <= r['w'] and r['shop'] and r['minW'] >= 90 and r['minH'] >= 44 and r['dayH'] < 24 and r['gap'] >= 0, str(r))
+          return {sw:document.documentElement.scrollWidth,w:innerWidth,shop:s.bottom<=innerHeight+1,dock:s.height/innerHeight,minW:Math.min(...its.map(r=>r.width)),minH:Math.min(...its.map(r=>r.height)),dayH:d.height,gap:n.top-d.bottom}})()""")
+        check('en el móvil caben la cabecera, las noticias, la votación y las dos fichas', r['sw'] <= r['w'] and r['shop'] and r['dock'] < 0.23 and r['minW'] >= 90 and r['minH'] >= 44 and r['dayH'] < 24 and r['gap'] >= 0, str(r))
         await nav_touch(mob, mp)
         await mp.evaluate('__tren.focus({car:2});__tren.camSettle()')
+        await mp.wait_for_timeout(400)
         r = await mp.evaluate("""(()=>{const c=document.getElementById('card').getBoundingClientRect(),s=document.getElementById('shop').getBoundingClientRect();return {l:c.left,r:c.right,b:c.bottom,top:s.top,w:innerWidth,vis:!document.getElementById('card').hidden}})()""")
         check('en el móvil la ficha del vagón cabe encima de las fichas de abajo', r['vis'] and r['l'] >= 0 and r['r'] <= r['w'] and r['b'] <= r['top'], str(r))
         if SHOTS:

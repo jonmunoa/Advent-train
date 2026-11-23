@@ -1,13 +1,13 @@
 // El tren de Navidad (prototipo, nombre provisional): economía y comunidad simulada, sin DOM.
-// Un solo tren para todo el mundo. Cada jugador manda regalos a sus amigos por el tren: el regalo viaja en el
-// vagón de regalos hasta la casa del amigo, y al amigo le llega un enlace para verlo llegar (y mandar otro).
-// Los regalos enviados por todos suman al objetivo común del día; al cumplirlo pasa el día y el tren recibe una
-// mejora: un tramo nuevo de vía (etapa de tren-map.js), otro vagón o más luces. Los jugadores ponen su casa junto a
-// la vía. En el prototipo los demás jugadores están simulados (online, crowdGifts, nombres).
+// Un solo tren para todo el mundo. En cada aguja la gente vota, con un toque, por qué camino va; entre los que votan
+// sale el maquinista, que lleva su nombre en la locomotora hasta la aguja siguiente. Los votos de todos suman al
+// objetivo común del día; al cumplirlo pasa el día y el tren recibe una mejora: un tramo nuevo de vía (etapa de
+// tren-map.js), otro vagón o más luces. Los jugadores ponen su casa junto a la vía. En el prototipo los demás
+// jugadores están simulados (online, crowdVotes, nombres).
 import {MAXSTAGE, slotsOf} from './tren-map.js';
 
-export const TKEY = 'advx-tren', TV = 3, DAYS = 24;
-export const MAXLIGHTS = 3, WAGON_MAX = 10, CAP = 5, FREE_GIFTS = 3;
+export const TKEY = 'advx-tren', TV = 4, DAYS = 24;
+export const MAXLIGHTS = 3, WAGON_MAX = 10, CAP = 5;
 export const DAY_SEC = 200;                 // en la demo, un día de Adviento dura unos 3 minutos
 export const BID_MIN = 5, BID_STEP = 1, MSG_PRICE = 3, CLOSE_H = 21;
 const nice = x => {if (x < 100) return Math.round(x); const p = 10 ** (Math.floor(Math.log10(x)) - 1); return Math.round(x / p) * p};
@@ -17,28 +17,43 @@ export const sacoOf = w => Math.round(10 * 1.5 ** w.lights * 2 ** w.stage);   //
 /* comunidad simulada */
 export const online = t => Math.max(12, Math.round(110 + 55 * Math.sin(t / 240) + 18 * Math.sin(t / 37 + 1)));
 const dayK = d => 1 + 0.1 * (d - 1);
-export const crowdGifts = (t, day) => online(t) * 0.055 * dayK(day);      // regalos por segundo que manda el resto
-export const goalFor = w => nice(110 * 0.055 * dayK(w.day) * DAY_SEC);
+export const VOTE_K = 0.008;
+export const crowdVotes = (t, day) => online(t) * VOTE_K * dayK(day);      // votos por segundo del resto
+export const goalFor = w => nice(110 * VOTE_K * dayK(w.day) * DAY_SEC);
 export const NAMES = ['Ane', 'Iker', 'Lucía', 'Mateo', 'Martina', 'Hugo', 'Leire', 'Unai', 'Sara', 'Pablo', 'Noa', 'Aitor', 'Carmen', 'Javi', 'Irene', 'Marcos', 'Nerea', 'Álvaro', 'Paula', 'Amaia'];
-export const PROVS = ['Bizkaia', 'Gipuzkoa', 'Álava', 'Navarra', 'Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Asturias', 'Cantabria', 'Málaga', 'Zaragoza', 'A Coruña', 'Murcia', 'Granada'];
-export const KIN = ['su abuela', 'su abuelo', 'su madre', 'su padre', 'su hermana', 'su hermano', 'su mejor amiga', 'su mejor amigo', 'su prima', 'su tía'];
 export const BIZ = ['Bar Txoko', 'Floristería Lirio', 'Taller Mendi', 'Academia Lur', 'Librería Itsaso', 'Panadería Ogi'];
-export const WRAP_NAMES = ['Rojo con lunares', 'Verde con estrellas', 'Rayas de caramelo', 'Dorado con rombos', 'Azul nevado', 'Morado con lunares'];
 
 export function newWorld(now = Date.now()) {
-  const w = {v: TV, day: 1, stage: 0, wagons: 3, lights: 0, houses: 3, mine: -1, prov: -1, myName: '', myProv: '',
-    today: 0, goal: 0, total: 18430, myGifts: 0, sent: 0, sDay: 1, sToday: 0, t: now};
+  const w = {v: TV, day: 1, stage: 0, wagons: 3, lights: 0, houses: 3, mine: -1, myName: '',
+    today: 0, goal: 0, total: 18430, myGifts: 0, votes: 0, wins: 0, drives: 0, sinceDrive: 0, t: now};
   w.goal = goalFor(w);
   return w;
 }
-/* regalos enviados hoy por todos: devuelve true si se cumple el objetivo del día */
-export function addSent(w, x) {w.today += x; return w.day <= DAYS && w.today >= w.goal}
-export const giftsLeft = w => w.sDay === w.day ? Math.max(0, FREE_GIFTS - w.sToday) : FREE_GIFTS;
-/* gasta uno de tus regalos del día; false si ya no te quedan */
-export function sendGift(w) {
-  if (w.sDay !== w.day) {w.sDay = w.day; w.sToday = 0}
-  if (w.sToday >= FREE_GIFTS) return false;
-  w.sToday++; w.sent++; return true;
+/* votos de hoy entre todos: devuelve true si se cumple el objetivo del día */
+export function addVotes(w, x) {w.today += x; return w.day <= DAYS && w.today >= w.goal}
+
+/* una votación: n[0] son los votos del camino de la izquierda y n[1], los de la derecha */
+export const newPoll = (rnd = Math.random) => ({n: [0, 0], mine: -1, ph: rnd() * 6.28, tilt: (rnd() - 0.5) * 0.3});
+/* votos del resto: k votos repartidos con una tendencia que cambia y un empujón al que va perdiendo (suele haber pelea hasta el final) */
+export function crowdVote(p, k, t) {
+  const tot = p.n[0] + p.n[1], q = Math.min(0.9, Math.max(0.1, 0.5 + p.tilt + 0.1 * Math.sin(t * 0.21 + p.ph) + 0.35 * (p.n[1] - p.n[0]) / (tot + 8)));
+  p.n[0] += k * q; p.n[1] += k * (1 - q);
+}
+/* tu voto: uno por aguja, y se puede cambiar hasta que se cierra. Devuelve 'nuevo', 'cambio' o null si no cambia nada */
+export function castVote(p, side) {
+  if ((side !== 0 && side !== 1) || p.mine === side) return null;
+  const was = p.mine; if (was >= 0) p.n[was]--;
+  p.n[side]++; p.mine = side; return was < 0 ? 'nuevo' : 'cambio';
+}
+export const votesOf = p => [Math.floor(p.n[0] + 1e-6), Math.floor(p.n[1] + 1e-6)];
+/* gana quien tenga más votos; en un empate decide tu voto (en la demo) y, si no has votado, la suerte */
+export const winnerOf = (p, rnd = Math.random) => {const [a, b] = votesOf(p); return a > b ? 0 : b > a ? 1 : p.mine >= 0 ? p.mine : rnd() < 0.5 ? 0 : 1};
+/* ¿te toca ser el maquinista? Solo si has votado; en la demo sale a menudo, y como tarde al tercer voto */
+export function drawDriver(w, voted, rnd = Math.random) {
+  if (!voted) return false;
+  w.sinceDrive++;
+  if (w.sinceDrive < 3 && rnd() >= 0.4) return false;
+  w.sinceDrive = 0; w.drives++; return true;
 }
 /* recompensa del día cumplido: los días impares crece la vía (hasta la última etapa); los demás, otro vagón o más luces */
 export function rewardOf(w) {
@@ -48,11 +63,11 @@ export function rewardOf(w) {
   if (w.lights < MAXLIGHTS) return 'luces';
   return w.stage < MAXSTAGE ? 'via' : null;
 }
-/* pasa al día siguiente: aplica la recompensa y devuelve los regalos gratis del día; devuelve la recompensa */
+/* pasa al día siguiente: aplica la recompensa y la devuelve */
 export function nextDay(w) {
   const r = w.day < DAYS ? rewardOf(w) : null;
   if (r === 'via') w.stage++; else if (r === 'vagon') w.wagons++; else if (r === 'luces') w.lights++;
-  w.day = Math.min(DAYS, w.day + 1); w.today = 0; w.goal = goalFor(w); w.sDay = w.day; w.sToday = 0;
+  w.day = Math.min(DAYS, w.day + 1); w.today = 0; w.goal = goalFor(w);
   return r;
 }
 
@@ -79,30 +94,6 @@ export function cleanUrl(s) {
   } catch (e) {return null}
 }
 
-/* regalo que viaja en un enlace (#regalo-…): de, para, papel y dedicatoria, en base32 (solo letras y números,
-   para que pase tal cual en el # de cualquier enlace). Al abrirlo se valida todo otra vez. */
-const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
-export const GIFT_MAX = {name: 14, msg: 80};
-export function cleanGift(g) {
-  if (!g || typeof g !== 'object') return null;
-  const d = cleanText(g.d, GIFT_MAX.name), p = cleanText(g.p, GIFT_MAX.name), m = cleanText(g.m, GIFT_MAX.msg), w = Math.floor(+g.w);
-  if (!d || !p || !(w >= 0 && w < WRAP_NAMES.length)) return null;
-  return {d, p, w, m};
-}
-export function encodeGift(g) {
-  const c = cleanGift(g); if (!c) return null;
-  const bytes = new TextEncoder().encode(JSON.stringify({v: 1, ...c})); let out = '', bits = 0, val = 0;
-  for (const b of bytes) {val = ((val << 8) | b) & 0xffff; bits += 8; while (bits >= 5) {out += B32[(val >>> (bits - 5)) & 31]; bits -= 5}}
-  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
-  return out;
-}
-export function decodeGift(s) {
-  s = String(s || '').toLowerCase().replace(/^#?regalo-/, ''); if (!s || s.length > 700) return null;
-  const out = []; let bits = 0, val = 0;
-  for (const ch of s) {const v = B32.indexOf(ch); if (v < 0) return null; val = ((val << 5) | v) & 0xffff; bits += 5; if (bits >= 8) {out.push((val >>> (bits - 8)) & 255); bits -= 8}}
-  try {const o = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(new Uint8Array(out))); return o && o.v === 1 ? cleanGift(o) : null} catch (e) {return null}
-}
-
 /* guardado: se valida y se acota todo; null si está roto o es de otra versión */
 export function parseWorld(raw) {
   let o; try {o = JSON.parse(raw)} catch (e) {return null}
@@ -114,10 +105,9 @@ export function parseWorld(raw) {
   w.wagons = num(o.wagons, 1, WAGON_MAX, 3);
   w.lights = num(o.lights, 0, MAXLIGHTS, 0);
   w.houses = num(o.houses, 0, slotsOf(w.stage).length, 3);
-  w.mine = num(o.mine, -1, w.houses - 1, -1); w.prov = num(o.prov, -1, w.houses - 1, -1);   // prov: la casa provisional a la que te llegó un regalo
-  for (const k of ['today', 'total', 'myGifts', 'sent']) w[k] = num(o[k], 0, 1e15, 0);
-  w.sDay = num(o.sDay, 1, DAYS, w.day); w.sToday = num(o.sToday, 0, FREE_GIFTS, 0);
-  w.myName = cleanText(o.myName, 14); w.myProv = cleanText(o.myProv, 20);
+  w.mine = num(o.mine, -1, w.houses - 1, -1);
+  for (const k of ['today', 'total', 'myGifts', 'votes', 'wins', 'drives', 'sinceDrive']) w[k] = num(o[k], 0, 1e15, 0);
+  w.myName = cleanText(o.myName, 14);
   if (w.mine >= 0 && !w.myName) w.mine = -1;
   w.goal = num(o.goal, 1, 1e15, 0) || goalFor(w);
   return w;

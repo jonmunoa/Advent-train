@@ -95,26 +95,76 @@ export const STAGES_RAW = [
 export const STAGES = STAGES_RAW.map(l => {const i = Math.max(0, l.findIndex(p => p[3])); return [...l.slice(i), ...l.slice(0, i)].map(p => p.slice(0, 3))});
 export const KG = 0, KT = 1, KB = 2;       // a ras, túnel, puente
 
-function buildTrack3(pts) {
-  const curve = new CatmullRomCurve3(pts.map(p => new Vector3(p[0], p[2], p[1])), true, 'centripetal');
-  const L = curve.getLength(), N = Math.round(L / STEP), sp = curve.getSpacedPoints(N), ds = L / N;
-  const x = new Float32Array(N), y = new Float32Array(N), z = new Float32Array(N), a = new Float32Array(N), p = new Float32Array(N), k = new Uint8Array(N);
-  for (let i = 0; i < N; i++) {x[i] = sp[i].x; y[i] = sp[i].y; z[i] = sp[i].z}
-  for (let i = 0; i < N; i++) {const q = (i + 1) % N, b = (i - 1 + N) % N, dx = x[q] - x[b], dz = z[q] - z[b]; a[i] = Math.atan2(dz, dx); p[i] = Math.atan2(y[q] - y[b], Math.hypot(dx, dz))}
-  // túnel, puente o a ras según lo lejos que quede el relieve natural
-  const wet = new Uint8Array(N);
+/* Agujas: en cada una la gente vota entre seguir por la vía principal o por un ramal que vuelve a ella más adelante.
+   from y to son puntos [x, z] de la vía principal (se toma la muestra más cercana) y pts, los del ramal [x, z, y]. */
+const OPT = {
+  tunel: {n: 'Túnel', art: 'el túnel'}, bosque: {n: 'Bosque', art: 'el bosque'},
+  orilla: {n: 'Orilla', art: 'la orilla'}, puente: {n: 'Puente', art: 'el puente del lago'}, pistas: {n: 'Pistas', art: 'las pistas de esquí'}, lago: {n: 'Lago', art: 'el lago'},
+  monte: {n: 'Montaña', art: 'la montaña'}, valle: {n: 'Valle', art: 'el valle'},
+};
+const F_HILL = {id: 'colina', from: [-19.5, 3], to: [17, -43.2], opts: ['tunel', 'bosque'], pts: [[-25, -12, 1.2], [-33, -27, 1.6], [-32, -44, 2], [-19, -57, 2.3], [-3, -58, 2.5], [8, -49, 2.7]]};
+const F_HILL3 = {...F_HILL, to: [22, -52], pts: [[-25, -12, 1.2], [-33, -27, 1.6], [-34, -46, 2], [-22, -61, 2.4], [-4, -65, 2.8], [10, -59, 3.2]]};
+const F_LAKE = {id: 'lago', from: [60, -21], to: [14, 77], opts: ['orilla', 'puente'], pts: [[68, -11, 3.8], [66, 3, 3.6], [56, 14, 3.5], [49, 27, 3.4], [45.5, 41, 3.4], [44, 55, 3.4], [43, 67, 3.5], [38, 78, 3.6], [29, 83.5, 3.8]]};
+const F_LAKE3 = {id: 'lago', from: [50, -56], to: [14, 77], opts: ['pistas', 'lago'], pts: [[63, -50, 5.6], [70, -38, 5], [70, -22, 4.4], [66, -5, 3.8], [57, 12, 3.5], [49, 27, 3.4], [45.5, 41, 3.4], [44, 55, 3.4], [43, 67, 3.5], [38, 78, 3.6], [29, 83.5, 3.8]]};
+const F_MONT = {id: 'monte', from: [-57, 23], to: [-91, 79], opts: ['monte', 'valle'], pts: [[-71, 19.5, 8.3], [-85, 22, 7.3], [-97, 31, 6.1], [-104, 44, 4.9], [-104, 58, 3.6], [-98, 70, 2.5]]};
+export const FORKS = [[F_HILL], [F_HILL, F_LAKE], [F_HILL, F_LAKE, F_MONT], [F_HILL3, F_LAKE3, F_MONT]];
+
+function heads(x, y, z, a, p, N) {for (let i = 0; i < N; i++) {const q = (i + 1) % N, b = (i - 1 + N) % N, dx = x[q] - x[b], dz = z[q] - z[b]; a[i] = Math.atan2(dz, dx); p[i] = Math.atan2(y[q] - y[b], Math.hypot(dx, dz))}}
+function runsOf(k, N) {
+  const out = []; let s = 0; while (s < N && k[s] === k[(s - 1 + N) % N]) s++; if (s >= N) return [{k: k[0], i: 0, n: N}];
+  for (let c = 0; c < N;) {const i = (s + c) % N, kk = k[i]; let n = 0; while (n < N - c && k[(i + n) % N] === kk) n++; out.push({k: kk, i, n}); c += n} return out;
+}
+/* túnel, puente o a ras según lo lejos que quede el relieve natural */
+function classify(x, y, z, N, ds) {
+  const k = new Uint8Array(N), wet = new Uint8Array(N);
   for (let i = 0; i < N; i++) {const g = H0(x[i], z[i]), d = g - y[i]; k[i] = d > TUN_DY ? KT : d < -BR_DY ? KB : KG; wet[i] = g < LAKE_Y - 0.3 && d < -1.2 ? 1 : 0}
   // sobre el agua siempre hay puente (un puentecito sobre el arroyo), con 4 m de estribo a cada lado
   for (let i = 0; i < N; i++) if (wet[i]) for (let q = -8; q <= 8; q++) {const j = (i + q + N) % N; if (k[j] === KG) k[j] = KB}
-  const runs = () => {const out = []; let s = 0; while (s < N && k[s] === k[(s - 1 + N) % N]) s++; if (s >= N) return [{k: k[0], i: 0, n: N}];
-    for (let c = 0; c < N;) {const i = (s + c) % N, kk = k[i]; let n = 0; while (n < N - c && k[(i + n) % N] === kk) n++; out.push({k: kk, i, n}); c += n} return out};
   const minLen = {[KT]: 16 / ds, [KB]: 6 / ds};
-  for (const r of runs()) if (r.k !== KG && r.n < minLen[r.k]) for (let j = 0; j < r.n; j++) k[(r.i + j) % N] = KG;
-  for (const r of runs()) if (r.k === KG && r.n < 6 / ds) {const prev = k[(r.i - 1 + N) % N], next = k[(r.i + r.n) % N]; if (prev === next && prev !== KG) for (let j = 0; j < r.n; j++) k[(r.i + j) % N] = prev}
+  for (const r of runsOf(k, N)) if (r.k !== KG && r.n < minLen[r.k]) for (let j = 0; j < r.n; j++) k[(r.i + j) % N] = KG;
+  for (const r of runsOf(k, N)) if (r.k === KG && r.n < 6 / ds) {const prev = k[(r.i - 1 + N) % N], next = k[(r.i + r.n) % N]; if (prev === next && prev !== KG) for (let j = 0; j < r.n; j++) k[(r.i + j) % N] = prev}
+  return k;
+}
+function buildTrack3(pts) {
+  const curve = new CatmullRomCurve3(pts.map(p => new Vector3(p[0], p[2], p[1])), true, 'centripetal');
+  const L = curve.getLength(), N = Math.round(L / STEP), sp = curve.getSpacedPoints(N), ds = L / N;
+  const x = new Float32Array(N), y = new Float32Array(N), z = new Float32Array(N), a = new Float32Array(N), p = new Float32Array(N);
+  for (let i = 0; i < N; i++) {x[i] = sp[i].x; y[i] = sp[i].y; z[i] = sp[i].z}
+  heads(x, y, z, a, p, N);
+  const k = classify(x, y, z, N, ds);
   for (let j = -20; j <= 30; j++) k[(j + N) % N] = KG; // el taller siempre a ras
-  const T = {x, y, z, a, p, k, N, L, ds};
-  T.runs = runs().filter(r => r.k !== KG);
-  return T;
+  return {x, y, z, a, p, k, N, L, ds, runs: runsOf(k, N).filter(r => r.k !== KG)};
+}
+/* ramal de una aguja: sale y entra pegado a la vía principal (comparte los primeros y los últimos metros) */
+function buildAlt(T, f) {
+  const near = ([px, pz]) => {let m = 1e9, bi = 0; for (let i = 0; i < T.N; i++) {const d = Math.hypot(T.x[i] - px, T.z[i] - pz); if (d < m) {m = d; bi = i}} return bi};
+  const i0 = near(f.from), i1 = near(f.to), P = i => new Vector3(T.x[i], T.y[i], T.z[i]), m = s => Math.round(s / T.ds);
+  // curva por los puntos, remuestreada cada 3 m y suavizada (energía de flexión) con los extremos clavados en la vía principal
+  const c0 = new CatmullRomCurve3([P(i0 - m(9)), P(i0), ...f.pts.map(p => new Vector3(p[0], p[2], p[1])), P(i1), P(i1 + m(9))], false, 'centripetal'), n0 = f.pts.length + 3, M0 = 600, W = [], al = [0];
+  for (let q = 0; q <= M0; q++) {W.push(c0.getPoint((1 + (n0 - 2) * q / M0) / n0)); if (q) al.push(al[q - 1] + W[q].distanceTo(W[q - 1]))}
+  const nC = Math.round(al[M0] / 3), C = [P(i0 - m(9)), P(i0 - m(6)), P(i0 - m(3)), P(i0), P(i0 + m(3))];
+  for (let i = 2, q = 0; i <= nC - 2; i++) {const s = i / nC * al[M0]; while (al[q + 1] < s) q++; C.push(W[q].clone().lerp(W[q + 1], (s - al[q]) / (al[q + 1] - al[q])))}
+  C.push(P(i1 - m(3)), P(i1), P(i1 + m(3)), P(i1 + m(6)), P(i1 + m(9)));
+  for (let it = 0; it < 1600; it++) {const D = C.map(v => v.clone()); for (let i = 5; i < C.length - 5; i++) for (const k of ['x', 'y', 'z']) C[i][k] = D[i][k] - 0.06 * (D[i - 2][k] - 4 * D[i - 1][k] + 6 * D[i][k] - 4 * D[i + 1][k] + D[i + 2][k])}
+  const ctrl = C.slice(2, -2), c = new CatmullRomCurve3(ctrl, false, 'centripetal'), n = ctrl.length - 1, Q = [], t0 = 1 / n, t1 = (n - 1) / n, K = 1600, acc = [0];
+  for (let q = 0; q <= K; q++) {Q.push(c.getPoint(t0 + (t1 - t0) * q / K)); if (q) acc.push(acc[q - 1] + Q[q].distanceTo(Q[q - 1]))}
+  const N = Math.round(acc[K] / T.ds), x = new Float32Array(N), y = new Float32Array(N), z = new Float32Array(N);
+  for (let i = 0, q = 0; i < N; i++) {const s = i / N * acc[K]; while (acc[q + 1] < s) q++; const t = (s - acc[q]) / (acc[q + 1] - acc[q]); x[i] = lerp(Q[q].x, Q[q + 1].x, t); y[i] = lerp(Q[q].y, Q[q + 1].y, t); z[i] = lerp(Q[q].z, Q[q + 1].z, t)}
+  return {i0, i1, N, x, y, z, k: null};
+}
+/* una vuelta completa: la vía principal, cambiada por el ramal en las agujas del bit a 1 */
+function buildRoute(T, alts, bits) {
+  if (!bits) return Object.assign(T, {bits: 0, fs: alts.map(A => A.i0 * T.ds), ms: alts.map(A => A.i1 * T.ds), alt: alts.map(() => null)});
+  const src = [], fs = [], ms = [], alt = [];   // [tramo: -1 principal o nº de aguja, muestra]
+  for (let i = 0; i < T.N;) {const f = alts.findIndex(A => A.i0 === i); if (f < 0) {src.push([-1, i++]); continue}
+    const A = alts[f]; fs[f] = src.length; if (bits >> f & 1) {alt[f] = src.length; for (let q = 0; q < A.N; q++) src.push([f, q])} else {alt[f] = null; for (let q = A.i0; q < A.i1; q++) src.push([-1, q])}
+    ms[f] = src.length; i = A.i1}
+  const N = src.length, pick = key => {const o = new Float32Array(N); src.forEach(([f, i], j) => {o[j] = (f < 0 ? T : alts[f])[key][i]}); return o}, x = pick('x'), y = pick('y'), z = pick('z'), a = new Float32Array(N), p = new Float32Array(N), k = new Uint8Array(N);
+  heads(x, y, z, a, p, N);
+  // el tipo de cada tramo no cambia según por dónde se llegue: se calcula una vez por tramo
+  if (alts.some((A, f) => bits >> f & 1 && !A.k)) {const kk = classify(x, y, z, N, T.ds); alts.forEach((A, f) => {if (bits >> f & 1 && !A.k) A.k = kk.slice(alt[f], alt[f] + A.N)})}
+  src.forEach(([f, i], j) => {k[j] = (f < 0 ? T : alts[f]).k[i]});
+  return {x, y, z, a, p, k, N, L: N * T.ds, ds: T.ds, bits, fs: fs.map(i => i * T.ds), ms: ms.map(i => i * T.ds), alt: alt.map(i => i === null ? null : i * T.ds), runs: runsOf(k, N).filter(r => r.k !== KG)};
 }
 const wrapA = a => {while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a};
 export const idxM = (T, s) => Math.floor((((s % T.L) + T.L) % T.L) / T.ds) % T.N;
@@ -124,24 +174,45 @@ export const kindAt = (T, s) => T.k[idxM(T, s)];
 
 /* ================= el suelo con la vía: rejilla de muestras para buscar la vía más cercana ================= */
 const GC = 8;
+/* todas las muestras sin repetir (la vía principal y los ramales); b es el tramo (0 principal, f + 1 ramal) y q, los metros desde su comienzo */
+function unionOf(T, alts) {
+  const N = T.N + alts.reduce((n, A) => n + A.N, 0), U = {N, ds: T.ds, L: T.L, x: new Float32Array(N), y: new Float32Array(N), z: new Float32Array(N), k: new Uint8Array(N), b: new Uint8Array(N), q: new Float32Array(N), alts};
+  let o = 0; [T, ...alts].forEach((B, b) => {for (let i = 0; i < B.N; i++, o++) {U.x[o] = B.x[i]; U.y[o] = B.y[i]; U.z[o] = B.z[i]; U.k[o] = B.k[i]; U.b[o] = b; U.q[o] = i * T.ds}});
+  return U;
+}
+/* metros por la vía entre dos muestras (por el camino más corto) */
+function alongD(U, i, j) {
+  if (U.b[i] > U.b[j]) [i, j] = [j, i];
+  const d = Math.abs(U.q[i] - U.q[j]);
+  if (U.b[i] === U.b[j]) return U.b[i] ? d : Math.min(d, U.L - d);
+  const w = x => {x = Math.abs(x); return Math.min(x, U.L - x)}, f = m => {const A = U.alts[U.b[m] - 1]; return [[A.i0 * U.ds, U.q[m]], [A.i1 * U.ds, A.N * U.ds - U.q[m]]]}, ends = f(j);
+  if (!U.b[i]) return Math.min(...ends.map(([s, e]) => w(U.q[i] - s) + e));
+  return Math.min(...f(i).flatMap(([s, e]) => ends.map(([s2, e2]) => w(s - s2) + e + e2)));
+}
 function sampleGrid(T) {
   const g = new Map();
   for (let i = 0; i < T.N; i += 2) {const key = Math.floor(T.x[i] / GC) * 8192 + Math.floor(T.z[i] / GC); let l = g.get(key); if (!l) g.set(key, l = []); l.push(i)}
   return g;
 }
-/* distancia a la vía más cercana (de cualquier tipo) y su índice */
+/* distancia a la vía más cercana (de cualquier tipo) y su índice en la unión de tramos */
 export function nearTrack(G, x, z, rmax = 16) {
   const T = G.T, cx = Math.floor(x / GC), cz = Math.floor(z / GC), R = Math.ceil(rmax / GC); let m = rmax * rmax, bi = -1;
   for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) {const l = G.grid.get((cx + a) * 8192 + cz + b); if (l) for (const i of l) {const dx = T.x[i] - x, dz = T.z[i] - z, d = dx * dx + dz * dz; if (d < m) {m = d; bi = i}}}
   return {d: bi < 0 ? rmax : Math.sqrt(m), i: bi};
 }
-const RMAX = CORR + FALL + 14;
-/* ¿pasa otro tramo de la vía (lejos a lo largo de ella) a menos de r de (x, z)? */
-export function otherNear(G, i, x, z, r) {
-  const T = G.T, cx = Math.floor(x / GC), cz = Math.floor(z / GC), R2 = r * r, far = 30 / T.ds;
-  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {const l = G.grid.get((cx + a) * 8192 + cz + b); if (l) for (const j of l) {let d = Math.abs(j - i); d = Math.min(d, T.N - d); if (d > far && (T.x[j] - x) ** 2 + (T.z[j] - z) ** 2 < R2) return true}}
+/* ¿pasa otro tramo de la vía a menos de r de (x, z)? Otro = a más de far metros siguiendo la vía desde la muestra i, o del ramal de al lado */
+export function otherNear(G, i, x, z, r, far = 30) {
+  const T = G.T, cx = Math.floor(x / GC), cz = Math.floor(z / GC), R2 = r * r;
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {const l = G.grid.get((cx + a) * 8192 + cz + b); if (l) for (const j of l) if ((T.x[j] - x) ** 2 + (T.z[j] - z) ** 2 < R2 && alongD(T, i, j) > far) return true}
   return false;
 }
+/* ¿hay, a la misma altura, vía de otro tramo (la de la aguja) a menos de r? Los pretiles de los puentes se abren ahí */
+export function branchNear(G, b, x, y, z, r) {
+  const T = G.T, cx = Math.floor(x / GC), cz = Math.floor(z / GC), R2 = r * r;
+  for (let u = -1; u <= 1; u++) for (let v = -1; v <= 1; v++) {const l = G.grid.get((cx + u) * 8192 + cz + v); if (l) for (const j of l) if (T.b[j] !== b && Math.abs(T.y[j] - y) < 3 && (T.x[j] - x) ** 2 + (T.z[j] - z) ** 2 < R2) return true}
+  return false;
+}
+const RMAX = CORR + FALL + 14;
 function groundH(G, x, z) {
   // cada muestra de vía a ras cercana tira del suelo hacia su altura; donde se solapan dos tramos a distinta altura,
   // la altura se reparte con pesos muy marcados (w^6): sale una ladera suave en vez de un escalón
@@ -159,10 +230,10 @@ function groundH(G, x, z) {
 }
 
 /* huecos para casas junto a la vía: a ras, lejos del resto de la vía, del lago, de la pista y de la plaza */
-function slotsFor(T, G, gap) {
-  const out = []; let side = 1;
+function slotsFor(T, G, gap, s0 = 30, s1 = T.L - 24, out = []) {
+  const n0 = out.length; let side = 1;
   const okRun = s => {for (let q = -7; q <= 7; q += 1) if (kindAt(T, s + q) !== KG) return false; return true};
-  for (let s = 30; s <= T.L - 24; s += gap) {
+  for (let s = s0; s <= s1; s += gap) {
     if (!okRun(s)) continue;
     const p = atM(T, s), nx = -Math.sin(p.a), nz = Math.cos(p.a);
     for (const sd of [side, -side]) {
@@ -173,22 +244,36 @@ function slotsFor(T, G, gap) {
       out.push({s, x, z, y: p.y, a: p.a, nx: nx * sd, nz: nz * sd, side: sd}); side = -side; break;
     }
   }
-  return out;
+  return out.slice(n0);
 }
 
 export const MAXSTAGE = STAGES.length - 1;
 const cache = {};
-/* todo lo de una etapa: vía, huecos de casas, plaza, taller y la función de altura del suelo */
+/* todo lo de una etapa: vía principal (T), ramales, vueltas posibles (R, por bits de agujas), agujas, huecos de casas, plaza, taller y la altura del suelo */
 export function mapOf(k) {
   if (cache[k]) return cache[k];
-  const T = buildTrack3(STAGES[k]), G = {T, grid: sampleGrid(T), pads: []};
+  const T = buildTrack3(STAGES[k]), alts = FORKS[k].map(f => buildAlt(T, f)), nR = 1 << alts.length, R = [buildRoute(T, alts, 0)];
+  alts.forEach((A, f) => {R[1 << f] = buildRoute(T, alts, 1 << f)});
+  for (let b = 1; b < nR; b++) if (!R[b]) R[b] = buildRoute(T, alts, b);
+  const U = unionOf(T, alts), G = {T: U, grid: sampleGrid(U), pads: []};
   const p0 = atM(T, 0), sx = -Math.sin(p0.a), sz = Math.cos(p0.a);
   const out = Math.hypot(p0.x + sx * 8 - F.plaza.x, p0.z + sz * 8 - F.plaza.z) < Math.hypot(p0.x - sx * 8 - F.plaza.x, p0.z - sz * 8 - F.plaza.z) ? 1 : -1;
   const st = {x: p0.x + sx * out * 8.2, z: p0.z + sz * out * 8.2, y: p0.y, a: p0.a, nx: sx * out, nz: sz * out};   // taller por dentro del lóbulo del pueblo, mirando a la plaza
   G.pads.push({x: st.x, z: st.z, r: 11, y: p0.y}, {x: F.plaza.x, z: F.plaza.z, r: F.plaza.r, y: H0(F.plaza.x, F.plaza.z) * 0.3});
-  const SL = slotsFor(T, G, 15);
+  // huecos de casas: en la vía principal y en los ramales, mezclados para que el pueblo crezca por todas partes
+  const all = [], groups = [slotsFor(T, G, 15, 30, T.L - 24, all)];
+  groups[0].forEach(s => {s.f = alts.findIndex(A => s.s > A.i0 * T.ds && s.s < A.i1 * T.ds); s.side1 = 0});
+  alts.forEach((A, f) => {const B = R[1 << f], g = slotsFor(B, G, 15, B.alt[f] + 16, B.alt[f] + A.N * T.ds - 16, all); g.forEach(s => {s.f = f; s.side1 = 1}); groups.push(g)});
+  const SL = groups.flatMap(g => g.map((s, i) => [(i + 0.5) / g.length, s])).sort((a, b) => a[0] - b[0]).map(q => q[1]);
+  // s de cada hueco en cada vuelta posible (-1 si esa vuelta no pasa por él)
+  for (const sl of SL) sl.rs = R.map(q => {if (sl.f >= 0 && (q.bits >> sl.f & 1) !== sl.side1) return -1; if (sl.side1) return q.alt[sl.f] + (sl.s - R[1 << sl.f].alt[sl.f]);
+    let s = sl.s; alts.forEach((A, f) => {if (A.i1 * T.ds <= sl.s && q.bits >> f & 1) s += (A.N - (A.i1 - A.i0)) * T.ds}); return s});
   for (const s of SL) G.pads.push({x: s.x, z: s.z, r: 5.4, y: s.y});
-  const m = {k, T, G, SL, st, h: (x, z) => groundH(G, x, z)};
+  // agujas: nombres, y si el ramal sale a la izquierda o a la derecha
+  const forks = alts.map((A, f) => {const B = R[1 << f], s = A.i0 * T.ds, m = atM(T, s + 24), a = atM(B, B.alt[f] + 24), p = atM(T, s);
+    const right = (a.x - m.x) * -Math.sin(p.a) + (a.z - m.z) * Math.cos(p.a) > 0;
+    return {f, id: FORKS[k][f].id, x: p.x, y: p.y, z: p.z, a: p.a, opts: FORKS[k][f].opts.map(o => ({id: o, ...OPT[o]})), left: right ? 0 : 1, len: [(A.i1 - A.i0) * T.ds, A.N * T.ds]}});
+  const m = {k, T, R, alts, forks, U, G, SL, st, h: (x, z) => groundH(G, x, z)};
   return cache[k] = m;
 }
 export const trackOf = k => mapOf(k).T;
