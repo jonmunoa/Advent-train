@@ -12,8 +12,10 @@
 <link rel="stylesheet" href="src/escaparates.css">
 </head>
 <body>
-<canvas id="c" aria-label="Una calle nevada en 3D: un niño y su madre pasean y se paran a mirar los trenes de los escaparates. Arrastra para mirar alrededor y usa la rueda o pellizca para acercarte al cristal"></canvas>
+<canvas id="c" aria-label="Una calle nevada en 3D: un niño y su madre pasean y se paran a mirar los trenes de los escaparates. Pincha un escaparate para verlo por dentro y arrastra para mirar alrededor"></canvas>
 <div id="frost" aria-hidden="true"></div>
+<div id="tun" aria-hidden="true"></div>
+<div id="dip" aria-hidden="true"></div>
 
 <header class="top hud">
   <div class="brand">El tren <span>del escaparate</span></div>
@@ -27,10 +29,20 @@
 
 <nav class="foot hud" id="foot" aria-label="El paseo">
   <button class="ar" id="bPrev" aria-label="Escaparate anterior" title="Escaparate anterior (←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-  <div class="cap" id="cap" aria-live="polite"><b id="capN"></b><span id="capS"></span></div>
+  <button class="cap" id="cap" type="button" title="Ver el escaparate por dentro"><b id="capN"></b><span id="capS" aria-live="polite"></span></button>
   <button class="ar" id="bNext" aria-label="Seguir paseando" title="Seguir paseando (→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
 </nav>
 <button class="marca hud" id="bAd" type="button">Tu marca aquí</button>
+
+<button class="volver" id="bVolver" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span id="bVolverT">Volver a la calle</span></button>
+<div class="nav hud" id="nav" role="group" aria-label="Vista de la maqueta">
+  <button class="tb" id="nIn" aria-label="Acercar" title="Acercar (+)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="tb" id="nOut" aria-label="Alejar" title="Alejar (−)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+  <button class="tb" id="nRot" aria-label="Girar" title="Girar (Q y E)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.200-5.100M19 4v4h-4"/></svg></button>
+  <button class="tb" id="nHome" aria-label="Ver toda la maqueta" title="Ver toda la maqueta (0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="tb" id="bCam" aria-label="Ir con el tren" aria-pressed="false" title="Ir con el tren (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+</div>
+<div id="navHint" hidden></div>
 
 <div id="card" class="adcard" hidden role="region" aria-label="Marca">
   <div class="ac-tx"><span class="ac-tag" id="caTag"></span><b id="caName"></b><span id="caSub"></span></div>

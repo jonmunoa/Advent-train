@@ -29,7 +29,8 @@ body.espera .hud{opacity:0;pointer-events:none}
 .foot{position:fixed;left:50%;bottom:calc(18px + var(--safe-b));z-index:10;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:8px;border-radius:999px;background:rgba(10,16,38,.62);border:1px solid rgba(224,173,69,.35);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .ar{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:var(--gold);color:var(--ink);display:grid;place-items:center;cursor:pointer;transition:transform 160ms var(--ease-out)}
 .ar svg{stroke-width:2.6}
-.cap{min-width:200px;text-align:center;line-height:1.2}
+.cap{min-width:200px;padding:4px 10px;border:0;border-radius:14px;background:none;text-align:center;line-height:1.2;cursor:pointer;transition:transform 160ms var(--ease-out)}
+.cap:active{transform:scale(.97)}
 .cap b{display:block;font:400 17px/1.15 'Alfa Slab One',Georgia,serif;color:var(--cream)}
 .cap span{font-size:12.5px;color:#cfd6ea}
 .marca{position:fixed;right:16px;bottom:calc(30px + var(--safe-b));z-index:10;padding:9px 14px;border:1px solid rgba(224,173,69,.5);border-radius:999px;background:rgba(10,16,38,.62);color:var(--gold);font-weight:600;font-size:13px;cursor:pointer;transition:transform 160ms var(--ease-out),opacity 500ms ease}
@@ -83,7 +84,7 @@ body.espera .hud{opacity:0;pointer-events:none}
 /* portada: se ve la calle detrás */
 .intro{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;text-align:center;background:linear-gradient(180deg,rgba(6,10,26,.82),rgba(6,10,26,.35) 45%,rgba(6,10,26,.78));transition:opacity 900ms ease,visibility 0s linear 900ms}
 .intro .in{max-width:640px}
-@media (min-aspect-ratio:5/4){.intro .in{transform:translateX(15vw)}.intro{background:linear-gradient(90deg,rgba(6,10,26,.18),rgba(6,10,26,.5) 38%,rgba(6,10,26,.74))}}
+@media (min-aspect-ratio:5/4){.intro .in{transform:translateX(15vw)}.intro{background:linear-gradient(90deg,rgba(6,10,26,.02),rgba(6,10,26,.34) 38%,rgba(6,10,26,.66))}}
 @media (max-aspect-ratio:4/5){.intro{place-items:start center;padding-top:13vh;background:linear-gradient(180deg,rgba(6,10,26,.86),rgba(6,10,26,.5) 45%,rgba(6,10,26,.05) 62%)}}
 .intro.ido{opacity:0;visibility:hidden;pointer-events:none}
 .intro.carga{background:#070c1e}.intro.carga .in{transform:none}
@@ -109,3 +110,20 @@ body.espera .hud{opacity:0;pointer-events:none}
   .intro p br{display:none}
 }
 @media (prefers-reduced-motion:reduce){.hud,.intro,.adcard,.modal .card,#toast{transition-duration:1ms}}
+
+/* dentro de un escaparate */
+#tun{position:fixed;inset:0;z-index:3;pointer-events:none;background:#05060c;opacity:0}
+#dip{position:fixed;inset:0;z-index:4;pointer-events:none;background:#eaf1ff;opacity:0;transition:opacity 260ms ease}
+#dip.on{opacity:1;transition-duration:190ms}
+.volver{position:fixed;left:50%;top:calc(14px + var(--safe-t));z-index:11;transform:translate(-50%,-8px);display:flex;align-items:center;gap:8px;padding:11px 18px 11px 13px;border:1.5px solid rgba(224,173,69,.7);border-radius:999px;background:rgba(10,16,38,.74);color:var(--cream);font-weight:600;font-size:14.5px;white-space:nowrap;cursor:pointer;opacity:0;visibility:hidden;transition:opacity 220ms var(--ease-out),transform 220ms var(--ease-out),visibility 220ms}
+body.dentro .volver{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.volver:active{transform:translate(-50%,0) scale(.97)!important}
+.volver svg{width:18px;height:18px;fill:none;stroke:var(--gold);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.nav{position:fixed;right:16px;top:50%;z-index:10;transform:translateY(-50%);display:none;flex-direction:column;gap:8px}
+body.dentro .nav{display:flex}
+.nav .tb.on{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+#navHint{position:fixed;left:50%;top:calc(72px + var(--safe-t));z-index:11;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);padding:9px 16px;border-radius:999px;background:rgba(10,16,38,.78);color:#dfe5f5;font-size:13.5px;text-align:center;transition:opacity 240ms var(--ease-out),transform 240ms var(--ease-out)}
+#navHint b{color:var(--gold);font-weight:600}
+#navHint.bye{opacity:0;transform:translate(-50%,-6px)}
+@media (hover:hover){.volver:hover{background:rgba(22,32,66,.86)}.tb:hover{border-color:var(--gold)}}
+@media (max-width:640px){.volver{top:calc(66px + var(--safe-t))}#navHint{top:calc(118px + var(--safe-t));border-radius:16px}.nav{right:10px}#nIn,#nOut,#nRot{display:none}}

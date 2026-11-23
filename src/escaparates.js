@@ -1,16 +1,16 @@
 /* El tren del escaparate: un niño pasea de la mano de su madre por una calle nevada y se para a mirar los trenes de los
-   escaparates. No hay que hacer nada: el paseo va solo. Se puede mirar alrededor, acercarse al cristal o seguir paseando.
-   Tres escenas con la misma cámara: la calle, lo que hay dentro de los escaparates (con su propia luz) y el aire (nieve,
-   cristal y vaho). Sin servidor: las marcas salen de esc-marcas.js. */
-import {THREE, QS, coarse, LOWQ, REDUCED, lerp, clamp, sstep, tick, canvasTex, dotTex, puffTex, loadModels, drawAd, hostOf, AD_W, AD_H, AD_BG, logoURL, loadImg} from './kit.js';
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
+   escaparates. El paseo va solo y la cámara va detrás del niño. Al pinchar un escaparate se entra en él y se recorre con la
+   cámara de mapa (esc-vista.js). Dos escenas con la misma cámara: la calle y lo que hay dentro de los escaparates, con su
+   propia luz (ahí van también el cristal y la nieve que cae). Sin servidor: las marcas salen de esc-marcas.js. */
+import {THREE, QS, coarse, LOWQ, REDUCED, CUT, lerp, clamp, sstep, tick, canvasTex, dotTex, puffTex, loadModels, drawAd, hostOf, AD_W, AD_H, AD_BG, logoURL, loadImg, BX} from './kit.js';
+import {Post} from './esc-post.js';
+import {Vista, FOVD} from './esc-vista.js';
 import {Mundo} from './esc-mundos.js';
 import {MAPS} from './esc-vias.js';
-import {Tienda, suelos, Huellas, nevada, Figura, rotuloTex, S, PASO, VX, VY0, VY1} from './esc-calle.js';
+import {Tienda, Huellas, nevada, rotuloTex, S, PASO, VX, VY0, VY1} from './esc-calle.js';
+import {Figura} from './esc-gente.js';
+import {Barrio, PER} from './esc-barrio.js';
+import {juntar} from './esc-geo.js';
 import {marcasEsc, pedirTexto, cleanText, cleanUrl, isoDay, tiendaDe, sitioDe} from './esc-eco.js';
 import {CONTACTO, PRECIO_ROTULO, PRECIO_VAGON, MARCAS} from './esc-marcas.js';
 import {au, pasos, traqueteo, setCerca, setSonido, sonidoOn, bells, whistle} from './musica.js';
@@ -19,122 +19,172 @@ clearTimeout(window.__boot);
 const $ = id => document.getElementById(id), canvas = $('c'), DEBUG = QS.has('debug');
 document.body.classList.toggle('lowq', LOWQ); document.body.classList.add('espera');
 const NOMBRES = ['La Estación', 'La Cumbre', 'Polo Norte'], K = .88, TILT = .13;   // rótulos propios de cada tienda y escala de las maquetas
+const store = {get(k) {try {return localStorage.getItem(k)} catch (e) {return null}}, set(k, v) {try {localStorage.setItem(k, v)} catch (e) {}}};
 
 /* ================= motor ================= */
 const renderer = new THREE.WebGLRenderer({canvas, antialias: LOWQ, powerPreference: 'high-performance', stencil: false});
-const MAXPR = Math.min(devicePixelRatio || 1, 2); let dynPR = Math.min(coarse ? 1.5 : 1.75, MAXPR);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.autoClear = false;
-const calle = new THREE.Scene(), dentro = new THREE.Scene(), aire = new THREE.Scene(); calle.background = new THREE.Color('#0b1330'); calle.fog = new THREE.Fog('#0f1a3e', 420, 1150);
-const camera = new THREE.PerspectiveCamera(36, 1, 2, 2600);
-{const es = new THREE.Scene(); es.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({color: 0x161826, side: THREE.BackSide}))); for (const [x, y, z, c, r] of [[-30, 20, 10, [9, 5, 2], 8], [20, 30, 20, [5, 4, 3], 9], [0, 5, 40, [2, 2, 3], 10], [30, 8, -12, [1.5, 2, 5], 6]]) {const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8), new THREE.MeshBasicMaterial({color: new THREE.Color(...c)})); m.position.set(x, y, z); es.add(m)} const pm = new THREE.PMREMGenerator(renderer), t = pm.fromScene(es, .03).texture; pm.dispose(); dentro.environment = t; dentro.environmentIntensity = .5; calle.environment = t; calle.environmentIntensity = .16}
+const MAXPR = Math.min(devicePixelRatio || 1, 2); let dynPR = Math.min(coarse ? 1.5 : 1.5, MAXPR);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false; renderer.autoClear = false;
+const calle = new THREE.Scene(), dentro = new THREE.Scene(); calle.fog = new THREE.Fog('#262a5c', 260, 1500); dentro.fog = new THREE.Fog('#b9c6e0', 5000, 6000); renderer.setClearColor('#0b1330', 1);
+const camera = new THREE.PerspectiveCamera(48, 1, 2, 2600); let ENV = null;
+/* el reflejo del entorno es caro: solo lo llevan el metal y lo barnizado */
+function reflejos(root, k) {root.traverse(o => {for (const m of [].concat(o.material || [])) if (m.isMeshStandardMaterial && !m.envMap && (m.metalness > .3 || m.roughness < .36 || (m.isMeshPhysicalMaterial && m.clearcoat > 0))) {m.envMap = ENV; m.envMapIntensity = k; m.needsUpdate = true}})}
+{const es = new THREE.Scene(); es.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({color: 0x161826, side: THREE.BackSide}))); for (const [x, y, z, c, r] of [[-30, 20, 10, [9, 5, 2], 8], [20, 30, 20, [5, 4, 3], 9], [0, 5, 40, [2, 2, 3], 10], [30, 8, -12, [1.5, 2, 5], 6]]) {const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8), new THREE.MeshBasicMaterial({color: new THREE.Color(...c)})); m.position.set(x, y, z); es.add(m)} const pm = new THREE.PMREMGenerator(renderer), t = pm.fromScene(es, .03).texture; pm.dispose(); ENV = t}
 // luz de la calle: luna fría y, por cada escaparate cercano, una luz cálida
-calle.add(new THREE.HemisphereLight(0x7c92dc, 0x4a4660, .85)); const luna = new THREE.DirectionalLight(0xa9bfff, .62); luna.position.set(-160, 300, 260); calle.add(luna);
-const calor = [0, 1].map(() => {const l = new THREE.PointLight(0xffb066, 0, 420, 1.3); calle.add(l); return l}), farol = new THREE.PointLight(0xffb870, LOWQ ? 480 : 900, 260, 1.5); calle.add(farol);
+calle.add(new THREE.HemisphereLight(0x8a9be6, 0x55486a, 1.02)); const luna = new THREE.DirectionalLight(0xa9bfff, .6); luna.position.set(160, 300, 220); calle.add(luna);
+const calor = [0, 1].map(() => {const l = new THREE.PointLight(0xffb066, 0, 420, 1.3); calle.add(l); return l}), farol = new THREE.PointLight(0xffb870, LOWQ ? 420 : 800, 280, 1.5); calle.add(farol);
 // luz de dentro: foco cálido con sombras sobre la maqueta que se mira, y relleno azul
-dentro.add(new THREE.HemisphereLight(0x9fb6ff, 0x4a3a3a, .72)); const foco = new THREE.DirectionalLight(0xffe4c4, 1.3); foco.castShadow = !LOWQ; foco.shadow.mapSize.set(2048, 2048); Object.assign(foco.shadow.camera, {left: -92, right: 92, top: 74, bottom: -56, near: 1, far: 300}); foco.shadow.bias = -.0005; foco.shadow.normalBias = .2; dentro.add(foco, foco.target);
-let composer = null, bloom = null, grade = null;
-if (!LOWQ) {composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, {type: THREE.HalfFloatType, samples: 4})); const p1 = new RenderPass(calle, camera), p2 = new RenderPass(dentro, camera), p3 = new RenderPass(aire, camera); p1.clear = true; p2.clear = p3.clear = false; [p1, p2, p3].forEach(p => composer.addPass(p)); bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .42, .55, .9); composer.addPass(bloom);
-  grade = new ShaderPass({uniforms: {tDiffuse: {value: null}, t: {value: 0}}, vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: 'uniform sampler2D tDiffuse;uniform float t;varying vec2 vUv;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}void main(){vec4 c=texture2D(tDiffuse,vUv);vec2 d=vUv-.5;c.rgb*=mix(.52,1.,smoothstep(.95,.3,length(d*vec2(1.1,1.))));float l=dot(c.rgb,vec3(.2126,.7152,.0722));c.rgb=mix(c.rgb,c.rgb*vec3(.93,.97,1.12),smoothstep(.3,0.,l)*.5);c.rgb=mix(c.rgb,c.rgb*vec3(1.08,1.,.88),smoothstep(.4,1.5,l)*.5);c.rgb=mix(vec3(l),c.rgb,1.12)+(h(vUv*977.+fract(t))-.5)*.012;gl_FragColor=c;}'}); composer.addPass(grade); composer.addPass(new OutputPass())}
-const draw = dt => {if (composer) composer.render(dt); else {renderer.clear(); renderer.render(calle, camera); renderer.render(dentro, camera); renderer.render(aire, camera)}};
-const portrait = () => camera.aspect < .8;
-function resize() {const w = innerWidth, h = innerHeight; renderer.setPixelRatio(dynPR); renderer.setSize(w, h, false); if (composer) {composer.setPixelRatio(dynPR); composer.setSize(w, h)} camera.aspect = w / h; camera.fov = portrait() ? 44 : 36; camera.updateProjectionMatrix()}
-addEventListener('resize', resize); resize();
+const hemiD = new THREE.HemisphereLight(0x9fb6ff, 0x4a3a3a, .86); dentro.add(hemiD); const foco = new THREE.DirectionalLight(0xffe4c4, 1.3); foco.castShadow = !LOWQ; foco.shadow.mapSize.set(2048, 2048); Object.assign(foco.shadow.camera, {left: -92, right: 92, top: 74, bottom: -56, near: 1, far: 300}); foco.shadow.bias = -.0005; foco.shadow.normalBias = .2; dentro.add(foco, foco.target);
+const post = LOWQ ? null : new Post(renderer), portrait = () => camera.aspect < .8;
+/* lo que se ve del niño desde dentro: una foto de la calle que se pinta en el cristal solo cuando se mira hacia él */
+const portalRT = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType}), pU = {m: {value: portalRT.texture}, r: {value: new THREE.Vector2()}};
+let verCalle = true, verPortal = false, fr = 0;
+function draw() {
+  fr++; if (renderer.shadowMap.enabled && fr % (E.st === 'paseo' || E.st === 'inicio' ? 12 : 3) === 1) renderer.shadowMap.needsUpdate = true;
+  if (verPortal) {const ex = renderer.toneMapping; tiendas.forEach(t => {t.g.visible = false}); copias.forEach(g => {g.visible = false}); renderer.toneMapping = THREE.NoToneMapping; renderer.setRenderTarget(portalRT); renderer.clear(); renderer.render(calle, camera); renderer.setRenderTarget(null); renderer.toneMapping = ex}
+  const L = verCalle ? [calle, dentro] : [dentro]; if (post) post.render(L, camera); else {renderer.setRenderTarget(null); renderer.clear(); L.forEach(s => renderer.render(s, camera))}
+}
+let vw = 1, vh = 1, MSFIJO = false; function resize() {const w = vw = innerWidth, h = vh = innerHeight; renderer.setPixelRatio(dynPR); renderer.setSize(w, h, false); const W = Math.floor(w * dynPR), H = Math.floor(h * dynPR); if (post) {post.size(W, H); if (!MSFIJO) post.msaa(dynPR > 1.3 ? 2 : 4)} const q = LOWQ ? .5 : .85; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0)); pU.r.value.set(W, H); camera.aspect = w / h; camera.updateProjectionMatrix()}
+addEventListener('resize', resize);
 
 /* ================= lo que hay en la calle ================= */
-const tiendas = [], mundos = []; let suelo = null, huellas = null, nieve = null, madre = null, nino = null, cristal = [], vaho = null, alientos = [];
-const REL = {glass: null};
+const tiendas = [], mundos = [], copias = [], fotos = []; let barrio = null, huellas = null, nieve = null, madre = null, nino = null, cristal = [], vaho = null, alientos = [], portal = null;
 function cristales() {
   const tx = canvasTex(512, 320, (g, w, h) => {g.clearRect(0, 0, w, h); const gr = (x, y, r, a) => {const q = g.createRadialGradient(x, y, 0, x, y, r); q.addColorStop(0, `rgba(235,244,255,${a})`); q.addColorStop(1, 'rgba(235,244,255,0)'); g.fillStyle = q; g.fillRect(0, 0, w, h)}; gr(0, h, 84, .5); gr(w, h, 84, .5); gr(0, 0, 64, .34); gr(w, 0, 64, .34); for (let x = 0; x < w; x += 26) gr(x, h + 14, 30, .3); g.globalAlpha = .035; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(w * .1, h); g.lineTo(w * .42, 0); g.lineTo(w * .52, 0); g.lineTo(w * .2, h); g.fill(); g.beginPath(); g.moveTo(w * .62, h); g.lineTo(w * .9, 0); g.lineTo(w * .93, 0); g.lineTo(w * .65, h); g.fill()}, 'cristal');
-  cristal = [0, 1, 2].map(() => {const m = new THREE.Mesh(new THREE.PlaneGeometry(VX * 2, VY1 - VY0), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthWrite: false, opacity: .8})); m.position.set(0, (VY0 + VY1) / 2, -1.2); m.renderOrder = 4; aire.add(m); return m});
-  vaho = new THREE.Mesh(new THREE.PlaneGeometry(20, 16), new THREE.MeshBasicMaterial({map: puffTex, transparent: true, depthWrite: false, opacity: 0, color: 0xeaf2ff})); vaho.position.z = -.6; vaho.renderOrder = 5; aire.add(vaho);
-  alientos = [0, 1, 2, 3, 4, 5].map(() => {const s = new THREE.Sprite(new THREE.SpriteMaterial({map: puffTex, transparent: true, depthWrite: false, opacity: 0, color: 0xdfe8ff})); s.userData = {l: 0}; aire.add(s); return s});
+  cristal = [0, 1, 2].map(() => {const m = new THREE.Mesh(new THREE.PlaneGeometry(VX * 2, VY1 - VY0), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthWrite: false, opacity: .8, fog: false})); m.position.set(0, (VY0 + VY1) / 2, -1.2); m.renderOrder = 4; dentro.add(m); return m});
+  vaho = new THREE.Mesh(new THREE.PlaneGeometry(20, 16), new THREE.MeshBasicMaterial({map: puffTex, transparent: true, depthWrite: false, opacity: 0, color: 0xeaf2ff, fog: false})); vaho.position.z = -.6; vaho.renderOrder = 5; dentro.add(vaho);
+  alientos = [0, 1, 2, 3, 4, 5].map(() => {const s = new THREE.Sprite(new THREE.SpriteMaterial({map: puffTex, transparent: true, depthWrite: false, opacity: 0, color: 0xdfe8ff, fog: false})); s.userData = {l: 0}; dentro.add(s); return s});
+  // el cristal visto desde dentro, con su marco
+  portal = new THREE.Group(); const w = VX * 2, h = VY1 - VY0, q = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateY(Math.PI), new THREE.ShaderMaterial({uniforms: pU, vertexShader: 'varying vec2 u;void main(){u=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: 'uniform sampler2D m;uniform vec2 r;varying vec2 u;void main(){vec3 c=texture2D(m,gl_FragCoord.xy/r).rgb;vec2 d=abs(u-.5)*2.;float f=smoothstep(.72,1.02,max(d.x,d.y));c=mix(c*1.12,vec3(.72,.82,1.),f*.4);gl_FragColor=vec4(c,1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}'})); portal.add(q);
+  const L = [], W = new THREE.MeshStandardMaterial({color: 0x5e1420, roughness: .45}), G = new THREE.MeshStandardMaterial({color: 0xd9a441, metalness: .75, roughness: .32}); for (const sd of [-1, 1]) {L.push([BX(9, h + 18, 8).translate(sd * (VX + 4.5), 0, 0), W], [BX(2, h, 2).translate(sd * (VX - .6), 0, -3.4), G], [BX(w + 18, 9, 8).translate(0, sd * (h / 2 + 4.5), 0), W], [BX(w, 2, 2).translate(0, sd * (h / 2 - .6), -3.4), G])} L.push([BX(w, 1.6, 3).translate(0, h / 2 - 13, -1.5), W]); for (let x = -50; x <= 50; x += 25) L.push([BX(1.2, 13, 2.4).translate(x, h / 2 - 6.5, -1.5), W]); juntar(L, portal, {sombra: false}); portal.position.y = (VY0 + VY1) / 2; portal.visible = false; dentro.add(portal);
 }
 let alI = 0; function aliento(f, dir) {const s = alientos[alI = (alI + 1) % alientos.length]; f.head.getWorldPosition(s.position); s.position.x += dir.x * 7; s.position.z += dir.z * 7; s.position.y += 3; s.userData = {l: 1, x: dir.x * 9, z: dir.z * 9}}
 
 /* ================= el paseo ================= */
-/* estado: inicio → paseo → llega → mira → sale → paseo… n: escaparate al que van (cualquier entero; la calle da la vuelta) */
-const E = {st: 'inicio', n: 0, dir: 1, x: -120, t: 0, vel: 0, u: 0, uT: 0, manual: false, az: 0, azT: 0, el: 0, elT: 0, idle: 0, auto: true};
-const WX = n => n * PASO, ZM = 54, ZN = 40, DX = 17, AUTO = 110;   // ZM, ZN: por dónde andan la madre y el niño; AUTO: segundos mirando antes de seguir
+/* estado: inicio → paseo → llega → mira → sale → paseo…, y «dentro» de un escaparate. n: escaparate (cualquier entero; la calle da la vuelta) */
+const E = {st: 'inicio', n: 0, dir: 1, x: -262, t: 0, vel: 0, u: 0, uT: 0, zs: 0, zsT: 0, manual: false, az: 0, azT: 0, el: 0, elT: 0, idle: 0, auto: true, md: 0, k: 0};
+const WX = n => n * PASO, ZM = 82, ZN = 60, DX = 15, AUTO = 80;   // ZM, ZN: por dónde andan la madre y el niño; AUTO: segundos mirando antes de seguir
 const V3 = () => new THREE.Vector3(), tp = V3(), v1 = V3(), v2 = V3(), v3 = V3();
 const damp = (a, b, l, dt) => lerp(a, b, 1 - Math.exp(-l * dt)), wrap = a => {while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a};
 const giro = (f, a, l, dt) => {f.yaw += wrap(a - f.yaw) * (1 - Math.exp(-l * dt))};
 /* anda hasta (x, z): devuelve la velocidad a la que va (0 al llegar) */
 function andar(f, x, z, v, dt) {const p = f.g.position, dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < .6) {p.x = x; p.z = z; return 0} const s = Math.min(v, d * 3.2 + 6), m = Math.min(d, s * dt); p.x += dx / d * m; p.z += dz / d * m; if (d > 3) giro(f, Math.atan2(-dz, dx), 9, dt); return s}
-function ir(n) {if (E.st === 'inicio' || n === E.n) return; if (E.st === 'llega') {E.pend = n; return} const d = n > E.n ? 1 : -1; if (n === E.n) return; E.dir = d; E.n = n; if (E.st === 'mira') {E.st = 'sale'; E.t = 0} E.auto = true; caption(); hideCard()}
-/* dónde se paran: en vertical, a un lado del cristal para no tapar la maqueta */
-const sitioN = () => portrait() ? -60 : -25, sitioM = () => portrait() ? -88 : -53;
-const enCristal = () => E.st === 'mira' || (E.st === 'llega' && E.t > 1.2);
+function ir(n) {if (E.st === 'inicio' || n === E.n) return; if (E.st === 'dentro') {cambia(n); return} if (E.st === 'llega') {E.pend = n; return} E.dir = n > E.n ? 1 : -1; E.n = n; if (E.st === 'mira') {E.st = 'sale'; E.t = 0} caption(); hideCard()}
+/* dónde se paran: el niño en medio del cristal y su madre un paso atrás, a un lado */
+const sitioN = () => 0, sitioM = () => -E.dir * (portrait() ? 40 : 37);
 let pasoN = 0;
+function aLaVentana() {const X = WX(E.n); E.x = X; nino.g.position.set(X + sitioN(), 0, 10.5); madre.g.position.set(X + sitioM(), 0, 24); nino.yaw = Math.PI / 2; madre.yaw = Math.PI / 2 - .25 * E.dir}
 function paseo(dt, t) {
   E.t += dt; const M = madre, N = nino; let sm = 0, sn = 0; M.reach = [null, null]; N.reach = [null, null]; let mano = false;
-  if (E.st === 'inicio') {M.g.position.set(E.x, 0, ZM); N.g.position.set(E.x + DX, 0, ZN); giro(M, -.12, 4, dt); giro(N, .05 + Math.sin(t * .5) * .1, 3, dt); mano = true; N.tip = Math.max(0, Math.sin(t * 5.2)) * .02 * (Math.sin(t * .8) > .2 ? 1 : 0); N.look.y = damp(N.look.y, .5 + Math.sin(t * .6) * .3, 2, dt); M.look.y = damp(M.look.y, .3, 2, dt); M.look.p = damp(M.look.p, -.2, 2, dt)}
+  if (E.st === 'inicio') {M.g.position.set(E.x, 0, ZM); N.g.position.set(E.x + DX, 0, ZN); giro(M, 0, 4, dt); giro(N, .08 + Math.sin(t * .5) * .1, 3, dt); mano = true; N.tip = Math.max(0, Math.sin(t * 5.2)) * .02 * (Math.sin(t * .8) > .2 ? 1 : 0); N.look.y = damp(N.look.y, .5 + Math.sin(t * .6) * .35, 2, dt); N.look.p = damp(N.look.p, .12, 2, dt); M.look.y = damp(M.look.y, .35, 2, dt); M.look.p = damp(M.look.p, -.22, 2, dt)}
   else if (E.st === 'paseo') {
-    const X = WX(E.n), fin = X - (E.dir > 0 ? 62 : -14), d = (fin - E.x) * E.dir; E.vel = damp(E.vel, d > 0 ? clamp(d * 1.1 + 6, 8, 44) : 0, 2.2, dt); E.x += E.vel * E.dir * dt; sm = sn = E.vel;
-    M.g.position.x = damp(M.g.position.x, E.x, 8, dt); M.g.position.z = damp(M.g.position.z, ZM, 3, dt); N.g.position.x = damp(N.g.position.x, E.x + DX * E.dir, 8, dt); N.g.position.z = damp(N.g.position.z, ZN, 3, dt); const a = E.dir > 0 ? 0 : Math.PI; giro(M, a, 5, dt); giro(N, a, 5, dt); mano = true; N.tip = 0;
-    const cerca = sstep(150, 40, d), s = E.dir > 0 ? 1 : -1; N.look.y = damp(N.look.y, s * (cerca * 1.05 + (d > 200 ? -.9 * sstep(200, 300, d) : 0)) + Math.sin(t * .9) * .12, 3, dt); N.look.p = damp(N.look.p, .06, 3, dt); M.look.y = damp(M.look.y, s * cerca * .5 - s * .1, 2, dt); M.look.p = damp(M.look.p, -.12 * cerca, 2, dt);
+    const X = WX(E.n), fin = X - E.dir * 46, d = (fin - E.x) * E.dir; E.vel = damp(E.vel, d > 0 ? clamp(d * 1.1 + 6, 8, 42) : 0, 2.2, dt); E.x += E.vel * E.dir * dt; sm = sn = E.vel;
+    M.g.position.x = damp(M.g.position.x, E.x, 8, dt); M.g.position.z = damp(M.g.position.z, ZM, 3, dt); N.g.position.x = damp(N.g.position.x, E.x + DX * E.dir, 8, dt); N.g.position.z = damp(N.g.position.z, ZN, 3, dt); const a = E.dir > 0 ? 0 : Math.PI; giro(M, a, 5, dt); giro(N, a, 5, dt); mano = true; N.tip = Math.max(0, Math.sin(t * .37)) > .93 ? Math.abs(Math.sin(t * 7)) * .05 : 0;
+    const cerca = sstep(190, 50, d), s = E.dir > 0 ? 1 : -1; N.look.y = damp(N.look.y, s * (cerca * 1.05 + (d > 230 ? .75 * sstep(230, 330, d) : 0)) + Math.sin(t * .9) * .14, 3, dt); N.look.p = damp(N.look.p, .08 + .16 * Math.max(0, Math.sin(t * .4)), 3, dt); M.look.y = damp(M.look.y, s * (.42 * Math.max(0, Math.sin(t * .31)) + cerca * .3), 2, dt); M.look.p = damp(M.look.p, -.2 * Math.max(0, Math.sin(t * .31)) - .06, 2, dt);
     if (d <= .5) {E.st = 'llega'; E.t = 0}
   } else if (E.st === 'llega') {
-    const X = WX(E.n); sn = andar(N, X + sitioN(), 10.5, 74, dt); sm = E.t > .55 ? andar(M, X + sitioM(), 24, 34, dt) : 0; if (!sn) giro(N, Math.PI / 2, 8, dt); if (!sm && E.t > .6) giro(M, Math.PI / 2 - .25, 5, dt); N.look.y = damp(N.look.y, 0, 5, dt); M.look.y = damp(M.look.y, 0, 3, dt);
-    if (!sn && !sm && E.t > 1.4) {E.st = 'mira'; E.t = 0; E.x = X; E.u = 0; E.uT = REDUCED ? .5 : 0; E.manual = false; E.az = E.azT = E.el = E.elT = 0; E.idle = 0; bells(); caption(); if (E.pend !== undefined) {const p = E.pend; E.pend = undefined; ir(p)}}
-  } else if (E.st === 'mira') {
-    const w = mundos[tiendaDe(E.n)]; giro(N, Math.PI / 2, 6, dt); giro(M, Math.PI / 2 - .25, 4, dt);
+    const X = WX(E.n); sn = andar(N, X + sitioN(), 10.5, 74, dt); sm = E.t > .2 ? andar(M, X + sitioM(), 24, 36, dt) : 0; if (!sn) giro(N, Math.PI / 2, 8, dt); if (!sm && E.t > .6) giro(M, Math.PI / 2 - .25 * E.dir, 5, dt); N.look.y = damp(N.look.y, 0, 5, dt); M.look.y = damp(M.look.y, 0, 3, dt);
+    if (!sn && !sm && E.t > 1.2) {E.st = 'mira'; E.t = 0; E.x = X; E.u = 0; E.uT = REDUCED ? .5 : 0; E.manual = false; E.az = E.azT = E.el = E.elT = 0; E.idle = 0; if (!FAST) bells(); caption(); if (E.pend !== undefined) {const p = E.pend; E.pend = undefined; ir(p)}}
+  } else if (E.st === 'mira' || E.st === 'dentro') {
+    const w = mundos[tiendaDe(E.n)]; giro(N, Math.PI / 2, 6, dt); giro(M, Math.PI / 2 - .25 * E.dir, 4, dt);
     // el niño sigue el tren con la cabeza, se pone de puntillas y apoya las manos en el cristal
-    w.tren.cars[1].getWorldPosition(tp); N.head.getWorldPosition(v1); const hy = Math.atan2(-(tp.z - v1.z), tp.x - v1.x) - N.yaw; N.look.y = damp(N.look.y, clamp(wrap(hy), -.75, .75), 2.2, dt); N.look.p = damp(N.look.p, clamp((tp.y - v1.y) * .006, -.15, .2), 2, dt); N.tip = damp(N.tip || 0, Math.sin(t * .7) > .55 ? .035 : 0, 5, dt);
+    w.tren.cars[1].getWorldPosition(tp); N.head.getWorldPosition(v1); const hy = Math.atan2(-(tp.z - v1.z), tp.x - v1.x) - N.yaw; N.look.y = damp(N.look.y, clamp(wrap(hy), -1.1, 1.1), 2.2, dt); N.look.p = damp(N.look.p, clamp((tp.y - v1.y) * .006, -.15, .2), 2, dt); N.tip = damp(N.tip || 0, Math.sin(t * .7) > .55 ? .035 : 0, 5, dt);
     for (const i of [0, 1]) {v2.set(N.g.position.x + (i ? 9 : -9), 34 + (N.tip || 0) * S + Math.sin(t * 1.3 + i) * .4, .6); N.reach[i] = v2.clone()}
-    const mirando = Math.sin(t * .23) > .1; M.look.y = damp(M.look.y, mirando ? -.5 : clamp(wrap(Math.atan2(-(tp.z - 23), tp.x - M.g.position.x) - M.yaw), -.5, .5), 1.4, dt); M.look.p = damp(M.look.p, mirando ? -.42 : 0, 1.4, dt); N.shoulder(0, v3); if (E.t > 1.2) M.reach[1] = v3.clone().add(v1.set(-1, 3, 4));
-    if (!E.manual) E.uT = damp(E.uT, portrait() ? .78 : .62, E.t > 1 ? (REDUCED ? 9 : .2) : 0, dt); E.idle += dt; if (E.idle > AUTO && E.auto && !modal() && $('card').hidden) {ir(E.n + 1)}
-    vaho.position.x = N.g.position.x; vaho.position.y = 41; vaho.material.opacity = .34 * Math.max(0, Math.sin(t * 1.5)) * sstep(0, 2, E.t);
+    const mirando = Math.sin(t * .23) > .1; M.look.y = damp(M.look.y, mirando ? -.5 * E.dir : clamp(wrap(Math.atan2(-(tp.z - 23), tp.x - M.g.position.x) - M.yaw), -.5, .5), 1.4, dt); M.look.p = damp(M.look.p, mirando ? -.42 : 0, 1.4, dt); N.shoulder(E.dir > 0 ? 0 : 1, v3); if (E.t > 1.2) M.reach[E.dir > 0 ? 1 : 0] = v3.clone().add(v1.set(-E.dir, 3, 4));
+    vaho.position.x = N.g.position.x; vaho.position.y = 41; vaho.material.opacity = E.st === 'mira' ? .34 * Math.max(0, Math.sin(t * 1.5)) * sstep(0, 2, E.t) : 0;
+    if (E.st === 'mira') {if (!E.manual) E.uT = damp(E.uT, portrait() ? .74 : .6, E.t > .8 ? (REDUCED ? 9 : .2) : 0, dt); E.idle += dt; if (E.idle > AUTO && E.auto && !modal() && $('card').hidden) ir(E.n + 1)}
   } else if (E.st === 'sale') {
-    const X = E.x, bx = X + 8 * E.dir; sm = andar(M, bx, ZM, 30, dt); sn = E.t > .7 ? andar(N, bx + DX * E.dir, ZN, 36, dt) : 0; const a = E.dir > 0 ? 0 : Math.PI; if (!sm) giro(M, a, 5, dt); N.tip = 0; N.look.y = damp(N.look.y, E.t < .7 ? 0 : .9 * E.dir, 3, dt); M.look.y = damp(M.look.y, .25 * E.dir, 2, dt); M.look.p = damp(M.look.p, -.2, 2, dt); if (!sm && !sn && E.t > 1.4) {E.st = 'paseo'; E.t = 0; E.x = bx; E.vel = 0}
+    const X = E.x, bx = X + 6 * E.dir; sm = andar(M, bx, ZM, 32, dt); sn = E.t > .6 ? andar(N, bx + DX * E.dir, ZN, 38, dt) : 0; const a = E.dir > 0 ? 0 : Math.PI; if (!sm) giro(M, a, 5, dt); N.tip = 0; N.look.y = damp(N.look.y, E.t < .7 ? 0 : .9 * E.dir, 3, dt); M.look.y = damp(M.look.y, .25 * E.dir, 2, dt); M.look.p = damp(M.look.p, -.2, 2, dt); if (!sm && !sn && E.t > 1.2) {E.st = 'paseo'; E.t = 0; E.x = bx; E.vel = 0; E.az = wrap(E.az); E.azT = 0}
   }
-  if (E.st !== 'mira') vaho.material.opacity = damp(vaho.material.opacity, 0, 4, dt);
+  if (E.st !== 'mira') vaho.material.opacity = E.st === 'dentro' ? 0 : damp(vaho.material.opacity, 0, 4, dt);
   if (mano) {const mi = E.dir > 0 ? 0 : 1, ci = 1 - mi; v1.set(lerp(M.g.position.x, N.g.position.x, .55), 31 + Math.abs(Math.sin(M.ph)) * .7, lerp(M.g.position.z, N.g.position.z, .52)); M.reach[mi] = v1.clone(); N.reach[ci] = v1.clone()}
   for (const f of [M, N]) {if (f.update(dt, t, f === M ? sm : sn)) {const p = f.g.position, sd = (pasoN++ % 2 ? 1 : -1) * (f.n ? 3 : 4); huellas.put(p.x - Math.sin(f.yaw) * sd, p.z - Math.cos(f.yaw) * sd, -f.yaw, f.n ? 4.6 : 6.4); if (!FAST) pasos(f.n ? .7 : 1)} f.g.updateMatrixWorld(true); for (const i of [0, 1]) if (f.reach[i]) f.aim(i, f.reach[i])}
   for (const s of alientos) {const d = s.userData; if (d.l <= 0) {s.material.opacity = 0; continue} d.l -= dt / 1.5; s.position.x += d.x * dt; s.position.z += d.z * dt; s.position.y += 4 * dt; s.scale.setScalar(5 + (1 - d.l) * 11); s.material.opacity = .22 * Math.max(0, d.l) * sstep(1, .8, d.l)}
 }
 
 /* ================= cámara ================= */
-const cam = {p: V3(), l: V3()}; let FAST = false;
+const cam = {p: V3(), l: V3(), fov: 48}; let FAST = false;
+/* detrás del niño: a su altura, mirando calle adelante; arrastrar gira alrededor y la rueda acerca hasta su hombro */
+function detras(t, P, L, lejos = 0) {
+  const pt = portrait(), M = madre.g.position, N = nino.g.position, z = E.zs, cx = lerp(N.x, M.x, .2), cz = lerp(N.z, M.z, .06), a = (E.dir > 0 ? 0 : Math.PI) + E.az + (E.dir > 0 ? .1 : -.1) * (1 - Math.min(1, Math.abs(E.az) * 2)), back = lerp(pt ? 116 : 98, 44, z) + lejos, h = lerp(56, 54, z) + lejos * .26, fx = Math.cos(a), fz = -Math.sin(a), bob = Math.abs(Math.sin(madre.ph)) * .7 * Math.min(1, E.vel / 30);
+  P.set(cx - fx * back, h + E.el * back * .8 + bob, Math.max(15, cz - fz * back)); L.set(cx + fx * 130, lerp(59, 58, z) - E.el * 50 + (pt ? 8 : 0) + lejos * .08, cz + fz * 130);
+}
 function camObjetivo(t, P, L) {
   const pt = portrait(), X = E.x;
-  if (E.st === 'inicio') {P.set(X + (pt ? 12 : 74) + Math.sin(t * .12) * 4, pt ? 112 : 72, pt ? 400 : 318); L.set(X + (pt ? 12 : 74), pt ? 110 : 66, 0); return 1.4}
-  if (E.st === 'paseo') {const d = E.dir; P.set(E.x + d * (pt ? 12 : 34), pt ? 88 : 58, pt ? 372 : 276); L.set(E.x + d * (pt ? 14 : 46), pt ? 92 : 63, 8); return 1.7}
-  if (E.st === 'llega' || E.st === 'sale') {const Xw = E.st === 'llega' ? WX(E.n) : E.x; P.set(Xw + (pt ? -26 : 10), pt ? 80 : 66, pt ? 330 : 252); L.set(Xw - (pt ? 28 : 2), pt ? 86 : 72, 0); return 1.25}
-  // mirando: de detrás de los dos hasta la nariz pegada al cristal, siguiendo un poco al tren
-  const w = mundos[tiendaDe(E.n)], u = E.u, e = Math.pow(u, .85), Xw = WX(E.n); w.tren.cars[2].getWorldPosition(tp); const fo = pt ? lerp(.25, .92, u) : lerp(.1, .8, u * u), tx = pt ? lerp(-26, clamp(tp.x - Xw, -34, 62) * fo, clamp((u - .22) * 2.2, 0, 1)) : clamp(tp.x - Xw, -62, 62) * fo; seg.x = damp(seg.x, tx, .8, segDt); seg.y = damp(seg.y, clamp(tp.y, 34, 62), .8, segDt);
-  const z = pt ? lerp(330, 40, e) : lerp(244, 20, e), D = z + 36, az = E.az + Math.sin(t * .11) * .03, el = E.el; L.set(Xw + seg.x, lerp(pt ? 84 : 76, lerp(53, seg.y + 4, .7 * u), Math.min(1, u * 1.5)), -36);
-  P.set(clamp(L.x * .5 + Xw * .5 + Math.sin(az) * D, Xw - 72 - z * .5, Xw + 72 + z * .5), clamp(lerp(pt ? 80 : 70, 66, u) + Math.sin(el) * D * .7 + Math.sin(t * .17) * .8, 44, 108 + z * .2), z); return 2.6;
+  if (E.st === 'inicio') {detras(t, P, L, (pt ? 60 : 46) + Math.sin(t * .2) * 5); cam.fov = pt ? 60 : 46; return 1.6}
+  if (E.st === 'paseo') {detras(t, P, L); cam.fov = pt ? 60 : 48; return 2.4}
+  if (E.st === 'sale') {detras(t, P, L); cam.fov = pt ? 60 : 48; return 1.5}
+  cam.fov = pt ? 46 : 40;
+  if (E.st === 'llega') {const Xw = WX(E.n); P.set(Xw - E.dir * (pt ? 10 : 18), pt ? 84 : 74, pt ? 250 : 172); L.set(Xw, pt ? 80 : 76, -8); return 1.7}
+  // mirando: por encima del hombro del niño hasta la nariz pegada al cristal, siguiendo un poco al tren
+  const w = mundos[tiendaDe(E.n)], u = E.u, e = Math.pow(u, .85), Xw = WX(E.n); w.tren.cars[2].getWorldPosition(tp); const fo = pt ? lerp(.15, .92, u) : lerp(.06, .72, u * u), tx = clamp(tp.x - Xw, -62, 62) * fo; seg.x = damp(seg.x, tx, .8, segDt); seg.y = damp(seg.y, clamp(tp.y, 34, 62), .8, segDt);
+  const z = pt ? lerp(250, 34, e) : lerp(168, 18, e), D = z + 36, az = E.az + Math.sin(t * .11) * .03; L.set(Xw + seg.x, lerp(pt ? 80 : 76, lerp(52, seg.y + 3, .7 * u), Math.min(1, u * 1.5)), -36);
+  P.set(clamp(L.x * .5 + Xw * .5 + Math.sin(az) * D, Xw - 72 - z * .4, Xw + 72 + z * .4), clamp(lerp(pt ? 84 : 76, 68, u) + Math.sin(E.el) * D * .7 + Math.sin(t * .17) * .8, 44, 108 + z * .2), z); return 2.6;
 }
 const seg = {x: 0, y: 44}; let segDt = 0;
-function camara(dt, t) {segDt = dt; E.u = damp(E.u, E.uT, 3.2, dt); E.az = damp(E.az, E.azT, 5, dt); E.el = damp(E.el, E.elT, 5, dt); const l = camObjetivo(t, v1, v2), k = FAST ? 1 : 1 - Math.exp(-l * dt); cam.p.lerp(v1, k); cam.l.lerp(v2, k); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld();
-  const c = E.st === 'mira' ? lerp(.45, 1, E.u) : E.st === 'llega' || E.st === 'sale' ? .4 : E.st === 'paseo' ? .12 + .2 * sstep(140, 20, Math.abs(WX(Math.round(E.x / PASO)) - E.x)) : .08; setCerca(c); $('frost').style.opacity = E.st === 'mira' ? (sstep(.55, 1, E.u) * .9).toFixed(2) : 0}
+function camara(dt, t) {
+  segDt = dt; E.u = damp(E.u, E.uT, 3.2, dt); E.zs = damp(E.zs, E.zsT, 4, dt); E.az = damp(E.az, E.azT, 5, dt); E.el = damp(E.el, E.elT, 5, dt); if (E.st === 'paseo' && !ptrs.size && performance.now() - lookT > 1600) {E.azT = damp(E.azT, 0, 1.4, dt); E.elT = damp(E.elT, 0, 1.4, dt)}
+  if (E.st === 'dentro') {vista.update(dt); cam.p.copy(camera.position); cam.l.copy(camera.position).add(camera.getWorldDirection(v1).multiplyScalar(60)); cam.fov = FOVD}
+  else {const l = camObjetivo(t, v1, v2), k = FAST ? 1 - Math.exp(-l * dt * 4) : 1 - Math.exp(-l * dt); cam.p.lerp(v1, k); cam.l.lerp(v2, k); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld()}
+  const nf = E.st === 'dentro' ? .4 : 2, f = FAST ? cam.fov : damp(camera.fov, cam.fov, E.st === 'dentro' ? 4 : 2.2, dt); if (Math.abs(f - camera.fov) > .01 || camera.near !== nf) {camera.fov = f; camera.near = nf; camera.far = E.st === 'dentro' ? 900 : 2600; camera.updateProjectionMatrix()}
+  // dentro: el decorado de caja se funde en el cielo entero y la calle deja de dibujarse
+  E.md = E.st === 'dentro' ? Math.min(1, E.md + dt / .9) : Math.max(0, E.md - dt / .45); const m = mundos[E.k]; m.modo(E.md); const md = E.md; dentro.fog.near = md > 0 ? 170 : 5000; dentro.fog.far = md > 0 ? 430 : 6000; if (m.bruma) dentro.fog.color.copy(m.bruma); if (md <= 0) {dentro.fog.near = 5000; dentro.fog.far = 6000}
+  hemiD.intensity = lerp(.86, .62, md); foco.intensity = lerp(1.3, 1.08, md);
+  verCalle = !(E.st === 'dentro' && !vista.flying && md >= 1) || false; if (E.st === 'dentro' && md >= .6 && camera.position.z < 40) verCalle = false;
+  const ms = E.st === 'dentro' && !verCalle; portal.visible = ms && camera.position.z < -4; verPortal = false; if (portal.visible) {camera.getWorldDirection(v1); portal.position.x = WX(E.n); portal.position.z = -2.2; verPortal = v1.z > -.35} nieve.m.visible = !ms; cristal.forEach((c, k) => {if (ms) c.visible = false});
+  if (post) {const u = post.u; u.tilt.value = damp(u.tilt.value, E.st === 'dentro' ? (vista.cam.focus ? .35 : .62 * sstep(34, 110, vista.cam.d) + .06) : E.st === 'mira' ? .25 * E.u : 0, 3, dt); u.foc.value = .5; u.frio.value = damp(u.frio.value, E.st === 'dentro' ? .25 : .55, 3, dt); post.bloom = damp(post.bloom, E.st === 'dentro' ? .42 : .62, 3, dt)}
+  {const F = E.st === 'dentro' && vista.cam.focus, c = F && m.tren.cars[F.car]; cutA = damp(cutA, F && !vista.inT ? 1 : 0, 5, dt); CUT.r.value = cutA < .02 ? 0 : cutA * 4.2; if (c && CUT.r.value) {CUT.a.value.copy(camera.position); c.getWorldPosition(CUT.b.value); CUT.b.value.y += 2}}
+  const c = E.st === 'dentro' ? 1 : E.st === 'mira' ? lerp(.45, 1, E.u) : E.st === 'llega' || E.st === 'sale' ? .4 : E.st === 'paseo' ? .12 + .2 * sstep(140, 20, Math.abs(WX(Math.round(E.x / PASO)) - E.x)) : .08; setCerca(c); $('frost').style.opacity = E.st === 'mira' ? (sstep(.6, 1, E.u) * .8).toFixed(2) : 0;
+}
+let cutA = 0, lookT = 0;
 /* las tiendas y las maquetas se recolocan delante de quien pasea; solo se mueve y se dibuja lo que se ve */
+const kpx = () => renderer.getPixelRatio() * innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
 function colocar(dt, t) {
-  const cx = cam.p.x, half = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * (cam.p.z + 60) + 30;
-  for (let k = 0; k < 3; k++) {const x = sitioDe(k, cx, PASO); tiendas[k].g.position.x = x; tiendas[k].g.visible = Math.abs(x - cx) < half + PASO / 2 + 20; const m = mundos[k]; m.g.position.set(x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = Math.abs(x - cx) < half + VX; cristal[k].position.x = x; cristal[k].visible = m.g.visible; m.smU.k.value = renderer.getPixelRatio() * innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360)) * K; if (m.g.visible) m.update(dt, t); else m.tren.s = (m.tren.s + 6.2 * dt) % m.T.L; tiendas[k].bm.material.color.setScalar(.62 + .38 * Math.sin(t * 1.9 + k))}
-  const ord = [0, 1, 2].map(k => tiendas[k].g.position.x).sort((a, b) => Math.abs(a - cx) - Math.abs(b - cx)); calor.forEach((l, i) => {l.position.set(ord[i], 82, -26); l.intensity = (LOWQ ? 560 : 1150) * sstep(330, 200, Math.abs(ord[i] - cx))}); foco.position.set(ord[0] - 46, 130, 78); foco.target.position.set(ord[0], 40, -40); foco.target.updateMatrixWorld(); farol.position.set(Math.round((cx + PASO / 2) / PASO) * PASO - PASO / 2 + 8, 128, 84);
-  suelo.mover(Math.round(cx / 124) * 0 + cx); nieve.t.value = t; nieve.c.value.set(cam.p.x, 130, Math.max(90, cam.p.z - 150)); nieve.k.value = renderer.getPixelRatio() * innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+  const cx = cam.p.x, px = kpx(), bi = cx + E.dir * 250, din = E.st === 'dentro';
+  for (let k = 0; k < 3; k++) {const x = din && k === E.k ? WX(E.n) : sitioDe(k, bi, PASO), T = tiendas[k], m = mundos[k]; T.g.position.x = x; T.g.visible = true; copias[k].position.x = x + E.dir * PER; copias[k].visible = !din;
+    const cerca = din ? k === E.k : (E.st === 'mira' ? Math.abs(x - cx) < 120 : Math.abs(E.az) > .7 ? Math.abs(x - cx) < 285 : (x - cx) * E.dir > -95 && (x - cx) * E.dir < (LOWQ ? 240 : 285)) || (k === tiendaDe(E.n) && E.st !== 'paseo' && Math.abs(x - cx) < 400); m.g.position.set(x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = cerca && (!din || k === E.k); fotos[k].position.x = x; fotos[k].visible = !m.g.visible && !din; cristal[k].position.x = x; cristal[k].visible = m.g.visible && verCalle; m.smU.k.value = px * K; if (m.copos) {m.copos.t.value = t * 1; m.copos.k.value = px * K; if (din && k === E.k) m.copos.c.value.copy(vista.pos)} if (m.g.visible) m.update(dt, t); else m.tren.s = (m.tren.s + 6.2 * dt) % m.T.L; T.bm.material.color.setScalar(.62 + .38 * Math.sin(t * 1.9 + k))}
+  const ord = [0, 1, 2].map(k => tiendas[k].g.position.x).sort((a, b) => Math.abs(a - cx) - Math.abs(b - cx)); calor.forEach((l, i) => {l.position.set(ord[i], 82, -26); l.intensity = (LOWQ ? 620 : 1250) * (din ? .34 : 1) * sstep(360, 220, Math.abs(ord[i] - cx))}); const fx = din ? WX(E.n) : E.st === 'paseo' || E.st === 'inicio' ? ord[0] : WX(E.st === 'sale' ? Math.round(E.x / PASO) : E.n); foco.position.set(fx - 46, 130, 78); foco.target.position.set(fx, 40, -40); foco.target.updateMatrixWorld(); farol.position.set(Math.round((cx + E.dir * 90 + PASO / 2) / PASO) * PASO - PASO / 2 + 8, 124, 112);
+  const frente = E.st === 'mira' && (E.u > .12 || E.t > 1.6) && Math.abs(E.az) < .5; barrio.ver(!frente); if (frente) copias.forEach(g => {g.visible = false});
+  if (!din || verPortal) barrio.mover(din ? WX(E.n) : cx, E.dir, dt, t, px); nieve.t.value = t; nieve.c.value.set(cam.p.x + E.dir * (E.st === 'paseo' ? 90 : 0), 120, Math.max(90, cam.p.z - 60)); nieve.k.value = px;
 }
 
-/* ================= gestos: mirar alrededor y acercarse ================= */
+/* ================= entrar en un escaparate ================= */
+let dipT = 0; function dip(fn, ms = 210) {if (FAST) {fn(); return} const el = $('dip'); el.classList.add('on'); clearTimeout(dipT); dipT = setTimeout(() => {fn(); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('on')))}, ms)}
+function entrar(n, {car} = {}) {
+  if (E.st === 'inicio' || !listo) return; if (E.st === 'dentro') {if (n !== E.n) cambia(n); else if (car !== undefined) vista.setFocus({car}); return} au(); hideCard();
+  const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = tiendaDe(n); E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundos[E.k]; m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); vista.entra(m, directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.6}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
+  if (cerca) fn(false); else dip(() => fn(true));
+}
+function cambia(n) {dip(() => {const v = mundos[E.k]; v.modo(0); v.g.visible = false; E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = n; E.k = tiendaDe(n); E.x = WX(n); aLaVentana(); const m = mundos[E.k]; m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5}); caption(); hideCard(); if (!FAST) bells()})}
+function salir() {
+  if (E.st !== 'dentro') return; hideCard(); camera.getWorldDirection(v1); const lejos = camera.position.z < -30 || v1.z > -.25; const fn = corte => {vista.sale(); E.st = 'mira'; E.t = 0; E.idle = 0; E.u = corte ? .7 : .95; E.uT = .12; E.manual = false; E.az = E.azT = E.el = E.elT = 0; if (corte) {E.md = 0; mundos[E.k].modo(0); cam.p.set(WX(E.n), 66, 34); cam.l.set(WX(E.n), 52, -36)} document.body.classList.remove('dentro'); verCalle = true; caption()};
+  if (lejos) dip(() => fn(true)); else fn(false);
+}
+function onFocus(f) {const b = $('bCam'); b.classList.toggle('on', !!(f && f.chase)); b.setAttribute('aria-pressed', !!(f && f.chase)); $('bVolverT').textContent = f ? 'Volver a la maqueta' : 'Volver a la calle'; document.body.classList.toggle('foc', !!f); if (E.st !== 'dentro') return; const w = f ? f.car - 1 : 0; if (f && !f.chase && w >= 1 && w <= 4) showCard(E.k, w); else hideCard()}
+const vista = Vista({camera, canvas, onFocus, cut: v => {$('tun').style.opacity = v}, onHint: () => {E.idle = 0; despierta(); fuera()}, over: (x, y) => vista.hitCar(x, y, 6) >= 0, pick(x, y, slop) {au(); const c = vista.hitCar(x, y, slop); if (c < 0) {if (!vista.cam.focus) hideCard(); return false} const f = vista.cam.focus; if (!(f && f.car === c && !f.chase)) vista.setFocus({car: c}); return true}});
+let pistaOn = false; function pista() {if (store.get('advx-esc-nav') || FAST) return; pistaOn = true; const h = $('navHint'); h.innerHTML = coarse ? '<b>Un dedo</b> mueve · <b>pellizca</b> para acercar · <b>gira</b> con dos dedos · <b>toca</b> el tren' : '<b>Arrastra</b> para moverte · <b>rueda</b> para acercarte · <b>botón derecho</b> para girar · <b>pincha</b> el tren'; h.hidden = false; h.classList.remove('bye')}
+function fuera() {if (!pistaOn) return; pistaOn = false; store.set('advx-esc-nav', '1'); $('navHint').classList.add('bye'); setTimeout(() => {$('navHint').hidden = true}, 260)}
+
+/* ================= gestos en la calle: mirar alrededor, acercarse y pinchar un escaparate ================= */
 const ptrs = new Map(); let pin = 0, tap = null, hov = null;
-const toca = () => {E.idle = 0; despierta()};
-canvas.addEventListener('pointerdown', e => {try {canvas.setPointerCapture(e.pointerId)} catch (_) {} ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY}); tap = ptrs.size === 1 ? {x: e.clientX, y: e.clientY, t: e.timeStamp} : null; if (ptrs.size === 2) {const [a, b] = [...ptrs.values()]; pin = Math.hypot(a.x - b.x, a.y - b.y)} canvas.classList.add('dr'); toca()});
-canvas.addEventListener('pointermove', e => {const p = ptrs.get(e.pointerId); if (!p) {if (e.pointerType === 'mouse') hov = {x: e.clientX, y: e.clientY}; despierta(); return} const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < (e.pointerType === 'touch' ? 10 : 5)) return; tap = null; E.idle = 0;
-  if (ptrs.size === 2) {const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pin > 0) zoom((d / pin - 1) * .9); pin = d; return} if (E.st === 'mira') {const k = 1.6 / Math.min(innerWidth, 900); E.azT = clamp(E.azT - dx * k, -.75, .75); E.elT = clamp(E.elT + dy * k, -.25, .6)} else drag += dx});
-let drag = 0;
-for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, e => {const was = ev === 'pointerup' && tap && e.timeStamp - tap.t < 500; ptrs.delete(e.pointerId); canvas.classList.remove('dr'); if (was) tocar(e.clientX, e.clientY); else if (!ptrs.size && Math.abs(drag) > 60 && E.st === 'paseo') ir(E.n + (drag < 0 ? 1 : -1)); if (!ptrs.size) drag = 0; tap = null});
-function zoom(d) {if (E.st !== 'mira') return; E.manual = true; E.uT = clamp(E.uT + d, 0, 1); toca()}
-canvas.addEventListener('wheel', e => {e.preventDefault(); const px = e.deltaY * (e.deltaMode === 1 ? 33 : 1); zoom(-clamp(px, -160, 160) * (e.ctrlKey ? .006 : .0009))}, {passive: false});
+const toca = () => {E.idle = 0; lookT = performance.now(); despierta()}, enCalle = () => E.st !== 'dentro';
+canvas.addEventListener('pointerdown', e => {if (!enCalle()) return; try {canvas.setPointerCapture(e.pointerId)} catch (_) {} ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY}); tap = ptrs.size === 1 ? {x: e.clientX, y: e.clientY, t: e.timeStamp} : null; if (ptrs.size === 2) {const [a, b] = [...ptrs.values()]; pin = Math.hypot(a.x - b.x, a.y - b.y)} canvas.classList.add('dr'); toca()});
+canvas.addEventListener('pointermove', e => {if (!enCalle()) return; const p = ptrs.get(e.pointerId); if (!p) {if (e.pointerType === 'mouse') hov = {x: e.clientX, y: e.clientY}; despierta(); return} const dx = e.clientX - p.x, dy = e.clientY - p.y; if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < (e.pointerType === 'touch' ? 10 : 5)) return; p.x = e.clientX; p.y = e.clientY; tap = null; toca();
+  if (ptrs.size === 2) {const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pin > 0) zoom((d / pin - 1) * .9); pin = d; return} const k = 1.7 / Math.min(innerWidth, 900); if (E.st === 'mira') {E.azT = clamp(E.azT - dx * k, -.75, .75); E.elT = clamp(E.elT + dy * k, -.25, .6)} else {E.azT = clamp(E.azT + dx * k * 1.3, -2.4, 2.4); E.elT = clamp(E.elT + dy * k, -.22, .5)}});
+for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, e => {if (!ptrs.has(e.pointerId)) return; const was = ev === 'pointerup' && tap && e.timeStamp - tap.t < 500; ptrs.delete(e.pointerId); if (!ptrs.size) canvas.classList.remove('dr'); tap = null; if (was && enCalle()) tocar(e.clientX, e.clientY)});
+function zoom(d) {toca(); if (E.st === 'mira') {E.manual = true; const v = E.uT + d; if (v > 1.14) {entrar(E.n); return} E.uT = clamp(v, 0, 1.15)} else if (E.st === 'paseo') E.zsT = clamp(E.zsT + d, 0, 1)}
+canvas.addEventListener('wheel', e => {if (!enCalle()) return; e.preventDefault(); const px = e.deltaY * (e.deltaMode === 1 ? 33 : 1); zoom(-clamp(px, -160, 160) * (e.ctrlKey ? .006 : .0009))}, {passive: false});
 canvas.addEventListener('contextmenu', e => e.preventDefault());
-/* tocar: un vagón o el rótulo enseñan su marca; un escaparate lejano lleva hasta él */
 const RC = new THREE.Raycaster(), ND = new THREE.Vector2(), inv = new THREE.Matrix4(), bx = new THREE.Box3(), ry = new THREE.Ray();
 function rayo(x, y) {ND.set(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2); RC.setFromCamera(ND, camera); return RC.ray}
-function queHay(x, y) {const R = rayo(x, y), px = 2 * Math.tan(camera.fov * Math.PI / 360) / innerHeight; let best = null, bt = 1e9;
-  for (let k = 0; k < 3; k++) {const m = mundos[k]; if (!m.g.visible) continue; m.tren.wag.forEach((W, i) => {if (m.tren.inTunnel(i + 2)) return; W.updateWorldMatrix(true, false); inv.copy(W.matrixWorld).invert(); ry.copy(R).applyMatrix4(inv); const e = 7 * px * v3.setFromMatrixPosition(W.matrixWorld).distanceTo(R.origin) / K; bx.min.set(-3.7 - e, .4 - e, -1.6 - e); bx.max.set(3.7 + e, 4.7 + e, 1.6 + e); const h = ry.intersectBox(bx, v2); if (h) {const t = h.applyMatrix4(W.matrixWorld).distanceTo(R.origin); if (t < bt) {bt = t; best = {k, sitio: i + 1}}}})
-    const h = RC.intersectObject(tiendas[k].rot, false)[0]; if (h && h.distance < bt) {bt = h.distance; best = {k, sitio: 'rotulo'}}}
-  return best}
-function tocar(x, y) {if (!listo || E.st === 'inicio') return; au(); const q = queHay(x, y); if (q) {showCard(q.k, q.sitio); return} hideCard(); if (E.st === 'paseo') {const R = rayo(x, y), t = -R.origin.z / R.direction.z; if (t > 0) {const n = Math.round((R.origin.x + R.direction.x * t) / PASO); if (n !== E.n) ir(n)}}}
+/* qué hay bajo el dedo: un vagón o un rótulo (su marca) o el hueco de un escaparate */
+function queHay(x, y) {
+  const R = rayo(x, y), px = 2 * Math.tan(camera.fov * Math.PI / 360) / innerHeight; let best = null, bt = 1e9;
+  for (let k = 0; k < 3; k++) {const m = mundos[k], T = tiendas[k]; if (m.g.visible && E.st === 'mira') m.tren.wag.forEach((W, i) => {if (m.tren.inTunnel(i + 2)) return; W.updateWorldMatrix(true, false); inv.copy(W.matrixWorld).invert(); ry.copy(R).applyMatrix4(inv); const e = 7 * px * v3.setFromMatrixPosition(W.matrixWorld).distanceTo(R.origin) / K; bx.min.set(-3.7 - e, .4 - e, -1.6 - e); bx.max.set(3.7 + e, 4.7 + e, 1.6 + e); const h = ry.intersectBox(bx, v2); if (h) {const t = h.applyMatrix4(W.matrixWorld).distanceTo(R.origin); if (t < bt) {bt = t; best = {k, sitio: i + 1}}}});
+    T.g.updateMatrixWorld(); const h = RC.intersectObject(T.rot, false)[0]; if (h && h.distance < bt) {bt = h.distance; best = {k, sitio: 'rotulo'}}}
+  if (best) return best; const t = -R.origin.z / R.direction.z; if (!(t > 0)) return null; const X = R.origin.x + R.direction.x * t, Y = R.origin.y + R.direction.y * t, n = Math.round(X / PASO); return Math.abs(X - n * PASO) < VX + 16 && Y > 4 && Y < VY1 + 8 && Math.abs(X - camera.position.x) < 1300 ? {k: tiendaDe(n), n, sitio: 'cristal'} : null;
+}
+function tocar(x, y) {if (!listo || E.st === 'inicio') return; au(); const q = queHay(x, y); if (!q) {hideCard(); return} if (q.sitio === 'rotulo') {showCard(q.k, q.sitio); return} if (q.sitio === 'cristal') {entrar(q.n); return} entrar(E.n, {car: q.sitio + 1})}
 
 /* ================= marcas ================= */
 const SITIOS = {1: {}, 2: {}, 3: {}};
@@ -156,47 +206,60 @@ $('adFile').addEventListener('change', async e => {const f = e.target.files && e
 function adOk() {if (vacio()) {$('adErr').textContent = 'Sube una imagen o escribe un mensaje.'; return false} if (cleanUrl(ed.url) === null) {$('adErr').textContent = 'Revisa el enlace: tiene que ser una web, por ejemplo tumarca.com o instagram.com/tumarca.'; $('adUrl').focus(); return false} return true}
 $('adAsk').onclick = () => {if (!adOk()) return; const rot = ed.tab === 'rot', txt = pedirTexto(edAd(), rot ? 'rotulo' : 'vagon', tiendaDe(E.n) + 1, rot ? PRECIO_ROTULO : PRECIO_VAGON), fin = ok => {$('adOk').hidden = false; $('adOk').textContent = CONTACTO ? 'Se abre tu correo con los datos puestos.' : ok ? 'Datos copiados. Pégalos en un mensaje y adjunta tu imagen.' : 'No se han podido copiar los datos.'}; try {navigator.clipboard.writeText(txt).then(() => fin(true), () => fin(false))} catch (e) {fin(false)} if (CONTACTO) {const a = document.createElement('a'); a.href = `mailto:${CONTACTO}?subject=${encodeURIComponent('Mi marca en el escaparate')}&body=${encodeURIComponent(txt)}`; a.click()}};
 let previa = null; async function finPrevia() {if (!previa) return; const p = previa; previa = null; $('prevBack').hidden = true; if (p.rot) await tiendas[p.k].setRotulo(SITIOS[p.k + 1].rotulo || null); else await mundos[p.k].tren.setAd(p.i, SITIOS[p.k + 1][p.i + 1] || null)}
-$('adSee').onclick = async () => {if (cleanUrl(ed.url) === null) {adOk(); return} await finPrevia(); const k = tiendaDe(E.n), rot = ed.tab === 'rot', libre = [1, 2, 3, 4].find(v => !SITIOS[k + 1][v]) || 1; previa = {k, rot, i: libre - 1}; const a = vacio() ? {text: 'Tu marca aquí', sub: '', bg: ed.bg, img: ''} : edAd(); if (rot) await tiendas[k].setRotulo(a); else await mundos[k].tren.setAd(libre - 1, a); closeAd(); $('prevBack').hidden = false; E.manual = true; E.uT = rot ? 0 : .6};
+$('adSee').onclick = async () => {if (cleanUrl(ed.url) === null) {adOk(); return} await finPrevia(); const k = tiendaDe(E.n), rot = ed.tab === 'rot', libre = [1, 2, 3, 4].find(v => !SITIOS[k + 1][v]) || 1; previa = {k, rot, i: libre - 1}; if (rot && E.st === 'dentro') salir(); else if (!rot && E.st === 'mira') entrar(E.n, {car: libre + 1}); const a = vacio() ? {text: 'Tu marca aquí', sub: '', bg: ed.bg, img: ''} : edAd(); if (rot) await tiendas[k].setRotulo(a); else await mundos[k].tren.setAd(libre - 1, a); closeAd(); $('prevBack').hidden = false; E.manual = true; E.uT = rot ? 0 : .6; if (!rot && E.st === 'dentro') vista.setFocus({car: libre + 1}); hideCard()};
 $('prevBack').onclick = async () => {await finPrevia(); openAd()};
 
 /* ================= interfaz ================= */
-function caption() {const k = tiendaDe(E.n); $('capN').textContent = MAPS[k].nombre; $('capS').textContent = E.st === 'mira' ? `Escaparate ${k + 1} de 3` : E.st === 'inicio' ? '' : 'De camino al escaparate ' + (k + 1)}
+function caption() {const k = tiendaDe(E.n); $('capN').textContent = MAPS[k].nombre; $('capS').textContent = E.st === 'dentro' ? `Escaparate ${k + 1} de 3` : E.st === 'mira' ? `Escaparate ${k + 1} de 3 · entrar` : E.st === 'inicio' ? '' : `De camino al escaparate ${k + 1}`}
 let toastT = 0; function toast(m) {const el = $('toast'); el.textContent = m; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600)}
 let quietoT = 0; function despierta() {document.body.classList.remove('quieto'); quietoT = performance.now()}
-$('bPrev').onclick = () => {au(); despierta(); ir(E.n - 1)}; $('bNext').onclick = () => {au(); despierta(); ir(E.n + 1)};
+$('bPrev').onclick = () => {au(); despierta(); ir(E.n - 1)}; $('bNext').onclick = () => {au(); despierta(); ir(E.n + 1)}; $('cap').onclick = () => {despierta(); if (E.st === 'dentro') vista.home(true); else entrar(E.n)};
+$('bVolver').onclick = () => {au(); if (previa) return finPrevia().then(() => openAd()); if (vista.cam.focus) vista.setFocus(null); else salir()};
+const mid = () => [innerWidth / 2, innerHeight / 2]; $('nIn').onclick = () => vista.zoomAt(...mid(), .62); $('nOut').onclick = () => vista.zoomAt(...mid(), 1.6); $('nRot').onclick = () => vista.turn(Math.PI / 4); $('nHome').onclick = () => {vista.toca(); vista.home(true)}; $('bCam').onclick = () => {au(); const f = vista.cam.focus; vista.toca(); vista.setFocus(f && f.chase ? null : {car: 0, chase: true})};
 const pintaSon = () => $('bSon').classList.toggle('off', !sonidoOn()); pintaSon(); $('bSon').onclick = () => {setSonido(!sonidoOn()); au(); pintaSon()};
 const url = () => window.ADVX_ESC_URL || location.origin + location.pathname;
 $('bShare').onclick = async () => {const text = '🚂 ¿Te acuerdas de cuando te quedabas embobado mirando el tren de un escaparate?'; if (navigator.share) try {await navigator.share({title: 'El tren del escaparate', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(url()); toast('Enlace copiado: pégalo donde quieras')} catch (e) {toast('No se ha podido copiar el enlace')}};
-addEventListener('keydown', e => {if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if (modal()) closeAd(); else hideCard(); return} if (modal() || /INPUT|TEXTAREA/.test(e.target.tagName) || !listo) return; if (e.key === 'ArrowRight') ir(E.n + 1); else if (e.key === 'ArrowLeft') ir(E.n - 1); else if (e.key === '+' || e.key === '=') zoom(.12); else if (e.key === '-') zoom(-.12)});
+const NAVK = {ArrowLeft: [-34, 0], ArrowRight: [34, 0], ArrowUp: [0, -34], ArrowDown: [0, 34], a: [-34, 0], d: [34, 0], w: [0, -34], s: [0, 34]};
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if (modal()) closeAd(); else if (E.st === 'dentro' && vista.cam.focus) vista.setFocus(null); else if (!$('card').hidden) hideCard(); else salir(); return} if (modal() || /INPUT|TEXTAREA/.test(e.target.tagName) || !listo) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (E.st === 'dentro') {if (NAVK[k]) {e.preventDefault(); vista.nudge(...NAVK[k])} else if (k === '+' || k === '=') vista.zoomAt(...mid(), .75); else if (k === '-') vista.zoomAt(...mid(), 1.34); else if (k === 'q' && !e.repeat) vista.turn(-Math.PI / 6); else if (k === 'e' && !e.repeat) vista.turn(Math.PI / 6); else if (k === '0') vista.home(true); else if (k === 'c' && !e.repeat) $('bCam').click(); return}
+  if (k === 'ArrowRight') ir(E.n + 1); else if (k === 'ArrowLeft') ir(E.n - 1); else if (k === 'ArrowUp' || (k === 'Enter' && e.target === document.body)) entrar(E.n); else if (k === '+' || k === '=') zoom(.12); else if (k === '-') zoom(-.12)});
 function empezar() {if (E.st !== 'inicio' || !listo) return; au(); $('intro').classList.add('ido'); document.body.classList.remove('espera'); E.st = 'paseo'; E.t = 0; E.n = 0; caption(); despierta(); if (!FAST) bells()}
 $('go').onclick = empezar;
 
 /* ================= bucle ================= */
-let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, alT = 0, HOLD = false; const dbg = DEBUG ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0;
-function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'mira' || f === madre) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
-let tqA = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
-  if (E.st === 'mira') {tqA += raw; if (tqA > .9) {tqA = 0; traqueteo(E.u)}} if (hov && !ptrs.size) {canvas.classList.toggle('pt', E.st !== 'inicio' && !!queHay(hov.x, hov.y)); hov = null} if (now - quietoT > 6000) document.body.classList.add('quieto'); if (grade) grade.uniforms.t.value = now / 1000;
-  if (dbg) renderer.info.reset(); draw(raw); if (dbg) {dN++; dT += raw; if (dT > .5) {dbg.textContent = `${Math.round(dN / dT)} fps · ${(dT / dN * 1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${renderer.info.render.calls} dc · ${(renderer.info.render.triangles / 1000).toFixed(0)}k · ${E.st}`; dN = dT = 0}}
-  if (!window.__noAdapt && !document.hidden && raw < .2) {fA += raw; if (++fN > 40 && now - lastAdj > 1500) {const a = fA / fN, g = coarse ? 1 / 30 : 1 / 60; fA = fN = 0; lastAdj = now; if (a > g * 1.3) {if (dynPR > 1) {dynPR = Math.max(1, dynPR - .2); resize()} else if (renderer.shadowMap.enabled && a > g * 1.8) {foco.castShadow = false; renderer.shadowMap.enabled = false} else if (bloom && bloom.enabled && a > g * 2) bloom.enabled = false}}}}
+let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, lento = 0, alT = 0, HOLD = false; const dbg = DEBUG ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0;
+function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'dentro' && (E.st !== 'mira' || f === madre)) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
+let tqA = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
+  if (E.st === 'mira' || E.st === 'dentro') {tqA += raw; if (tqA > .9) {tqA = 0; traqueteo(E.st === 'dentro' ? 1 : E.u)}} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); hov = null} if (now - quietoT > 6000) document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
+  if (dbg) renderer.info.reset(); draw(); if (dbg) {dN++; dT += raw; if (dT > .5) {dbg.textContent = `${Math.round(dN / dT)} fps · ${(dT / dN * 1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${renderer.info.render.calls} dc · ${(renderer.info.render.triangles / 1000).toFixed(0)}k · ${E.st}`; dN = dT = 0}}
+  adapta(raw, now)}
+/* si va justo: primero baja la resolución hasta 1×, luego sombras y MSAA, y por último el brillo */
+function adapta(raw, now) {if (window.__noAdapt || document.hidden || raw > .2) return; fA += raw; if (++fN < 40 || now - lastAdj < 1300) return; const a = fA / fN, g = coarse ? 1 / 30 : 1 / 60; fA = fN = 0; lastAdj = now; if (a < g * 1.25) {lento = 0; return} if (++lento < 2) return; if (dynPR > 1) {dynPR = Math.max(1, dynPR - .2); resize()} else if (post && post.samples > 2) {MSFIJO = true; post.msaa(2)} else if (renderer.shadowMap.enabled && a > g * 1.6) {foco.castShadow = false; renderer.shadowMap.enabled = false} else if (post && post.bloom > 0 && a > g * 2.2) post.bloom = 0}
 const prog = (p, t) => {$('lBar').style.transform = `scaleX(${p})`; if (t) $('go').textContent = t};
 /* móvil: materiales con barniz pasados a estándar */
 function ligero(root) {const c = new Map(); root.traverse(o => {if (!o.isMesh || !o.material.isMeshPhysicalMaterial) return; let m = c.get(o.material); if (!m) {const p = o.material; m = new THREE.MeshStandardMaterial({color: p.color, map: p.map, roughness: Math.max(.35, p.roughness), metalness: Math.min(.6, p.metalness), emissive: p.emissive, emissiveIntensity: p.emissiveIntensity, transparent: p.transparent, opacity: p.opacity, side: p.side}); c.set(p, m)} o.material = m})}
+/* foto de cada escaparate, para verlo de lejos sin dibujar la maqueta entera */
+function fotografia(k) {const w = LOWQ ? 512 : 1024, h = Math.round(w * (VY1 - VY0) / (VX * 2)), rt = new THREE.WebGLRenderTarget(w, h, {type: THREE.HalfFloatType, samples: LOWQ ? 0 : 4, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter}), c = new THREE.PerspectiveCamera(2 * Math.atan((VY1 - VY0) / 2 / 170) * 180 / Math.PI, w / h, 2, 900); rt.texture.anisotropy = 8; mundos.forEach((m, i) => {m.g.visible = i === k; m.g.position.set(0, VY0 + 14.5, -39.5); m.g.rotation.x = TILT}); cristal.forEach(q => {q.visible = false}); foco.position.set(-46, 130, 78); foco.target.position.set(0, 40, -40); foco.target.updateMatrixWorld(); c.position.set(0, (VY0 + VY1) / 2, 170); c.lookAt(0, (VY0 + VY1) / 2, 0); mundos[k].update(0, 0); const tm = renderer.toneMapping; renderer.toneMapping = THREE.NoToneMapping; renderer.shadowMap.needsUpdate = true; renderer.setRenderTarget(rt); renderer.clear(); renderer.render(dentro, c); renderer.setRenderTarget(null); renderer.toneMapping = tm;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(VX * 2, VY1 - VY0), new THREE.MeshBasicMaterial({map: rt.texture, fog: false})); m.position.set(0, (VY0 + VY1) / 2, -3); return m}
 async function boot() {
-  $('intro').classList.add('carga'); prog(.05); const fonts = document.fonts ? Promise.all(['400 80px "Alfa Slab One"', '500 40px Rubik', '400 40px Yesteryear'].map(f => document.fonts.load(f))).catch(() => {}) : null;
+  resize(); $('intro').classList.add('carga'); prog(.05); const fonts = document.fonts ? Promise.all(['400 80px "Alfa Slab One"', '500 40px Rubik', '400 40px Yesteryear'].map(f => document.fonts.load(f))).catch(() => {}) : null;
   await loadModels(p => prog(.05 + p * .4)); await fonts;
-  for (let k = 0; k < 3; k++) {prog(.5 + k * .13, ['Encendiendo los escaparates…', 'Nevando en la montaña…', 'Despertando a los duendes…'][k]); await tick(); const m = new Mundo(k).build(); m.g.scale.setScalar(K); dentro.add(m.g); mundos.push(m); const t = new Tienda(k, NOMBRES[k]); calle.add(t.g); tiendas.push(t)}
-  prog(.92, 'Poniendo la bufanda…'); await tick(); suelo = suelos(calle); huellas = new Huellas(calle); nieve = nevada(aire, LOWQ ? 420 : 900); cristales(); madre = new Figura('madre'); nino = new Figura('nino'); calle.add(madre.g, nino.g);
-  for (const m of mundos) m.tren.s = m.T.L * .04; await ponMarcas(); if (LOWQ) {ligero(dentro); ligero(calle)}
-  FAST = true; paso(1 / 60); FAST = false; listo = true; draw(0); $('intro').classList.remove('carga'); $('go').disabled = false; prog(1, 'Dame la mano'); caption();
+  for (let k = 0; k < 3; k++) {prog(.5 + k * .12, ['Encendiendo los escaparates…', 'Nevando en la montaña…', 'Despertando a los duendes…'][k]); await tick(); const m = new Mundo(k).build(); m.g.scale.setScalar(K); dentro.add(m.g); mundos.push(m); const t = new Tienda(k, NOMBRES[k]); calle.add(t.g); tiendas.push(t)}
+  prog(.86, 'Colgando las luces…'); await tick(); barrio = new Barrio(calle); huellas = new Huellas(calle); nieve = nevada(dentro, LOWQ ? 420 : 900); cristales();
+  prog(.94, 'Poniendo la bufanda…'); await tick(); madre = new Figura('madre'); nino = new Figura('nino'); calle.add(madre.g, nino.g);
+  for (const m of mundos) m.tren.s = m.T.L * .04; await ponMarcas(); if (LOWQ) {ligero(dentro); ligero(calle)} reflejos(dentro, .5); reflejos(calle, .22);
+  nieve.m.visible = false; for (let k = 0; k < 3; k++) {const f = fotografia(k); fotos.push(f); calle.add(f); const g = tiendas[k].copia(f); copias.push(g); calle.add(g)} nieve.m.visible = true; fotos.forEach((f, k) => {const c = copias[k].children[copias[k].children.length - 1]; c.position.x = 0});
+  madre.g.position.set(E.x, 0, ZM); nino.g.position.set(E.x + DX, 0, ZN); detras(0, cam.p, cam.l, 46); FAST = true; paso(1 / 60); E.st = 'inicio'; for (let i = 0; i < 30; i++) paso(1 / 30); FAST = false; listo = true; draw(); $('intro').classList.remove('carga'); $('go').disabled = false; prog(1, 'Dame la mano'); caption();
 }
 boot().catch(e => {console.error(e); const f = $('fatal'); f.textContent = 'No se ha podido montar la calle. Recarga la página.'; f.hidden = false});
 requestAnimationFrame(loop);
 
 /* gancho para las pruebas */
-window.__esc = {get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, mundos, tiendas, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro, aire}, get fly() {return FAST},
+const aPantalla = v => {v.project(camera); return {x: (v.x * .5 + .5) * innerWidth, y: (.5 - v.y * .5) * innerHeight, z: v.z}};
+window.__esc = {eng: {renderer, post, foco, camera, get verCalle() {return verCalle}, get verPortal() {return verPortal}}, get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, entrar, salir, vista, mundos, tiendas, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro}, get fly() {return FAST},
   step(sec, d = 1 / 30) {const f = FAST; for (let i = 0; i < sec / d; i++) {FAST = true; paso(d)} FAST = f},
-  mirar(u) {E.manual = true; E.u = E.uT = u}, cam: () => ({p: cam.p.toArray().map(v => +v.toFixed(1)), l: cam.l.toArray().map(v => +v.toFixed(1))}), setCam: (p, l) => {cam.p.set(...p); cam.l.set(...l); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld(); colocar(0, tG); draw(0)}, pos: () => ({m: madre.g.position.toArray(), n: nino.g.position.toArray(), ym: madre.yaw, yn: nino.yaw, hn: nino.look.y}),
+  mirar(u) {E.manual = true; E.u = E.uT = u}, cam: () => ({p: cam.p.toArray().map(v => +v.toFixed(1)), l: cam.l.toArray().map(v => +v.toFixed(1))}), setCam: (p, l) => {cam.p.set(...p); cam.l.set(...l); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld(); colocar(0, tG); draw()}, pos: () => ({m: madre.g.position.toArray(), n: nino.g.position.toArray(), ym: madre.yaw, yn: nino.yaw, hn: nino.look.y}),
   manos() {const mi = E.dir > 0 ? 0 : 1, a = v1.clone(), b = v1.clone(), t = (f, i, o) => {f.g.updateMatrixWorld(true); return o.set(0, -f.D.arm, 0).applyMatrix4(f.arm[i].matrixWorld)}; t(madre, mi, a); t(nino, 1 - mi, b); return a.distanceTo(b)},
-  vagon(k, i) {const W = mundos[k].tren.wag[i]; W.updateWorldMatrix(true, false); const p = new THREE.Vector3(0, 3, 0).applyMatrix4(W.matrixWorld).project(camera); return {x: (p.x * .5 + .5) * innerWidth, y: (.5 - p.y * .5) * innerHeight}},
-  rotulo(k) {const p = tiendas[k].rot.getWorldPosition(new THREE.Vector3()).project(camera); return {x: (p.x * .5 + .5) * innerWidth, y: (.5 - p.y * .5) * innerHeight}},
-  perf(n = 60, pr = 1) {const ip = dynPR, ar = renderer.info.autoReset, gl = renderer.getContext(), px = new Uint8Array(4), sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); dynPR = pr; resize(); renderer.info.autoReset = false; for (let i = 0; i < 3; i++) {draw(0); sync()} renderer.info.reset(); draw(0); const c = renderer.info.render.calls, tr = renderer.info.render.triangles; const t0 = performance.now(); for (let i = 0; i < n; i++) {renderer.info.reset(); draw(0); sync()} const ms = (performance.now() - t0) / n; renderer.info.autoReset = ar; dynPR = ip; resize(); return {ms: +ms.toFixed(2), calls: c, tris: tr}}};
+  vagon(k, i) {const W = mundos[k].tren.wag[i]; W.updateWorldMatrix(true, false); return aPantalla(new THREE.Vector3(0, 3, 0).applyMatrix4(W.matrixWorld))}, ventana: n => aPantalla(new THREE.Vector3(WX(n), 70, 0)), rotulo: k => aPantalla(tiendas[k].rot.getWorldPosition(new THREE.Vector3())), figura: q => aPantalla((q === 'nino' ? nino : madre).head.getWorldPosition(new THREE.Vector3())),
+  perf(n = 60, pr = 1) {const ip = dynPR, ar = renderer.info.autoReset, gl = renderer.getContext(), px = new Uint8Array(4), sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); dynPR = pr; resize(); renderer.info.autoReset = false; for (let i = 0; i < 3; i++) {draw(); sync()} fr = 1; renderer.info.reset(); draw(); const c = renderer.info.render.calls, tr = renderer.info.render.triangles; const t0 = performance.now(); for (let i = 0; i < n; i++) {renderer.info.reset(); draw(); sync()} const ms = (performance.now() - t0) / n; renderer.info.autoReset = ar; dynPR = ip; resize(); return {ms: +ms.toFixed(2), calls: c, tris: tr}}};
