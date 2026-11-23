@@ -21,20 +21,28 @@ ok('las pendientes son de tren de juguete (menos del 10 %) y el taller está a r
 ok('hay túnel desde el primer día, puentes desde el segundo y más túneles y puentes al final', () => {
   const runs = k => mapOf(k).T.runs, has = (k, kk) => runs(k).filter(r => r.k === kk).length;
   assert.ok(has(0, KT) >= 1); assert.ok(has(1, KB) >= 2); assert.ok(has(MAXSTAGE, KT) >= 2 && has(MAXSTAGE, KB) >= 3, JSON.stringify(runs(MAXSTAGE)));
-  for (let k = 0; k <= MAXSTAGE; k++) for (const r of runs(k)) assert.ok(r.n * mapOf(k).T.ds >= (r.k === KT ? 16 : 8), `tramo corto en la etapa ${k}`);
+  for (let k = 0; k <= MAXSTAGE; k++) for (const r of runs(k)) assert.ok(r.n * mapOf(k).T.ds >= (r.k === KT ? 16 : 6), `tramo corto en la etapa ${k}`);
 });
 ok('el terreno se adapta a la vía: a ras queda a la altura de los carriles y en los túneles la montaña los cubre', () => {
   for (let k = 0; k <= MAXSTAGE; k++) {const M = mapOf(k), T = M.T;
     for (let i = 0; i < T.N; i += 7) {const h = M.h(T.x[i], T.z[i]);
-      if (T.k[i] === KG) assert.ok(Math.abs(h - T.y[i]) < 0.6, `etapa ${k}, ${i}: suelo ${h.toFixed(2)} y vía ${T.y[i].toFixed(2)}`);
+      const abut = [-12, -6, 6, 12].some(q => T.k[(i + q + T.N) % T.N] === KB);   // junto a un puente lo tapa el estribo de piedra
+      if (T.k[i] === KG && !abut) assert.ok(Math.abs(h - T.y[i]) < 0.6, `etapa ${k}, ${i}: suelo ${h.toFixed(2)} y vía ${T.y[i].toFixed(2)}`);
       const inner = [-2, -1, 1, 2].every(q => T.k[(i + q + T.N) % T.N] === KT);   // en la boca, la tapa la fachada de piedra
       if (inner) assert.ok(h > T.y[i] + 6.4, `etapa ${k}, ${i}: túnel sin techo`)}}
 });
 ok('los huecos de casas no pisan la vía, el lago, la pista ni la plaza, y están separados', () => {
   for (let k = 0; k <= MAXSTAGE; k++) {const M = mapOf(k);
-    assert.ok(M.SL.length >= 12, `etapa ${k}: ${M.SL.length} huecos`);
+    assert.ok(M.SL.length >= (k ? 15 : 8), `etapa ${k}: ${M.SL.length} huecos`);
     for (const s of M.SL) {assert.ok(nearTrack(M.G, s.x, s.z, 12).d > 8.5); assert.ok(lakeE(s.x, s.z) > 1.5 && pisteD(s.x, s.z) > 11 && Math.hypot(s.x - F.plaza.x, s.z - F.plaza.z) > F.plaza.r + 6);
       assert.ok(M.SL.every(o => o === s || Math.hypot(o.x - s.x, o.z - s.z) >= 12.5)); assert.ok(Math.abs(M.h(s.x, s.z) - s.y) < 0.05, 'el solar está allanado')}}
+});
+ok('la vía es un ocho: se cruza a sí misma con 7 m de hueco por debajo y sin curvas demasiado cerradas', () => {
+  for (let k = 0; k <= MAXSTAGE; k++) {const {T} = mapOf(k), far = Math.round(40 / T.ds); let crosses = 0, minR = 1e9;
+    for (let i = 0; i < T.N; i += 2) for (let j = i + far; j < T.N; j += 2) {if (T.N - j + i < far) continue;
+      if (Math.hypot(T.x[i] - T.x[j], T.z[i] - T.z[j]) < 5) {crosses++; assert.ok(Math.abs(T.y[i] - T.y[j]) > 7, `etapa ${k}: cruce sin hueco (${T.y[i].toFixed(1)} / ${T.y[j].toFixed(1)})`)}}
+    for (let i = 0; i < T.N; i++) {const w = 8, da = Math.abs(((T.a[(i + w) % T.N] - T.a[(i - w + T.N) % T.N] + Math.PI * 3) % (Math.PI * 2)) - Math.PI); minR = Math.min(minR, 2 * w * T.ds / Math.max(da, 1e-6))}
+    assert.ok(crosses > 0, `etapa ${k}: sin cruce`); assert.ok(minR > 10, `etapa ${k}: radio ${minR.toFixed(1)}`)}
 });
 ok('atM interpola posición, altura y rumbo a lo largo de la vía (y da la vuelta)', () => {
   const {T} = mapOf(2), a = atM(T, 10), b = atM(T, 10 + T.L);

@@ -23,7 +23,7 @@ export const PROVS = ['Bizkaia', 'Gipuzkoa', 'Álava', 'Navarra', 'Madrid', 'Bar
 export const BIZ = ['Bar Txoko', 'Floristería Lirio', 'Taller Mendi', 'Academia Lur', 'Librería Itsaso', 'Panadería Ogi'];
 
 export function newWorld(now = Date.now()) {
-  const w = {v: TV, day: 1, stage: 0, wagons: 3, lights: 0, houses: 5, mine: -1, myName: '', myProv: '',
+  const w = {v: TV, day: 1, stage: 0, wagons: 3, lights: 0, houses: 3, mine: -1, myName: '', myProv: '',
     today: 0, goal: 0, total: 18430, myGifts: 0, myElves: 0, eDay: 1, eMask: 0, t: now};
   w.goal = goalFor(w);
   return w;
@@ -99,7 +99,7 @@ export function parseWorld(raw) {
   w.day = num(o.day, 1, DAYS, 1);
   w.wagons = num(o.wagons, 1, WAGON_MAX, 3);
   w.lights = num(o.lights, 0, MAXLIGHTS, 0);
-  w.houses = num(o.houses, 0, slotsOf(w.stage).length, 5);
+  w.houses = num(o.houses, 0, slotsOf(w.stage).length, 3);
   w.mine = num(o.mine, -1, w.houses - 1, -1);
   for (const k of ['today', 'total', 'myGifts', 'myElves']) w[k] = num(o[k], 0, 1e15, 0);
   w.eDay = num(o.eDay, 1, DAYS, w.day); w.eMask = num(o.eMask, 0, (1 << ELVES) - 1, 0);
