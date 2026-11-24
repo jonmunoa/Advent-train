@@ -8,7 +8,10 @@ export const QS=new URLSearchParams(location.search),coarse=matchMedia('(pointer
 const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
 const lerp=(a,b,t)=>a+(b-a)*t,clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 function hash2(x,y){const s=Math.sin(x*127.1+y*311.7)*43758.5453;return s-Math.floor(s)}
-function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);return lerp(lerp(hash2(xi,yi),hash2(xi+1,yi),u),lerp(hash2(xi,yi+1),hash2(xi+1,yi+1),u),v)}
+/* el ruido en los puntos de la rejilla, apuntado para no repetir el seno (mismo resultado, unas 8 veces más rápido) */
+const HV=new Float64Array(262144).fill(-1);
+function hs(x,y){if(x<-256||x>255||y<-256||y>255)return hash2(x,y);const i=(x+256)*512+y+256,v=HV[i];return v<0?HV[i]=hash2(x,y):v}
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf),a=hs(xi,yi),b=hs(xi,yi+1);return lerp(a+(hs(xi+1,yi)-a)*u,b+(hs(xi+1,yi+1)-b)*u,v)}
 const fbm=(x,y)=>vnoise(x,y)*0.6+vnoise(x*2.1,y*2.1)*0.28+vnoise(x*4.3,y*4.3)*0.12;
 const tick=()=>new Promise(r=>setTimeout(r,0));
 

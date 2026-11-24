@@ -165,14 +165,26 @@ export function sierra(Ra, A, fr, j, q, c, bru) {
   for (let i = 0; i <= N; i++) for (let f = 0; f <= F; f++) {const p = at(i, f), l = at(i - 1, f), rr = at(i + 1, f), up = at(i, f - 1), dn = at(i, f + 1); d1.set(rr[0] - l[0], rr[1] - l[1], rr[2] - l[2]); d2.set(dn[0] - up[0], dn[1] - up[1], dn[2] - up[2]); n.crossVectors(d1, d2).normalize(); if (n.y < 0) n.negate(); const luz = .46 + .7 * Math.max(0, n.dot(Lz)), u = f / F, ro = sstep(.62, .34, n.y + (vnoise(p[0] * .16, p[1] * .22 + p[2] * .1) - .5) * .4) * (1 - u) * .85; k.copy(nieve).lerp(roca, ro).multiplyScalar(luz).lerp(bru, sstep(.06, .52, u) * .96 + .04 * (3 - j) * (1 - u)); P.push(...p); C.push(k.r, k.g, k.b); if (i < N && f < F) {const b = i * (F + 1) + f; I.push(b, b + 1, b + F + 1, b + F + 1, b + 1, b + F + 2)}}
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); return new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide, fog: false, color: new THREE.Color(.86, .86, .92)}));
 }
-/* la misma idea pintada en el telón del escaparate */
-export function sierraTela(g, w, h, y0, sem, col, f) {
-  const e = h / 640, W = Math.round(w / 2 / e), H = 190, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x2 = cv.getContext('2d'), im = x2.createImageData(W, H), d = im.data, c = new THREE.Color(col).convertLinearToSRGB(), cima = [], cota = x => (216 - (fbm(x * 2 * f + sem, sem) * .55 + picos(x * 2 * f * .9 + sem, sem * 1.7) * .62) * 190) * .375; for (let x = -60; x < W + 60; x++) cima[x + 60] = cota(x);
-  const C = x => cima[Math.max(0, Math.min(W + 119, Math.round(x) + 60))], R = [c.r * 255, c.g * 255, c.b * 255], P = (x, y) => picos(x * .021 + sem, y * .021 + sem * 1.3);
-  for (let x = 0; x < W; x++) for (let y = Math.max(0, Math.floor(C(x))); y < H; y++) {
+/* la misma idea pintada en el telón del escaparate. El relieve (luz y roca de cada punto) solo depende de la semilla: se guarda para las demás maquetas y se calcula por tiras para no parar la imagen */
+const TELAS = new Map(), TW = 1024, TH = 190;
+function tela(sem, f) {
+  const key = sem + '|' + f; let t = TELAS.get(key); if (t) return t;
+  const cima = []; for (let x = -60; x < TW + 60; x++) cima.push((216 - (fbm(x * 2 * f + sem, sem) * .55 + picos(x * 2 * f * .9 + sem, sem * 1.7) * .62) * 190) * .375);
+  const C = x => cima[Math.max(0, Math.min(TW + 119, Math.round(x) + 60))], P = (x, y) => picos(x * .021 + sem, y * .021 + sem * 1.3); t = {C, luz: new Uint8Array(TW * TH), roca: new Uint8Array(TW * TH), x: 0}; TELAS.set(key, t);
+  t.hasta = X => {for (; t.x < X; t.x++) {const x = t.x, cx = C(x); for (let y = Math.max(0, Math.floor(cx)); y < TH; y++) {
     // cada cima tiene su lado con luz y su lado en sombra; la arista baja haciendo eses
-    const v = y - C(x), wx = x + (vnoise(x * .022 + sem, v * .03) - .5) * 46 * Math.min(1, v / 30), wy = v + (vnoise(x * .03 + 5, v * .03 + sem) - .5) * 26, cu = Math.max(-.34, Math.min(.36, (C(wx + 7) - C(wx - 7)) / 14 * .62)), a = P(wx, wy), b = P(wx + 1.7, wy - 1.1), fi = vnoise(x * .33, y * .33) - .5, luz = Math.max(.62, Math.min(1.34, 1.02 - cu * Math.exp(-v / 85) + (b - a) * 2.3 + fi * .07)), roca = Math.max(0, Math.min(1, (.46 - a) * 5 + fi)) * (1 - luz * .5), ni = Math.max(0, 1 - v / 100) * (1 - roca), u = Math.min(1, v / 140), o = (y * W + x) * 4;
-    for (let q = 0; q < 3; q++) {let z = R[q] * luz * (1 - roca * [.2, .16, .08][q]); z += (255 - z) * ni * .2; d[o + q] = z + (Math.min(255, R[q] * 1.1 + 12) - z) * u * .82} d[o + 3] = 255 * Math.min(1, v + .6)} x2.putImageData(im, 0, 0); g.imageSmoothingQuality = 'high'; const alto = H * 2 * 1.333 * e; g.drawImage(cv, 0, 0, W, H, 0, y0 - 150 * e, w, alto); g.fillStyle = `rgb(${R.map(z => Math.min(255, z * 1.1 + 12) | 0).join()})`; g.fillRect(0, y0 - 150 * e + alto - 1, w, h);
+    const v = y - cx, wx = x + (vnoise(x * .022 + sem, v * .03) - .5) * 46 * Math.min(1, v / 30), wy = v + (vnoise(x * .03 + 5, v * .03 + sem) - .5) * 26, cu = Math.max(-.34, Math.min(.36, (C(wx + 7) - C(wx - 7)) / 14 * .62)), a = P(wx, wy), b = P(wx + 1.7, wy - 1.1), fi = vnoise((x % 768) * .33, y * .33) - .5, luz = Math.max(.62, Math.min(1.34, 1.02 - cu * Math.exp(-v / 85) + (b - a) * 2.3 + fi * .07)), o = y * TW + x;
+    t.luz[o] = (luz - .62) * 354 + .5; t.roca[o] = Math.max(0, Math.min(1, (.46 - a) * 5 + fi)) * (1 - luz * .5) * 255 + .5}}};
+  return t;
+}
+/* los trozos del relieve que falten, para repartirlos entre fotogramas */
+export const telaPasos = (sem, f) => [1, 2, 3, 4, 5, 6, 7, 8].map(q => q * TW / 8).filter(X => !(TELAS.get(sem + '|' + f)?.x >= X)).map(X => () => tela(sem, f).hasta(X));
+export function sierraTela(g, w, h, y0, sem, col, f) {
+  const e = h / 640, t = tela(sem, f), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; t.hasta(TW); const x2 = cv.getContext('2d'), im = x2.createImageData(TW, TH), d = im.data, c = new THREE.Color(col).convertLinearToSRGB(), R = [c.r * 255, c.g * 255, c.b * 255], B = R.map(z => Math.min(255, z * 1.1 + 12)), K = [.2, .16, .08];
+  for (let x = 0; x < TW; x++) {const cx = t.C(x); for (let y = Math.max(0, Math.floor(cx)); y < TH; y++) {
+    const v = y - cx, p = y * TW + x, o = p * 4, luz = t.luz[p] / 354 + .62, roca = t.roca[p] / 255, ni = Math.max(0, 1 - v / 100) * (1 - roca) * .2, u = Math.min(1, v / 140) * .82;
+    for (let q = 0; q < 3; q++) {let z = R[q] * luz * (1 - roca * K[q]); z += (255 - z) * ni; d[o + q] = z + (B[q] - z) * u} d[o + 3] = 255 * Math.min(1, v + .6)}}
+  x2.putImageData(im, 0, 0); g.imageSmoothingQuality = 'high'; const alto = TH * 2 * 1.333 * e; g.drawImage(cv, 0, 0, TW, TH, 0, y0 - 150 * e, w, alto); g.fillStyle = `rgb(${B.map(z => z | 0).join()})`; g.fillRect(0, y0 - 150 * e + alto - 1, w, h);
 }
 
 /* nieve con los cantos redondos y algo hundida, en vez de una losa */

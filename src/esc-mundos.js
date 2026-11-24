@@ -7,7 +7,7 @@ import {TREN_DE, TIPOS} from './esc-trenes.js';
 import {Tren} from './esc-tren.js';
 import {juntar} from './esc-geo.js';
 import {nevada} from './esc-calle.js';
-import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, catenaria, cerca} from './esc-real.js';
+import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, telaPasos, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, catenaria, cerca} from './esc-real.js';
 
 const C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .6, ...o}), glow = (r, g, b) => new THREE.MeshBasicMaterial({color: new THREE.Color(r, g, b)});
 export const X = {
@@ -29,6 +29,8 @@ const CFG = [
 ];
 
 const mezcla = (s, j) => j === 0 ? s[0] : j === 1 ? '#' + new THREE.Color(s[0]).lerp(new THREE.Color(s[1]), .5).getHexString() : s[j - 1];
+/* las tres filas de montañas del telón: semilla y frecuencia */
+const SIERRAS = [[1, .006], [5, .008], [9, .011]];
 export class Mundo {
   /* i: día - 1. q: estilo de partida (0 pueblo, 1 montaña, 2 polo); tema: colores del día (esc-dias.js) */
   constructor(i, tema) {this.i = i; this.m = mapaOf(i); this.q = this.m.sem; this.tema = tema || null; const q = i; this.T = this.m.T; this.g = new THREE.Group(); this.anim = []; this.S = []; this.bulbs = [[], [], []]; this.smokeAt = []; this.r = rng(77 + q * 31); this.glows = []; this.taken = []; this.cfg = {...CFG[this.q], ...(tema ? tema.tren : null), tipo: TREN_DE[i] || 'americana'}}
@@ -47,7 +49,7 @@ export class Mundo {
   }
   /* los pasos de montaje por separado: se pueden repartir entre fotogramas */
   pasos() {
-    return [() => this.terreno(), () => {this.via(); this.puentes()}, () => this.bocas(), () => this[this.m.id](), () => this.bosque(), () => this.escenario(), () => this.cerrar(), () => {
+    return [() => this.terreno(), () => {this.via(); this.puentes()}, () => this.bocas(), () => this[this.m.id](), () => this.bosque(), ...SIERRAS.flatMap(([k, f]) => telaPasos(k + this.q * 9, f)), () => this.escenario(), () => this.cerrar(), () => {
       this.tren = new Tren(this.g, this.T, this.cfg); this.tren.s = this.T.L * .1; if (this.trenes) {this.mas = []; for (let k = 1; k < this.trenes; k++) {const c = CFG[k], t = new Tren(this.g, this.T, {...c, wagons: 3, tipo: ['', 'grande', 'diesel'][k]}); t.s = this.T.L * (.1 + k / this.trenes); this.mas.push(t)}}
     }];
   }
@@ -271,7 +273,7 @@ export class Mundo {
       // nubes altas, muy tenues, encendidas por el horizonte
       {const cw = 256, ch = 64, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const c2 = cv.getContext('2d'), im = c2.createImageData(cw, ch), col = new THREE.Color(cs[3]).lerp(new THREE.Color(1, 1, 1), .25).convertLinearToSRGB(); for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {const n = fbm(x * .028 + 7 + this.i, y * .11 + 3) * .75 + fbm(x * .09, y * .3 + 9) * .3, a = sstep(.46, .86, n) * sstep(0, .5, y / ch) * sstep(1, .86, y / ch); im.data.set([col.r * 255, col.g * 255, col.b * 255, a * 120], (y * cw + x) * 4)} c2.putImageData(im, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(cv, 0, h * .26, w, h * .5)}
       g.fillStyle = '#fff6d8'; g.shadowColor = '#fff3c0'; g.shadowBlur = 60 * e; g.beginPath(); g.arc(w / 2 + ([770, 240, 830][q] - (this.i * 97) % 300 - 512) * 1.14 * w / 2048, 110 * e, 34 * e, 0, 7); g.fill(); g.shadowBlur = 0;
-      const sc = TM_ ? TM_.sierra : [['#5a5f9c', '#8a87b8', '#cfc3d8'], ['#6f93c4', '#a9c4e4', '#e6eefa'], ['#2c6392', '#4b8db4', '#a5d4e0']][q]; sierraTela(g, w, h, h * .8, 1 + q * 9, sc[0], .006); sierraTela(g, w, h, h * .9, 5 + q * 9, sc[1], .008); sierraTela(g, w, h, h * 1.0, 9 + q * 9, sc[2], .011);
+      const sc = TM_ ? TM_.sierra : [['#5a5f9c', '#8a87b8', '#cfc3d8'], ['#6f93c4', '#a9c4e4', '#e6eefa'], ['#2c6392', '#4b8db4', '#a5d4e0']][q]; SIERRAS.forEach(([k, f], i) => sierraTela(g, w, h, h * (.8 + i * .1), k + q * 9, sc[i], f));
       const bz = g.createLinearGradient(0, h * .5, 0, h), bc = new THREE.Color(TM_ ? TM_.bru : ['#9c8fb4', '#b8cce4', '#6fa8c0'][q]).convertLinearToSRGB(), ba = a => `rgba(${bc.r * 255 | 0},${bc.g * 255 | 0},${bc.b * 255 | 0},${a})`; bz.addColorStop(0, ba(0)); bz.addColorStop(.6, ba(.22)); bz.addColorStop(1, ba(.5)); g.fillStyle = bz; g.fillRect(0, h * .5, w, h * .5)}, 'sky' + this.i);
     this.caja = new THREE.Group(); this.g.add(this.caja); this.telas = []; sky.wrapS = THREE.ClampToEdgeWrapping;
     // telón de una pieza con las esquinas curvas, como el fondo de un estudio
