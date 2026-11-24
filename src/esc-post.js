@@ -62,7 +62,7 @@ vec3 nitida(vec2 q){vec2 p=1./rs;vec3 c=texture2D(m,q).rgb;if(ni2<.01)return c;v
 float oclusion(float dz){vec2 q=v/ap-.5,i=floor(q),f=q-i;float s=0.,w=0.;for(int k=0;k<4;k++){vec2 o=vec2(float(k%2),float(k/2)),c=texture2D(ao,(i+o+.5)*ap).rg;float g=(o.x>.5?f.x:1.-f.x)*(o.y>.5?f.y:1.-f.y)/(.002+abs(c.g-dz)/dz);s+=c.r*g;w+=g;}return s/max(w,1e-5);}
 vec3 agx(vec3 c){const mat3 A=mat3(.842479062253094,.0423282422610123,.0423756549057051,.0784335999999992,.878468636469772,.0784336,.0792237451477643,.0791661274605434,.879142973793104);const mat3 B=mat3(1.19687900512017,-.0528968517574562,-.0529716355144438,-.0980208811401368,1.15190312990417,-.0980434501171241,-.0990297440797205,-.0989611768448433,1.15107367264116);c=A*max(c,1e-10);c=clamp((log2(c)+12.47393)/16.5,0.,1.);vec3 x2=c*c,x4=x2*x2;c=15.5*x4*x2-40.14*x4*c+31.96*x4-6.868*x2*c+.4298*x2+.1191*c-.00232;
 /* toque de revelado: algo más de contraste y de color que el AgX base */
-float l=lu(c);c=pow(max(c,0.),vec3(1.16));c=l+1.14*(c-l);c=B*c;return clamp(c,0.,1.);}
+float l=lu(c);c=pow(max(c,0.),vec3(1.24));l=lu(c);c=l+1.16*(c-l);c=B*c;return clamp(c,0.,1.);}
 void main(){vec2 q=v-.5;float r2=dot(q,q);vec3 c=nitida(v);
 #ifdef ALTO
 float zd=texture2D(z,v).r,dz=lin(zd);if(ak>.01){float a=oclusion(dz);a=mix(1.,a,ak*smoothstep(3.,.7,lu(c)));c*=a/(a*(1.-.35*clamp(c/(c+.5),0.,1.))+.35*clamp(c/(c+.5),0.,1.));c*=1.;}

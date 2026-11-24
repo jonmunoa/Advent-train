@@ -14,7 +14,7 @@ const tex = new THREE.TextureLoader(); const phT = {}; const ph = (n, srgb) => p
 /* ---------- material horneado ----------
    o: {d, n: texturas; k: repeticiones por unidad; tipo: liso | foto | nieve | suelo | prop} */
 function horneado({tipo, d, n, k = 1 / 90, nor = 1, color = [1, 1, 1], rug = 1, suelo = null}) {
-  const m = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1, metalness: 0}); m.userData.horno = true; m.userData.solo = true;
+  const m = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1, metalness: 0, side: tipo === 'suelo' ? THREE.DoubleSide : THREE.FrontSide}); m.userData.horno = true; m.userData.solo = true;
   const u = {tA: {value: d || null}, tN: {value: n || null}, k: {value: k}, col: {value: new THREE.Color(...color)}, tS: {value: suelo ? suelo.n : null}, tSd: {value: suelo ? suelo.d : null}}, foto = tipo !== 'liso', pr = tipo === 'prop';
   m.onBeforeCompile = s => {
     Object.assign(s.uniforms, u, U); m.userData.s = s;
@@ -30,14 +30,14 @@ vec4 ssr(vec3 P,vec3 R,float ru,float j){float t=2.5+j*2.,st=3.2;vec3 q=P;float 
 if(hit<.5)return vec4(0.);vec2 e=smoothstep(vec2(0.),vec2(.12),uv)*smoothstep(vec2(1.),vec2(.88),uv);float lod=clamp(ru*t*.11,0.,5.);vec3 C=textureLod(sC,uv,lod).rgb;return vec4(min(C,vec3(9.)),e.x*e.y);}` : ''}
 mat3 marcoB(vec3 p,vec3 N,vec2 q){vec3 a=dFdx(p),b=dFdy(p);vec2 c=dFdx(q),e=dFdy(q);vec3 q1=cross(b,N),q0=cross(N,a),T=q1*c.x+q0*e.x,B=q1*c.y+q0*e.y;float D=max(dot(T,T),dot(B,B)),sc=D==0.?0.:inversesqrt(D);return mat3(T*sc,B*sc,N);}`)
       .replace('#include <map_fragment>', `lmM=texture2D(tE,vL).rgb;rugB=1.;metB=0.;snB=0.;
-${tipo === 'liso' ? `diffuseColor.rgb=pow(vT.rgb,vec3(2.2));rugB=vT.a>.5?(vT.a-.502)*2.008:vT.a*2.008;metB=step(.5,vT.a);{float g=nB(vPo*vec3(.9,.16,.9)),g2=nB(vPo*.06);diffuseColor.rgb*=.86+.2*g2+.07*g;rugB=clamp(rugB+(g-.5)*.16+(g2-.5)*.14,.06,1.);}`
+${tipo === 'liso' ? `diffuseColor.rgb=pow(vT.rgb,vec3(2.2));rugB=vT.a>.5?(vT.a-.502)*2.008:vT.a*2.008;metB=step(.5,vT.a);{float g=nB(vPo*vec3(.9,.16,.9)),g2=nB(vPo*.06);diffuseColor.rgb*=.86+.2*g2+.07*g;rugB=clamp(rugB+(g-.5)*.07+(g2-.5)*.12,.06,1.);if(metB<.5)rugB=max(rugB,.3);}`
         : tipo === 'nieve' ? `{float g=nB(vPo*.05),g2=nB(vPo*.6);diffuseColor.rgb=vec3(.80,.82,.86)*(.93+.1*g)*(.97+.05*g2);rugB=.72;snB=1.;}`
-        : tipo === 'suelo' ? `{vec4 A=texture2D(tA,vB);float h=A.a,n1=nB(vPo*.045),n2=nB(vPo*.21),n3=nB(vPo*.9);float sn=smoothstep(.40,.62,vT.a*1.12+(.5-h)*.62+(n2-.5)*.22+(n3-.5)*.1);float agua=smoothstep(.16,.5,vT.g*.75+(.5-h)*.9+(n1-.5)*1.1)*(1.-sn);vec3 c=A.rgb*col*(vT.r*2.);c*=mix(1.,.5,agua*.8+.2*(1.-sn));vec3 nv=vec3(.78,.80,.85)*(.9+.12*n1)*(.95+.08*n3);nv=mix(nv,nv*vec3(.72,.70,.69),smoothstep(.2,.9,vT.g)*.55*n2);diffuseColor.rgb=mix(c,nv,sn);rugB=mix(mix(.46,.09,agua),mix(.78,.5,vT.g*.7),sn);snB=sn;}`
+        : tipo === 'suelo' ? `{vec4 A=texture2D(tA,vB);float h=A.a,n1=nB(vPo*.045),n2=nB(vPo*.21),n3=nB(vPo*.9);float sn=smoothstep(.40,.62,vT.a*1.12+(.5-h)*.62+(n2-.5)*.22+(n3-.5)*.1);float agua=smoothstep(.12,.42,vT.g*.6+(.5-h)*.8+(n1-.44)*1.5)*(1.-sn);vec3 c=A.rgb*col*(vT.r*2.);c*=mix(1.,.5,agua*.8+.2*(1.-sn));vec3 nv=vec3(.78,.80,.85)*(.9+.12*n1)*(.95+.08*n3);nv=mix(nv,nv*vec3(.72,.70,.69),smoothstep(.2,.9,vT.g)*.55*n2);diffuseColor.rgb=mix(c,nv,sn);rugB=mix(mix(.34,.07,agua),mix(.78,.46,vT.g*.7),sn);rugB=min(1.,rugB+length(vViewPosition)*.00022);snB=sn;}`
         : `{vec4 A=texture2D(tA,vB);diffuseColor.rgb=A.rgb*col*(${pr ? '1.' : 'vT.r*2.'});${pr ? '' : 'diffuseColor.rgb*=.82+.3*nB(vPo*vec3(.02,.012,.02));'}}`}
 ${tipo === 'nieve' || tipo === 'suelo' ? '' : 'diffuseColor.rgb*=mix(.66,1.,smoothstep(0.,.34,lmM.g));'}`)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor=rugB;vec3 nrB=vec3(.5,.5,1.);${foto ? `{vec4 Q=texture2D(tN,vB);nrB=Q.rgb;${tipo === 'foto' || pr ? `roughnessFactor=clamp(Q.b*${rug.toFixed(2)},.05,1.);` : ''}}` : ''}`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor=metB;')
-      .replace('#include <normal_fragment_maps>', `vec3 nLis=normal;${foto ? `{vec2 q=nrB.xy*2.-1.;${tipo === 'suelo' ? 'vec2 qs=(texture2D(tS,vPo.xz*.0111).xy*2.-1.)*.75+(texture2D(tS,vPo.xz*.047+.3).xy*2.-1.)*.6;q=mix(q*mix(.35,1.15,smoothstep(.06,.34,rugB)),qs,snB);' : tipo === 'nieve' ? 'q=q*.7+(texture2D(tN,vB*4.3+.37).xy*2.-1.)*.55;' : ''}q*=${nor.toFixed(2)};vec3 t=vec3(q,sqrt(max(0.,1.-dot(q,q))));normal=normalize(marcoB(-vViewPosition,normal,${tipo === 'suelo' ? 'vPo.xz*.02' : 'vB'})*t);}` : ''}
+      .replace('#include <normal_fragment_maps>', `vec3 nLis=normal;${foto ? `{vec2 q=nrB.xy*2.-1.;${tipo === 'suelo' ? 'vec2 qs=(texture2D(tS,vPo.xz*.0111).xy*2.-1.)*.75+(texture2D(tS,vPo.xz*.047+.3).xy*2.-1.)*.6;q=mix(q*mix(.35,1.15,smoothstep(.06,.34,rugB)),qs,snB);q*=mix(1.,.25,smoothstep(140.,900.,length(vViewPosition)));' : tipo === 'nieve' ? 'q=q*.7+(texture2D(tN,vB*4.3+.37).xy*2.-1.)*.55;' : ''}q*=${nor.toFixed(2)};vec3 t=vec3(q,sqrt(max(0.,1.-dot(q,q))));normal=normalize(marcoB(-vViewPosition,normal,${tipo === 'suelo' ? 'vPo.xz*.02' : 'vB'})*t);}` : ''}
 {vec3 Vd=normalize(vViewPosition);float dV=length(vViewPosition);if(snB>.4&&dV<190.){float hq=hB(floor(vPo*3.1)+floor(Vd*4.)*3.);totalEmissiveRadiance+=vec3(.9,.95,1.)*step(.9965,hq)*smoothstep(190.,40.,dV)*.9*dot(pow(texture2D(tL,vL).rgb,vec3(2.4))*MX+lmM.r*lmM.r*MW,vec3(.33));}}`)
       .replace('#include <lights_fragment_begin>', `vec3 geometryPosition=-vViewPosition;vec3 geometryNormal=normal;vec3 geometryViewDir=normalize(vViewPosition);vec3 geometryClearcoatNormal=vec3(0.);
 vec3 iblIrradiance=vec3(0.),clearcoatRadiance=vec3(0.),radiance=vec3(0.);
@@ -149,6 +149,11 @@ export class Bloques {
   luz(n, v) {const i = n - U.lzB.value; if (i >= 0 && i < 12) U.lz.value[i] = v}
   encender(u) {U.on.value = u; this.bomb.forEach(b => {b.count = Math.floor(this.nb * u)})}
   ver(v) {this.g.visible = v}
+  /* las luces más cercanas para encender la niebla: farolas, escaparates, figuras colgadas y comercios de enfrente */
+  niebla(cam, lzf, max = 20) {
+    const L = this._n ||= [], on = U.on.value, PER = this.D.PER; let k = 0; const q = (x, y, z, r, g, b, rad) => {const o = L[k] ||= {p: new THREE.Vector3(), c: new THREE.Color(), r: 1, d: 0}; o.p.set(x, y, z); o.c.setRGB(r, g, b); o.r = rad; o.d = o.p.distanceToSquared(cam.position); k++}; this.grupos.forEach(G => {if (!G.visible) return; const x0 = G.position.x; for (const [x, y, z] of this.D.farolas) q(x0 + x, y, z, .62 * on, .44 * on, .27 * on, 7); for (let i = 0; i < 3; i++) {const l = lzf(x0 + i * 340); q(x0 + i * 340, 68, 14, .62 * l, .47 * l, .32 * l, 44); q(x0 + i * 340 - 42, 66, 404, .4 * on, .28 * on, .17 * on, 44)} for (let i = 0; i < 6; i++) q(x0 + this.D.X0 + PER * (i + .5) / 6, 166, 210, ...(i & 1 ? [.34, .24, .11] : [.13, .18, .28]).map(v => v * on), 24)});
+    const A = L.slice(0, k).sort((a, b) => a.d - b.d).slice(0, max); return A;
+  }
   /* luz que llega a un punto (armónicos de orden 1): out = 4 × RGB; lzf(n) da cuánto luce cada escaparate */
   sonda(x, y, z, lzf, out) {
     const {NX, ZS, YS} = this.D.sondas, sh = this.D.sh, PER = this.D.PER, u = (((x - this.D.X0) / PER) % 1 + 1) % 1 * NX, i0 = Math.floor(u) % NX, fx = u - Math.floor(u), busca = (A, v) => {let k = 0; while (k < A.length - 2 && A[k + 1] < v) k++; return [k, clamp((v - A[k]) / (A[k + 1] - A[k]), 0, 1)]}, [kz, fz] = busca(ZS, z), [ky, fy] = busca(YS, y), lw = lzf(x); out.fill(0);
