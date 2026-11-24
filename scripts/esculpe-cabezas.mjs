@@ -16,22 +16,22 @@ const con = (a, b) => ({...a, ...b, nz: {...a.nz, ...(b.nz || {})}, ceja: {...a.
 const NINO = con(BASE, {
   tris: 14500, cr: [-.014, .127, 0], crR: [.114, .105, .111], ca: [.022, .084, 0], caR: [.0845, .079, .0845], me: [.0545, .056, .046], meR: .0428, meK: .038, ba: [.07, .0115, 0], baR: [.0225, .0195, .0235], baK: .04, hoc: [.0745, .038, 0, .022, .0185, .027, .03],
   E: [.0672, .0945, .0438], R: .0356, cuenca: .52, w: .95, au: .7, al: .53, inc: .015, pico: .05, pk: -.05, bolsa: 0, pliegue: .0006, iris: .655, ceja: {y: .1345, h: .0062, z0: .0185, z1: .0645, g: .0035, n: 44, r: .0008, l: .0105, k: .0012, arco: .001},
-  nz: {a: [.0945, .094, 0], b: [.1132, .0725, 0], r: .0088, w: .0064, ala: .0041, r0: .0038, k: .0145, nar: .2}, my: .0382, w2: .0212, hu: .0015, hl: .0023, lx: .0022, bc: .0044, surco: .0005, mejRubor: [.078, .0605, .057, .03], narRubor: .85, lash: .0022,
+  nz: {a: [.0945, .094, 0], b: [.1132, .0725, 0], r: .0088, w: .0064, ala: .0041, r0: .0038, k: .0145, nar: .2}, my: .0382, w2: .0212, hu: .0015, hl: .0023, lx: .0022, bc: .0044, surco: .0005, mejRubor: [.078, .0605, .057, .03], narRubor: .85, lash: .0016, pes: {n: 24, l: .0106, g: .00044, alza: .3},
 });
 const MADRE = con(BASE, {
   tris: 12500, cr: [-.02, .138, 0], crR: [.105, .103, .098], ca: [.021, .0885, 0], caR: [.08, .083, .077], k1: .045, me: [.0525, .0765, .043], meR: .0325, meK: .032, ba: [.0705, .0165, 0], baR: [.0185, .0175, .0195], baK: .038, mand: [[.0, .053, .051], [.055, .0185, .0135], .0185, .012, .036], hoc: [.0755, .0455, 0, .0185, .016, .0235, .024],
   E: [.0632, .1055, .0405], R: .0322, yaw: .14, cuenca: .6, w: .96, au: .61, al: .43, inc: .07, pico: .06, pk: -.1, pliegue: .0009, iris: .615, ceja: {y: .1385, h: .0064, z0: .0165, z1: .0615, g: .0025, n: 40, r: .0007, l: .0095, arco: .001, k: .0009}, arcoCeja: 0,
   nz: {a: [.0895, .109, 0], b: [.1078, .0768, 0], r0: .0039, r: .0069, w: .0057, ala: .0038, k: .0125}, my: .0445, w2: .0232, hu: .0026, hl: .0034, lx: .0033, bc: .0042, surco: .0007,
-  or: [-.014, .092, .0895], orR: [.0135, .022, .006], cue: [[-.014, .06, 0], [-.022, -.1, 0], .04, .042], mejRubor: [.07, .075, .054, .03], pest: 1, lash: .0023, bolsa: .0001,
+  or: [-.014, .092, .0895], orR: [.0135, .022, .006], cue: [[-.014, .06, 0], [-.022, -.1, 0], .04, .042], mejRubor: [.07, .075, .054, .03], lash: .0018, pes: {n: 34, l: .0152, g: .00058, alza: .42}, bolsa: .0001,
 });
 const MAYOR = con(MADRE, {
-  tris: 12500, me: [.05, .069, .043], meR: .033, baR: [.021, .018, .025], mand: [[.0, .046, .055], [.058, .012, .018], .021, .016, .03], au: .52, al: .36, inc: 0, pliegue: .001, bolsa: .0012, hu: .0028, hl: .0044, lx: .0042, ceja: {n: 44, r: .0009, y: .139}, orR: [.02, .034, .009], w2: .0225, bc: .0022, lash: .0013, pest: 0, E: [.0635, .1075, .0405], R: .0302, iris: .57,
+  tris: 12500, me: [.05, .069, .043], meR: .033, baR: [.021, .018, .025], mand: [[.0, .046, .055], [.058, .012, .018], .021, .016, .03], au: .52, al: .36, inc: 0, pliegue: .001, bolsa: .0012, hu: .0028, hl: .0044, lx: .0042, ceja: {n: 44, r: .0009, y: .139}, orR: [.02, .034, .009], w2: .0225, bc: .0022, lash: .0011, pes: {n: 22, l: .0105, g: .00045, alza: .32}, E: [.0635, .1075, .0405], R: .0302, iris: .57,
   arrugas: [['naso', .0011, .0034], ['pata', .0007, .0016], ['frente', .00055, .0022], ['boca', .0004, .0012], ['bolsa', .0008, .0026]],
 });
 const HOMBRE = con(BASE, {
   tris: 10500, cr: [-.016, .136, 0], crR: [.108, .104, .1], ca: [.02, .082, 0], caR: [.08, .096, .08], k1: .045, me: [.05, .07, .044], meR: .031, meK: .03, ba: [.0725, .001, 0], baR: [.022, .022, .028], baK: .036, mand: [[-.005, .038, .056], [.06, .0, .022], .02, .017, .03], hoc: [.076, .036, 0, .02, .019, .027, .026],
   E: [.0655, .1085, .0398], R: .027, yaw: .13, cuenca: .7, w: .94, au: .54, al: .38, inc: .05, pico: .12, bolsa: .0003, iris: .56, ceja: {y: .1375, h: .0056, z0: .0165, z1: .0625, g: .0038, r: .001, l: .0115, n: 56, arco: .001, k: .0014}, arcoCeja: .0012,
-  nz: {a: [.093, .112, 0], b: [.1245, .0735, 0], r0: .0062, r: .0122, w: .0098, ala: .0074, k: .016}, my: .0375, w2: .0238, hu: .0028, hl: .0042, lx: .004, bc: .0018, or: [-.012, .09, .0985], orR: [.021, .033, .0105], cue: [[-.014, .05, 0], [-.022, -.1, 0], .052, .054], mejRubor: [.066, .073, .055, .03], lash: .0012,
+  nz: {a: [.093, .112, 0], b: [.1245, .0735, 0], r0: .0062, r: .0122, w: .0098, ala: .0074, k: .016}, my: .0375, w2: .0238, hu: .0028, hl: .0042, lx: .004, bc: .0018, or: [-.012, .09, .0985], orR: [.021, .033, .0105], cue: [[-.014, .05, 0], [-.022, -.1, 0], .052, .054], mejRubor: [.066, .073, .055, .03], lash: .001, pes: {n: 20, l: .0092, g: .00042, alza: .24},
 });
 const VIEJO = con(HOMBRE, {
   tris: 12000, crR: [.108, .1, .1], me: [.054, .066, .045], meR: .036, nz: {b: [.129, .07, 0], r: .0158, r0: .0075, w: .0122, ala: .0098}, au: .5, al: .38, inc: -.03, pliegue: .0016, bolsa: .0016, orR: [.023, .039, .0115], ceja: {n: 90, r: .0014, l: .0165, g: .0042, y: .1385}, hu: .0026, hl: .0042,
@@ -139,12 +139,14 @@ function crea(P, nombre) {
   };
   /* ---------- párpados que se mueven (giran sobre el eje de los dos ojos; borde a 0°) ---------- */
   H.parpados = () => {
-    const L = [], r = R * 1.026; for (const sd of [-1, 1]) {
+    const L = [], r = R * 1.026, rndP = azar(23), hash = k => {const v = Math.sin(k * 127.1 + 4) * 43758.5; return v - Math.floor(v)}; for (const sd of [-1, 1]) {
       const M = {p: [], n: [], c: [], uv: [], ix: []}, NL = 18, NF = 8; for (let j = 0; j <= NF; j++) for (let i = 0; i <= NL; i++) {const la = lerp(-1.42, 1.42, i / NL), fi = j / NF * 1.75, x = Math.cos(la) * Math.cos(fi), y = Math.cos(la) * Math.sin(fi), z = Math.sin(la), g = j === 0 ? .992 : 1; M.p.push(E[0] + x * r * g, E[1] + y * r * g, sd * E[2] + z * r * g); M.n.push(x, y, z); M.c.push(.93, j < 2 ? .34 : .16, 0, 0); M.uv.push(i / NL, j / NF)}
       const w = NL + 1; for (let j = 0; j < NF; j++) for (let i = 0; i < NL; i++) {const a = j * w + i, b = a + 1, c = a + w, d = c + 1; M.ix.push(a, c, b, b, c, d)} L.push(M);
       const arc = []; for (let i = 0; i <= 10; i++) {const la = lerp(-1.12, 1.12, i / 10); arc.push([E[0] + Math.cos(la) * r * 1.012, E[1] - .0004, sd * E[2] + Math.sin(la) * r * 1.012])} const gz = P.lash; L.push(tubo(arc, u => {const q = sd > 0 ? u : 1 - u, k = Math.sqrt(Math.max(.03, Math.sin(Math.PI * Math.pow(q, .8)))) * lerp(.45, 1.2, q); return [gz * k, gz * .8 * k]}, {lados: 6, seg: 18, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}));
-      // rabillo: dos pestañas gruesas que siguen la línea hacia fuera
-      if (P.pest) for (const [la0, l, g0, al] of [[.94, .0112, .0027, .2]]) {const la = sd * la0, c = [E[0] + Math.cos(la) * r * 1.008, E[1], sd * E[2] + Math.sin(la) * r * 1.008], o = [Math.cos(la * 1.12), 0, Math.sin(la * 1.12)], T = [0, 1, 2, 3].map(k => {const t = k / 3; return [c[0] + o[0] * l * t, c[1] + al * l * t * t, c[2] + o[2] * l * t]}); L.push(tubo(T, u => {const k = Math.max(.06, Math.pow(1 - u, .9)); return [g0 * k, g0 * .8 * k]}, {lados: 6, seg: 7, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}))}
+      // pestañas sueltas, en grupitos: más largas y abiertas hacia el rabillo
+      const PE = P.pes; if (PE) for (let i = 0; i < PE.n; i++) {
+        const q = (i + .5 + (rndP() - .5) * .5) / PE.n, la = sd * lerp(-.98, 1.13, q), gr = Math.floor(i / 3), cl = ((i % 3) - 1) * -.035, l = PE.l * (.5 + .62 * Math.pow(q, .8)) * (.85 + rndP() * .3) * (q < .08 ? .6 : 1), ab = lerp(-.12, .46, q) + cl + (hash(gr) - .5) * .06, al = PE.alza * (.8 + hash(gr + 9) * .4);
+        const c = [E[0] + Math.cos(la) * r * 1.03, E[1] - .0013, sd * E[2] + Math.sin(la) * r * 1.03], a2 = la + sd * ab, o = [Math.cos(a2), 0, Math.sin(a2)], T = [0, 1, 2, 3].map(k => {const t = k / 3; return [c[0] + o[0] * l * (t - .22 * t * t), c[1] + l * (-.2 * t + (al + .06) * t * t), c[2] + o[2] * l * (t - .12 * t * t)]}); L.push(tubo(T, u => {const k = Math.max(.12, 1 - Math.pow(u, 1.5)); return [PE.g * k, PE.g * k]}, {lados: 3, seg: 5, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}))}
     } return L;
   };
   H.P = P; H.xDe = xDe; H.base = base; H.nombre = nombre; H.pelos = () => {const o = PEINADOS[nombre](H, base); if (nombre === 'hombre') {o.bigote = bigote(H, .9); o.barba = barba(H)} return o}; return H;

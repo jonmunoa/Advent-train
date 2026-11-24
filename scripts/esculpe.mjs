@@ -44,7 +44,7 @@ const une = L => {const o = {p: [], n: [], c: [], uv: [], ix: []}; let b = 0; fo
 for (const id of Object.keys(CABEZAS)) {
   if (CUALES.length && !CUALES.includes(id)) continue; const t0 = Date.now(), H = CABEZAS[id], g = rejilla(H.caja, H.paso * (BASTO ? 1.9 : 1), H.denso);
   let M = malla(H.f, g, H.vale); normales(H.f, M, 4e-4); M.c = H.pinta(M); const bruto = M.ix.length / 3; M = simplifica(M, H.tris * (BASTO ? .6 : 1)); normales(H.f, M, 4e-4); M.c = H.pinta(M); M.uv = new Float32Array(M.p.length / 3 * 2); for (let i = 0; i < M.p.length / 3; i++) {M.uv[i * 2] = Math.atan2(M.p[i * 3 + 2], M.p[i * 3]) * 1.6; M.uv[i * 2 + 1] = M.p[i * 3 + 1] * 12}
-  const cara = une([M, ...H.extras()]); cara.morphs = H.morphs(cara); const mallas = {cara, parpados: une(H.parpados())}; for (const [k, L] of Object.entries(H.pelos())) mallas[k] = aligera(une(L), {pelo: id === 'viejo' ? 8000 : id === 'nino' ? 12500 : 14500, barba: 6000, bigote: 2400}[k] || 4000);
+  const cara = une([M, ...H.extras()]); cara.morphs = H.morphs(cara); const mallas = {cara, parpados: une(H.parpados())}; const pl = H.pelos(); for (const [k, L] of Object.entries(pl)) {if (k === 'hebras') continue; mallas[k] = aligera(une(L), {pelo: id === 'viejo' ? 8000 : id === 'nino' ? 13500 : id === 'madre' ? 21000 : 14500, barba: 6000, bigote: 2400}[k] || 4000); if (k === 'pelo' && pl.hebras) mallas.hebras = une(pl.hebras)}
   await guarda(id, mallas); console.log('  ', bruto, '→', M.ix.length / 3, '·', ((Date.now() - t0) / 1000).toFixed(1) + ' s');
 }
 writeFileSync(join(ROOT, 'src/esc-medidas.js'), `/* generado por scripts/esculpe.mjs: los ojos de cada cabeza */\nexport const MEDIDAS = ${JSON.stringify(OJOS)};\n`);
