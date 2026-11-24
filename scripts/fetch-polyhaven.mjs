@@ -38,9 +38,17 @@ for (const [slug, t] of Object.entries(cfg.textures)) {
   const files = await api(slug);
   for (const [map, key] of Object.entries(t.maps)) {
     const f = files[key]['1k'].jpg, src = await download(f, join(SRC, slug, `${slug}_${map}_1k.jpg`)), out = join(OUT, `${slug}_${map}.webp`), px = sizeOf(t.size, map);
-    await sharp(src).resize(px, px, {fit: 'inside'}).webp({quality: map === 'nor' ? 90 : 82, effort: 6}).toFile(out);
+    await (map === 'diff' && t.mod ? sharp(src).modulate(t.mod) : sharp(src)).resize(px, px, {fit: 'inside'}).webp({quality: map === 'nor' ? 90 : 82, effort: 6}).toFile(out);
     console.log('textura', `${slug}_${map}.webp`, px + ' px', kb(out));
   }
+}
+// una ramita recortada: color y transparencia en una sola imagen, y su normal
+for (const [slug, t] of Object.entries(cfg.recortes || {})) {
+  if (!want(slug)) continue;
+  const files = await api(slug), baja = async k => {const f = files[t[k]]['1k'], g = f.png || f.jpg; return download(g, join(SRC, slug, `${slug}_${k}_1k.${f.png ? 'png' : 'jpg'}`))};
+  const [d, a, n] = [await baja('diff'), await baja('alpha'), await baja('nor')], px = t.size, alfa = await sharp(a).resize(px, px).greyscale().extractChannel(0).raw().toBuffer();
+  const out = join(OUT, `${slug}_rama.webp`); await sharp(d).resize(px, px).removeAlpha().joinChannel(alfa, {raw: {width: px, height: px, channels: 1}}).webp({quality: 86, alphaQuality: 90, effort: 6}).toFile(out);
+  const on = join(OUT, `${slug}_rama_nor.webp`); await sharp(n).resize(px / 2, px / 2).webp({quality: 86, effort: 6}).toFile(on); console.log('recorte', `${slug}_rama.webp`, kb(out), kb(on));
 }
 for (const [slug, res] of Object.entries(cfg.hdris)) {
   if (!want(slug)) continue;

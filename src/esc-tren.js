@@ -1,6 +1,6 @@
 /* Un tren de vapor completo (máquina, ténder, furgones con marca y furgón de cola) que da vueltas por una vía.
    Los furgones y las ruedas son mallas instanciadas; cada maqueta tiene el suyo. */
-import {THREE, RT, WB, WS, GAUGE, WLEN, WTOP, WHALF, TM, M, wagonGeos, bigWheelGeos, smallWheelGeos, buildLoco, buildTender, buildCaboose, SPH, coneTex, dotTex,
+import {THREE, gastado, RT, WB, WS, GAUGE, WLEN, WTOP, WHALF, TM, M, wagonGeos, bigWheelGeos, smallWheelGeos, buildLoco, buildTender, buildCaboose, SPH, coneTex, dotTex,
   PANEL, PANEL_Y, AD_W, AD_H, drawAd, loadImg, adTex, hostOf, ZAX, ONE, QFLIP, lerp} from './kit.js';
 import {atM, kindAt, KT} from './esc-vias.js';
 import {QS} from './kit.js';
@@ -14,7 +14,7 @@ const adorno = i => {if (!adornos[i]) {const cv = document.createElement('canvas
 export const V = 6.2;   // unidades por segundo: despacio, para verlo pasar
 let GEO = null;
 const geos = () => GEO || (GEO = {w: wagonGeos(), b: bigWheelGeos(), s: smallWheelGeos()});
-const lac = c => new THREE.MeshPhysicalMaterial({color: c, roughness: .3, clearcoat: 1, clearcoatRoughness: .06});
+const lac = c => gastado(new THREE.MeshPhysicalMaterial({color: c, roughness: .34, clearcoat: .7, clearcoatRoughness: .14}), {k: .42, id: 'c'});
 const m1 = new THREE.Matrix4(), m2 = new THREE.Matrix4(), q1 = new THREE.Quaternion(), v1 = new THREE.Vector3();
 let freeM = null;
 const freeMat = () => {if (freeM) return freeM; const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {text: 'Tu marca aquí', sub: 'Toca el vagón para ponerla', bg: '#16213f', tag: 'Libre'}); return freeM = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.82, .82, .82)})};
@@ -35,7 +35,7 @@ export class Tren {
     this.wl = []; this.cars.forEach((c, ci) => c.userData.wheels.forEach(w => this.wl.push({c: ci, ...w})));
     const mk = (geo, mat, n) => {const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; this.g.add(m); return m};
     const nb = this.wl.filter(w => w.big).length;
-    this.iw = [mk(G.w.lac, TM.lac, wagons), mk(G.w.blk, TM.black, wagons), mk(G.w.gld, TM.brass, wagons)]; this.ib = [mk(G.b.body, cr, nb), mk(G.b.tire, TM.steel, nb)]; this.is = [mk(G.s.body, cr, this.wl.length - nb), mk(G.s.tire, TM.steel, this.wl.length - nb)];
+    this.iw = [mk(G.w.lac, TM.lac, wagons), mk(G.w.blk, TM.black, wagons), mk(G.w.gld, TM.brass, wagons), mk(G.w.nie, TM.snow, wagons)]; this.ib = [mk(G.b.body, cr, nb), mk(G.b.tire, TM.steel, nb)]; this.is = [mk(G.s.body, cr, this.wl.length - nb), mk(G.s.tire, TM.steel, this.wl.length - nb)];
     for (let i = 0; i < wagons; i++) this.iw[0].setColorAt(i, new THREE.Color(cols[i % cols.length])); this.iw[0].instanceColor.needsUpdate = true;
     // faro con su haz y luces de cola
     const L = this.cars[0], lp = L.userData.lamp, lens = new THREE.Mesh(SPH(.21, 14, 10), M.lamp); lens.position.copy(lp); L.add(lens);

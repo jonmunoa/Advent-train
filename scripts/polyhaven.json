@@ -1,11 +1,21 @@
 {
-  "$comment": "Recursos de Poly Haven (CC0) para el salón. scripts/fetch-polyhaven.mjs los descarga a assets-src/polyhaven/ (no se sube) y deja las versiones ligeras en m/ph/ y m/env/. size = lado máximo en px de cada mapa; en modelos, detail = lado de normal/rugosidad/ARM.",
+  "$comment": "Recursos de Poly Haven (CC0) para el salón y los escaparates. scripts/fetch-polyhaven.mjs los descarga a assets-src/polyhaven/ (no se sube) y deja las versiones ligeras en m/ph/ y m/env/. size = lado máximo en px de cada mapa; en modelos, detail = lado de normal/rugosidad/ARM. recortes = texturas con transparencia (una ramita) sacadas de los mapas de un modelo.",
   "textures": {
     "herringbone_parquet": {"maps": {"diff": "Diffuse", "nor": "nor_gl", "arm": "arm"}, "size": {"diff": 1024, "nor": 512, "arm": 256}},
     "snow_02": {"maps": {"nor": "nor_gl", "rough": "Rough"}, "size": {"nor": 1024, "rough": 256}},
     "red_brick_03": {"maps": {"diff": "Diffuse", "nor": "nor_gl", "arm": "arm"}, "size": {"diff": 512, "nor": 512, "arm": 512}},
     "quatrefoil_jacquard_fabric": {"maps": {"nor": "nor_gl"}, "size": {"nor": 256}},
-    "fabric_pattern_07": {"maps": {"diff": "col_1", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}}
+    "fabric_pattern_07": {"maps": {"diff": "col_1", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}},
+    "rock_face_03": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.28, "brightness": 1.12}},
+    "gravel_stones": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.6, "brightness": 1.5}},
+    "white_planks_clean": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.35, "brightness": 1.28}},
+    "stone_brick_wall_001": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.35, "brightness": 1.5}},
+    "painted_plaster_wall": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.6, "brightness": 1.2}},
+    "cobblestone_floor_04": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.3, "brightness": 1.0}},
+    "weathered_brown_planks": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.75, "brightness": 1.25}},
+    "grey_roof_tiles_02": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}},
+    "dark_wood": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}},
+    "pine_bark": {"maps": {"diff": "Diffuse", "nor": "nor_gl"}, "size": {"diff": 512, "nor": 512}, "mod": {"saturation": 0.6, "brightness": 1.0}}
   },
   "hdris": {"fireplace": "1k"},
   "models": {
@@ -15,5 +25,8 @@
     "vintage_oil_lamp": {"size": 512, "detail": 256},
     "potted_plant_02": {"size": 512, "detail": 256, "simplify": 0.12},
     "potted_plant_04": {"size": 512, "detail": 256}
+  },
+  "recortes": {
+    "fir_tree_01": {"diff": "twig_diff", "alpha": "twig_alpha", "nor": "twig_nor_gl", "size": 512}
   }
 }

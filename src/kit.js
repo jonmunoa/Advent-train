@@ -65,7 +65,7 @@ const M={
   wood:new THREE.MeshStandardMaterial({color:0x8a5032,map:plankTex,roughness:.85}),
   roofEdge:new THREE.MeshStandardMaterial({color:0x5a1b16,roughness:.7}),
   icicle:new THREE.MeshStandardMaterial({color:0xdff3ff,roughness:.05,metalness:.3,emissive:0x1b2b44}),
-  branch:new THREE.MeshStandardMaterial({map:branchTex,alphaTest:.42,side:THREE.DoubleSide,roughness:.85,alphaToCoverage:true}),
+  branch:new THREE.MeshStandardMaterial({map:(()=>{const t=TL.load('m/ph/rama.webp');t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t})(),alphaTest:.36,side:THREE.DoubleSide,roughness:.85,alphaToCoverage:true}),
   core:new THREE.MeshStandardMaterial({color:0x0e2b1c,roughness:1}),
   door:new THREE.MeshStandardMaterial({color:0x4a2a1a,map:plankTex,roughness:.8}),
   cane:new THREE.MeshStandardMaterial({map:caneTex,roughness:.3}),
@@ -131,6 +131,14 @@ const TM={
   glow:new THREE.MeshBasicMaterial({color:new THREE.Color(1.6,1.15,.6)}),
   tail:new THREE.MeshBasicMaterial({color:new THREE.Color(3,.45,.35)}),
 };
+const winG=canvasTex(64,64,(g,w,h)=>{const r=g.createRadialGradient(32,22,2,32,30,44);r.addColorStop(0,'#fff3cf');r.addColorStop(.45,'#ffcf7d');r.addColorStop(1,'#b8601c');g.fillStyle=r;g.fillRect(0,0,w,h);g.fillStyle='rgba(70,30,10,.6)';g.fillRect(0,50,w,14);g.beginPath();g.arc(22,44,9,0,7);g.fill()},'winG');TM.glow.map=winG;TM.glow.color.setRGB(1.7,1.4,1.05);
+function gastado(m,{lo=.7,hi=3.1,k=.5,id=''}={}){m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vLo;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLo=position;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vLo;float sz;float hG(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}float nG(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(hG(i),hG(i+vec3(1,0,0)),f.x),mix(hG(i+vec3(0,1,0)),hG(i+vec3(1,1,0)),f.x),f.y),mix(mix(hG(i+vec3(0,0,1)),hG(i+vec3(1,0,1)),f.x),mix(hG(i+vec3(0,1,1)),hG(i+vec3(1,1,1)),f.x),f.y),f.z);}').replace('#include <color_fragment>','#include <color_fragment>\n{float n=nG(vLo*2.3),n2=nG(vLo*vec3(9.,2.2,9.));sz=(1.-smoothstep('+lo.toFixed(2)+','+hi.toFixed(2)+',vLo.y+(n-.5)*1.1))*'+k.toFixed(2)+';sz=clamp(sz+smoothstep(.62,.9,n2)*.14,0.,1.);diffuseColor.rgb=mix(diffuseColor.rgb*(.93+.12*n),vec3(.085,.07,.06),sz*.62);}').replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor+sz*.5,0.,1.);')};m.customProgramCacheKey=()=>'gas'+id+lo+hi+k;return m}
+gastado(TM.lac,{id:'l'});gastado(TM.black,{k:.35,id:'b'});gastado(TM.green,{id:'g'});gastado(TM.red,{id:'r'});gastado(TM.brass,{k:.3,id:'d'});
+// furgones de tablas: la veta y las juntas vienen de la foto
+TM.lac.map=phTex('white_planks_clean_diff',1,1,true);TM.lac.clearcoat=.35;TM.lac.clearcoatRoughness=.35;TM.lac.roughness=.5;if(!LOWQ){TM.lac.normalMap=phTex('white_planks_clean_nor',1);TM.lac.normalScale=new THREE.Vector2(1.7,1.7)}
+TM.snow=new THREE.MeshStandardMaterial({color:0xeef3fb,roughness:.85});
+function uvCaja(g,k){const u=g.attributes.uv,p=g.attributes.position,n=g.attributes.normal;for(let i=0;i<u.count;i++){const X=Math.abs(n.getX(i)),Y=Math.abs(n.getY(i));u.setXY(i,(X>.5?p.getZ(i):p.getX(i))*k,(Y>.5?p.getZ(i):p.getY(i))*k)}return g}
 const _m=new THREE.Matrix4(),_m2=new THREE.Matrix4(),_q=new THREE.Quaternion(),_p=new THREE.Vector3(),_s=new THREE.Vector3(1,1,1),_e=new THREE.Euler(),
   UPV=new THREE.Vector3(0,1,0),ZAX=new THREE.Vector3(0,0,1),ONE=new THREE.Vector3(1,1,1),QFLIP=new THREE.Quaternion().setFromAxisAngle(UPV,Math.PI),ZERO=new THREE.Matrix4().makeScale(0,0,0);
 /* piezas sueltas que luego se unen por material (pocas llamadas de dibujo por coche) */
@@ -150,12 +158,19 @@ function bigWheelGeos(){const r=WB,L=[ringGeo(r*0.9,r*0.74,0.2),CY(r*0.2,r*0.2,0
   return {body:mergeGeometries(L.map(geoOnly),false),tire:geoOnly(ringGeo(r,r*0.9,0.26))}}
 function smallWheelGeos(){const r=WS;return {body:mergeGeometries([CY(r*0.88,r*0.88,0.16,20).rotateX(Math.PI/2),CY(r*0.25,r*0.25,0.28,12).rotateX(Math.PI/2)].map(geoOnly),false),tire:geoOnly(ringGeo(r,r*0.86,0.22,24))}}
 /* furgón: caja lacada, techo, bastidor, bogies, marco dorado del panel y escalerillas */
-function wagonGeos(){const lac=[BX(7.0,2.7,2.84).translate(0,2.9,0)],blk=[roofGeo(7.4,3.1,0.32).translate(0,4.25,0),BX(6.6,0.08,0.55).translate(0,4.6,0),BX(7.3,0.32,2.3).translate(0,1.42,0)],gld=[];
-  for(const x of[-2.45,2.45])blk.push(BX(2.0,0.34,2.12).translate(x,1.17,0));
-  for(const x of[-3.78,3.78])blk.push(BX(0.4,0.22,0.3).translate(x,1.42,0));
+function wagonGeos(){const N=LOWQ?8:14,lac=[uvCaja(BX(7.0,2.7,2.84).translate(0,2.9,0),.42)],blk=[roofGeo(7.4,3.1,0.32).translate(0,4.25,0),BX(7.3,0.32,2.3).translate(0,1.42,0)],gld=[],nie=[];
+  // techo: pasarela de tablas, costillas y una capa de nieve que no llega al borde
+  for(const z of[-.16,.16])blk.push(BX(6.9,.06,.27).translate(0,4.64,z));for(let k=0;k<7;k++){const x=-3.3+k*1.1;blk.push(roofGeo(.09,3.14,.34).translate(x,4.27,0))}
+  nie.push(roofGeo(6.7,2.5,.24,.06).translate(0,4.4,0));for(const [x,z,r] of [[-2.6,.75,.5],[-.6,-.85,.62],[1.7,.8,.56],[2.9,-.6,.44]])nie.push(SPH(r,10,5).scale(1.6,.24,1).translate(x,4.46,z));
+  // bogies: largueros, cajas de grasa y muelles
+  for(const x of[-2.45,2.45]){blk.push(BX(2.0,0.26,2.12).translate(x,1.2,0));for(const z of[-1.2,1.2]){blk.push(BX(1.9,.2,.16).translate(x,1.0,z));for(const d of[-.5,.5])blk.push(BX(.34,.34,.2).translate(x+d,.86,z*1.02),CY(.09,.09,.3,8).translate(x+d*.42,1.16,z*1.05))}}
+  // topes, enganche y tirantes bajo el bastidor
+  for(const x of[-3.78,3.78]){blk.push(BX(0.4,0.22,0.3).translate(x,1.42,0));for(const z of[-.8,.8])blk.push(CYX(.1,.34,8).translate(x*.985,1.46,z),CYX(.2,.06,N).translate(x*1.03,1.46,z))}for(const z of[-.95,.95]){blk.push(BX(2.4,.06,.06).translate(0,.98,z));for(const s of[-1,1])blk.push(BX(1.4,.06,.06).rotateZ(s*.3).translate(s*1.82,1.17,z))}
+  // esquinas de hierro con remaches y puertas correderas asomando bajo el panel
+  for(const x of[-3.47,3.47])for(const z of[-1.4,1.4]){blk.push(BX(.14,2.66,.14).translate(x,2.9,z));for(let k=0;k<6;k++)blk.push(SPH(.035,5,4).translate(x,1.75+k*.46,z+Math.sign(z)*.08))}for(const z of[-1.45,1.45])blk.push(BX(6.9,.09,.07).translate(0,1.66,z),BX(6.9,.09,.07).translate(0,4.22,z));
   for(const sd of[-1,1]){const z=sd*(WHALF+0.03);gld.push(BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y+PANEL_H/2+0.045,z),BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y-PANEL_H/2-0.045,z),BX(0.09,PANEL_H+0.18,0.05).translate(-PANEL_W/2-0.045,PANEL_Y,z),BX(0.09,PANEL_H+0.18,0.05).translate(PANEL_W/2+0.045,PANEL_Y,z))}
-  for(const x of[-3.52,3.52]){for(const z of[0.55,1.05])gld.push(BX(0.05,2.3,0.05).translate(x,2.95,z));for(let k=0;k<6;k++)gld.push(BX(0.05,0.05,0.55).translate(x,1.95+k*0.4,0.8))}
-  const mg=a=>mergeGeometries(a.map(geoOnly),false);return {lac:mg(lac),blk:mg(blk),gld:mg(gld)}}
+  for(const x of[-3.56,3.56]){for(const z of[0.55,1.05])gld.push(CY(.028,.028,2.6,6).translate(x,2.95,z));for(let k=0;k<7;k++)gld.push(CY(.024,.024,.5,6).rotateX(Math.PI/2).translate(x,1.8+k*0.38,0.8))}gld.push(TOR(.3,.035,16).rotateY(Math.PI/2).translate(-3.66,4.05,-.75));
+  const mg=a=>mergeGeometries(a.map(geoOnly),false);return {lac:mg(lac),blk:mg(blk),gld:mg(gld),nie:mg(nie)}}
 function buildLoco(CB=TM.green,CR=TM.red){const L=[],g=new THREE.Group();
   part(L,BX(8.0,0.36,2.0),TM.black,-0.3,1.72,0);
   part(L,BX(7.8,0.12,3.0),CR,-0.35,2.4,0);part(L,BX(7.84,0.05,3.04),TM.brass,-0.35,2.47,0);
@@ -170,6 +185,13 @@ function buildLoco(CB=TM.green,CR=TM.red){const L=[],g=new THREE.Group();
   for(const z of[-1.42,1.42]){part(L,CYX(0.42,1.0,18),TM.black,2.5,1.62,z);part(L,CYX(0.45,0.07,18),TM.brass,2.0,1.62,z);part(L,CYX(0.45,0.07,18),TM.brass,3.0,1.62,z)}
   {const s=new THREE.Shape();s.moveTo(0,0);s.lineTo(0.95,0);s.lineTo(0,0.95);s.closePath();const cg=new THREE.ExtrudeGeometry(s,{depth:2.5,bevelEnabled:false});cg.translate(0,0,-1.25);part(L,cg,CR,3.95,0.85,0)}
   part(L,BX(0.3,0.5,2.9),CR,3.95,1.98,0);for(const z of[-0.95,0.95])part(L,CYX(0.2,0.32,14),TM.brass,4.25,1.98,z);
+  // remaches, tuberías, pasamanos, arenero, dinamo, campana, escalones y topes
+  {const rv=(x,r,n,y=3.45)=>{for(let k=0;k<n;k++){const t=k/n*6.283;part(L,SPH(.04,5,4),TM.black,x,y+Math.sin(t)*r,Math.cos(t)*r)}};if(!LOWQ){rv(3.06,1.07,22);rv(3.76,1.07,22);for(const x of[-1.2,.5,2.2])rv(x+.16,1.005,18);for(let k=0;k<15;k++)for(const z of[-1.51,1.51])part(L,SPH(.035,5,4),TM.black,-4.1+k*.16,2.52,z)}
+    for(const z of[-1,1]){part(L,CYX(.05,4.2,8),TM.brass,.9,2.86,z*1.06);part(L,CYX(.07,2.2,8),TM.black,1.9,3.05,z*.98);part(L,CY(.05,.05,1.0,8),TM.brass,2.95,3.6,z*1.02,z*-.5,0,0);for(const x of[-1.2,.4,2.0,3.2])part(L,SPH(.055,6,5),TM.brass,x,3.95,z*1.1);part(L,BX(.42,.07,.5),TM.black,3.2,1.2,z*1.35);part(L,BX(.42,.07,.5),TM.black,-3.9,1.3,z*1.4);part(L,BX(.07,.9,.07),TM.black,3.2,1.7,z*1.5);part(L,BX(1.2,.36,.5),TM.black,.2,2.12,z*1.18);part(L,CYX(.17,1.0,10),TM.black,-1.2,2.75,z*1.25);
+      part(L,CYX(.24,.5,14),TM.black,4.28,1.98,z*.95);part(L,CYX(.3,.08,16),TM.black,4.52,1.98,z*.95)}
+    part(L,CY(.1,.14,.34,10),TM.black,2.35,4.5,0);part(L,new THREE.SphereGeometry(.22,14,8,0,6.2832,0,1.6),TM.brass,2.35,4.68,0);part(L,CY(.24,.22,.07,14),TM.brass,2.35,4.68,0);part(L,BX(.06,.06,.5),TM.black,2.35,4.94,0);for(const z of[-.24,.24])part(L,BX(.06,.5,.06),TM.black,2.35,4.7,z);
+    part(L,TOR(.72,.045,20),TM.black,3.9,3.45,0,0,Math.PI/2,0);for(let k=0;k<8;k++){const t=k/8*6.283;part(L,BX(.05,.16,.1),TM.black,3.9,3.45+Math.sin(t)*.82,Math.cos(t)*.82,-t,0,0)}part(L,BX(.05,.34,.8),TM.brass,3.93,3.06,0);part(L,CYX(.05,.5,8),TM.steel,4.35,1.5,0);part(L,TOR(.13,.04,10),TM.steel,4.62,1.5,0);
+    for(let k=0;k<9;k++)part(L,BX(.08,.95,.07),CR,4.35-.0,1.02,-1.12+k*.28,0,0,.62);}
   // cabina con las ventanas encendidas
   part(L,BX(2.5,2.55,2.9),CR,-3.0,3.62,0);part(L,BX(2.54,0.07,2.94),TM.brass,-3.0,2.38,0);
   for(const sd of[-1,1]){part(L,PLN(0.95,0.85),TM.glow,-3.05,4.2,sd*1.456,0,sd>0?0:Math.PI,0);
@@ -183,7 +205,7 @@ function buildLoco(CB=TM.green,CR=TM.red){const L=[],g=new THREE.Group();
   g.userData={len:8.9,top:5.3,chimney:new THREE.Vector3(3.35,5.9,0),lamp:new THREE.Vector3(3.92,4.55,0),wheels:W,rods};return g}
 function buildTender(CR=TM.red){const L=[],g=new THREE.Group();
   part(L,BX(4.6,0.3,2.2),TM.black,0,1.45,0);for(const x of[-1.15,1.15])part(L,BX(1.9,0.34,2.12),TM.black,x,1.17,0);
-  part(L,BX(4.4,1.75,2.9),CR,0,2.5,0);part(L,BX(4.44,0.08,2.94),TM.brass,0,3.4,0);part(L,BX(4.44,0.08,2.94),TM.brass,0,1.66,0);
+  part(L,BX(4.4,1.75,2.9),CR,0,2.5,0);if(!LOWQ)for(const z of[-1.47,1.47])for(let k=0;k<14;k++)for(const y of[1.78,3.22])part(L,SPH(.04,5,4),TM.black,-2.05+k*.315,y,z);part(L,BX(3.4,.9,.04),TM.brass,0,2.5,1.46);part(L,BX(3.3,.8,.05),CR,0,2.5,1.465);part(L,BX(3.4,.9,.04),TM.brass,0,2.5,-1.46);part(L,BX(3.3,.8,.05),CR,0,2.5,-1.465);for(const x of[-2.35,2.35])for(const z of[-.8,.8])part(L,CYX(.1,.3,8),TM.black,x,1.5,z);part(L,BX(4.44,0.08,2.94),TM.brass,0,3.4,0);part(L,BX(4.44,0.08,2.94),TM.brass,0,1.66,0);
   {const cg=new THREE.BoxGeometry(4.0,0.6,2.5,14,1,9),p=cg.attributes.position;for(let i=0;i<p.count;i++)if(p.getY(i)>0)p.setY(i,p.getY(i)+hash2(p.getX(i)*3.1,p.getZ(i)*2.7)*0.5*(1-Math.abs(p.getZ(i))/1.4));cg.computeVertexNormals();part(L,cg,TM.coal,0,3.3,0)}
   fuse(L,g);
   const W=[];for(const x of[-1.7,-0.6,0.6,1.7])for(const sd of[-1,1])W.push({x,y:RT+WS,z:sd*GAUGE,big:false});
@@ -191,7 +213,7 @@ function buildTender(CR=TM.red){const L=[],g=new THREE.Group();
 function buildCaboose(CR=TM.red){const L=[],g=new THREE.Group();
   part(L,BX(5.4,0.3,2.3),TM.black,0,1.42,0);for(const x of[-1.4,1.4])part(L,BX(1.9,0.34,2.12),TM.black,x,1.17,0);
   part(L,BX(4.2,2.4,2.8),CR,0,2.78,0);part(L,roofGeo(4.6,3.1,0.25),TM.black,0,3.98,0);
-  part(L,BX(1.8,1.0,2.1),CR,0.2,4.5,0);part(L,roofGeo(2.2,2.5,0.18),TM.black,0.2,5.0,0);
+  part(L,BX(1.8,1.0,2.1),CR,0.2,4.5,0);part(L,roofGeo(2.2,2.5,0.18),TM.black,0.2,5.0,0);part(L,roofGeo(1.9,1.9,.14,.05),TM.snow,.2,5.14,0);part(L,roofGeo(1.1,2.4,.18,.05),TM.snow,-1.5,4.16,0);part(L,roofGeo(.9,2.4,.18,.05),TM.snow,1.7,4.16,0);part(L,CY(.12,.12,.7,10),TM.black,-1.6,4.5,.5);for(const z of[-1.43,1.43])for(const y of[1.75,3.85])part(L,BX(4.2,.08,.05),TM.black,0,y,z);
   for(const sd of[-1,1]){for(const x of[-1.3,0,1.3])part(L,PLN(0.6,0.6),TM.glow,x,3.15,sd*1.405,0,sd>0?0:Math.PI,0);part(L,PLN(0.5,0.4),TM.glow,0.2,4.55,sd*1.055,0,sd>0?0:Math.PI,0);part(L,BX(4.24,0.07,0.04),TM.brass,0,1.62,sd*1.42)}
   for(const x of[-2.55,2.55]){part(L,BX(0.5,0.08,2.3),TM.black,x,1.6,0);for(const z of[-1.05,1.05])part(L,BX(0.05,1.0,0.05),TM.brass,x+Math.sign(x)*0.2,2.1,z);part(L,BX(0.05,0.05,2.15),TM.brass,x+Math.sign(x)*0.2,2.6,0)}
   part(L,SPH(0.16),TM.tail,-2.78,3.4,0.9);
@@ -209,7 +231,7 @@ function buildTree(par,x,y,z,sc){
   const wh=24,per=14,n=wh*per,br=new THREE.InstancedMesh(branchGeo,M.branch,n),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),p=new THREE.Vector3(),s=new THREE.Vector3(),col=new THREE.Color();let k=0;const tips=[];
   const y0=12.5;
   for(let i=0;i<wh;i++){const u=i/wh,yy=y0+(H-y0)*0.94*u,L=R*Math.pow(1-u,0.95)+1.2;const pitch0=-Math.min(0.45,Math.asin(Math.min(1,Math.max(0,yy-10)/L)));
-    for(let j=0;j<per;j++){const phi=j/per*Math.PI*2+i*0.7,pitch=pitch0+(hash2(i,j)-.5)*0.12;q.setFromEuler(e.set(0,phi,pitch,'YZX'));p.set(0,yy,0);s.set(L,1,L);m4.compose(p,q,s);br.setMatrixAt(k,m4);col.setHSL(0.36,0.25,0.72+hash2(i,j*3)*0.28);br.setColorAt(k,col);k++;
+    for(let j=0;j<per;j++){const phi=j/per*Math.PI*2+i*0.7,pitch=pitch0+(hash2(i,j)-.5)*0.12;q.setFromEuler(e.set(0,phi,pitch,'YZX'));p.set(0,yy,0);s.set(L,1,L);m4.compose(p,q,s);br.setMatrixAt(k,m4);col.setHSL(0.36,0.14,0.8+hash2(i,j*3)*0.2).multiplyScalar(1.25);br.setColorAt(k,col);k++;
       if(j%2===0)tips.push([Math.cos(phi)*L*0.82,yy+Math.sin(pitch)*L*0.82-1.2,-Math.sin(phi)*L*0.82])}}
   br.instanceColor.needsUpdate=true;br.castShadow=br.receiveShadow=true;g.add(br);
   const radAt=yy=>{const u=Math.min(1,Math.max(0,(yy-y0)/((H-y0)*0.94)));return (R*Math.pow(1-u,0.95)+1.2)*0.8};
@@ -217,7 +239,7 @@ function buildTree(par,x,y,z,sc){
   const pal=[[3,.4,.5],[3,2.3,.5],[.5,1.4,3],[.7,3,.9],[3,.9,2.4]],o=new THREE.Object3D();
   for(let i=0;i<NB;i++){const t=i/NB,yy=y0+2+t*(H-y0-4),ang=t*Math.PI*2*10,rr=radAt(yy);o.position.set(Math.cos(ang)*rr,yy-1,Math.sin(ang)*rr);o.scale.set(0.8,1.3,0.8);o.updateMatrix();lights.setMatrixAt(i,o.matrix);const c=new THREE.Color(...pal[i%5]);base.push(c);lights.setColorAt(i,c)}
   g.add(lights);
-  const orn=new THREE.InstancedMesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshPhysicalMaterial({roughness:.06,metalness:.85,clearcoat:1,iridescence:.4}),tips.length),oc=[0xd0202f,0xf0b93c,0xdfe6f2,0x2a6fd6,0x1f8a52];o.scale.set(1,1,1);
+  const orn=new THREE.InstancedMesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshPhysicalMaterial({roughness:.14,metalness:.45,clearcoat:1,clearcoatRoughness:.05}),tips.length),oc=[0xd0202f,0xf0b93c,0xdfe6f2,0x2a6fd6,0x1f8a52];o.scale.set(1,1,1);
   tips.forEach((tp,i)=>{if(tp[1]<10)tp[1]=10;const sc2=(1.6+hash2(i,7)*1.4)*0.57;o.position.set(...tp);o.scale.setScalar(sc2);o.updateMatrix();orn.setMatrixAt(i,o.matrix);orn.setColorAt(i,new THREE.Color(oc[i%5]))});orn.instanceColor.needsUpdate=true;orn.castShadow=true;g.add(orn);
   const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2?2.2:5.2,a=Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}
   const stg=new THREE.ExtrudeGeometry(sh,{depth:1.4,bevelEnabled:true,bevelSize:.3,bevelThickness:.3,bevelSegments:2});stg.translate(0,0,-0.7);
@@ -238,15 +260,21 @@ function santaFig(){const L=[],g=new THREE.Group(),W=M.fur;
   const arm=new THREE.Group();arm.position.set(0,2.05,0.66);const am=new THREE.Mesh(CY(0.15,0.15,0.85,10).translate(0,-0.42,0),M.velvet),mit=new THREE.Mesh(SPH(0.17,10,8),W);mit.position.y=-0.9;am.castShadow=true;arm.add(am,mit);g.add(arm);
   return {g,arm}}
 
-/* personitas (esquiadores, patinadores y gente en el telesilla): chaqueta y gorro con color por instancia; el resto con colores de vértice */
-function personGeos(pose){const J=[],R=[],col=(g,c)=>{const n=g.attributes.position.count,a=new Float32Array(n*3),cc=new THREE.Color(c);for(let i=0;i<n;i++)a.set([cc.r,cc.g,cc.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));return g},
-  put=(L,g,c,x,y,z,rx=0,ry=0,rz=0)=>{_m.compose(_p.set(x,y,z),_q.setFromEuler(_e.set(rx,ry,rz)),ONE);g.applyMatrix4(_m);g=geoOnly(g);if(c!==undefined)col(g,c);L.push(g)};
-  const sit=pose==='sit',ski=pose==='ski',lean=ski?-0.28:0;
-  put(J,CY(0.28,0.34,0.8,10),undefined,ski?0.1:0,1.2,0,0,0,lean);put(J,new THREE.ConeGeometry(0.21,0.42,10),undefined,ski?0.22:0,1.98,0);
-  for(const sd of[-1,1])put(J,CY(0.085,0.085,0.7,6),undefined,ski?0.25:0.02,1.15,sd*0.38,sd*0.35,0,ski?-0.9:0);
-  put(R,SPH(0.22,10,8),0xf0c3a2,ski?0.18:0,1.72,0);put(R,SPH(0.09,6,5),0xffffff,ski?0.22:0,2.22,0);put(R,CY(0.2,0.2,0.08,10),0xffffff,ski?0.18:0,1.84,0);
-  for(const sd of[-1,1]){if(sit){put(R,CY(0.11,0.11,0.6,6),0x26303f,0.3,0.92,sd*0.14,0,0,Math.PI/2);put(R,CY(0.1,0.1,0.55,6),0x26303f,0.6,0.62,sd*0.14)}else put(R,CY(0.11,0.11,0.8,6),0x26303f,ski?0.05:0,0.42,sd*0.14,0,0,ski?-0.15:0);
-    if(ski){put(R,BX(1.7,0.04,0.11),0xc8182c,0.2,0.03,sd*0.16);put(R,CY(0.022,0.022,1.25,4),0x30343c,0.55,0.62,sd*0.48,0,0,0.45)}else if(!sit)put(R,BX(0.36,0.06,0.1),0xdfe6f2,0.04,0.03,sd*0.14)}
+/* personitas (esquiadores, patinadores y gente en el telesilla): abrigo y gorro con color por instancia; el resto con colores de vértice */
+function personGeos(pose){const J=[],R=[],SG=LOWQ?7:11,col=(g,c)=>{const n=g.attributes.position.count,a=new Float32Array(n*3),cc=new THREE.Color(c);for(let i=0;i<n;i++)a.set([cc.r,cc.g,cc.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));return g},
+  put=(L,g,c,x,y,z,rx=0,ry=0,rz=0)=>{_m.compose(_p.set(x,y,z),_q.setFromEuler(_e.set(rx,ry,rz)),ONE);g.applyMatrix4(_m);g=geoOnly(g);if(c!==undefined)col(g,c);L.push(g)},
+  hueso=(L,c,a,b,r0,r1)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),D=B.clone().sub(A),l=D.length(),g=new THREE.CylinderGeometry(r1,r0,l,SG,1).translate(0,l/2,0);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UPV,D.normalize()));put(L,g,c,...a);put(L,SPH(r1,SG,5),c,...b);put(L,SPH(r0,SG,5),c,...a)};
+  const sit=pose==='sit',ski=pose==='ski',skate=pose==='skate',ln=ski?.2:skate?.1:0,px=y=>ln*Math.max(0,y-.55);
+  // abrigo con vuelo, cuello y mangas
+  put(J,new THREE.LatheGeometry([[.02,.62],[.36,.6],[.375,.66],[.31,.95],[.268,1.1],[.3,1.34],[.262,1.52],[.15,1.63],[.1,1.67]].map(([a,b])=>new THREE.Vector2(a,b)),SG+4),undefined,px(1.1)*.6,0,0,0,0,-ln*.7);
+  for(const s of[-1,1]){const h=ski?[.5,1.1,s*.42]:skate?[-.18,1.02,s*.5]:[.1+.05*s,.98,s*.4],c=ski?[.28,1.18,s*.44]:skate?[.02,1.22,s*.46]:[.02,1.22,s*.42];hueso(J,undefined,[px(1.5),1.47,s*.24],c,.1,.085);hueso(J,undefined,c,h,.085,.075);put(R,SPH(.085,SG,6),0x2a2a30,...h)}
+  // gorro con vuelta y borla
+  put(J,new THREE.SphereGeometry(.222,SG+3,7,0,6.2832,0,1.7).scale(1,1.12,1),undefined,px(1.9),1.9,0,0,0,-ln*.4);put(R,TOR(.205,.05,SG+5),0xf2efe8,px(1.9)+.004,1.885,0,Math.PI/2,0,0);put(R,SPH(.075,7,5),0xf2efe8,px(2.15)-.01,2.17,0);
+  put(R,SPH(.2,SG+3,9).scale(.96,1.08,.95),0xeebf9d,px(1.8)+.01,1.8,0);put(R,SPH(.032,6,5),0xe0a07e,px(1.8)+.205,1.79,0);for(const s of[-1,1]){put(R,SPH(.02,5,4),0x241812,px(1.8)+.188,1.835,s*.07);put(R,SPH(.045,6,5).scale(.5,.8,1),0xdf8f7c,px(1.8)+.172,1.765,s*.1);put(R,SPH(.055,6,5),0xe4b090,px(1.8),1.8,s*.19)}put(R,SPH(.195,SG,7).scale(.9,.95,1),0x4a2e1c,px(1.8)-.045,1.8,0);
+  put(R,TOR(.15,.062,SG+3).scale(1,1,.9),0xd9c9a4,px(1.65),1.645,0,Math.PI/2,0,0);put(R,BX(.06,.34,.11),0xd9c9a4,px(1.5)+.27,1.47,.08,0,0,.2);
+  for(const s of[-1,1]){const z=s*.13;if(sit){hueso(R,0x2a3140,[.02,.8,z],[.52,.84,z],.12,.105);hueso(R,0x2a3140,[.52,.84,z],[.56,.4,z],.1,.085);put(R,SPH(.12,SG,6).scale(1.5,.75,1),0x3a281c,.62,.32,z)}
+    else{const f=skate?[s*.16,.1]:ski?[.02,.1]:[.015*s,.1],k=ski?.16:skate?.1:.02;hueso(R,0x2a3140,[0,.72,z],[k,.4,z*1.05],.125,.1);hueso(R,0x2a3140,[k,.4,z*1.05],[f[0],.14,z],.1,.085);put(R,SPH(.115,SG,6).scale(1.55,.85,1),0x3a281c,f[0]+.06,.11,z)}
+    if(ski){put(R,BX(1.75,.035,.11),0xc8182c,.2,.03,z*1.2);put(R,CY(.018,.018,1.25,4),0x30343c,.6,.6,s*.48,0,0,.45)}else if(skate)put(R,BX(.36,.07,.03),0xdfe6f2,s*.16+.05,.03,z)}
   const j=mergeGeometries(J,false),r=mergeGeometries(R,false);if(sit){j.translate(0,-0.92,0);r.translate(0,-0.92,0)}return {j,r}}
 const JACKETS=[0xc8182c,0x1f6fd6,0x1f8a52,0xf0b93c,0x7d4f72,0xe8e2d4,0xff7a2e,0x2a2f3a];
 function crowd(pose,n,par){const g=personGeos(pose),jm=new THREE.InstancedMesh(g.j,M.person,n),rm=new THREE.InstancedMesh(g.r,M.personV,n);for(let i=0;i<n;i++)jm.setColorAt(i,new THREE.Color(JACKETS[(i*3+pose.length)%JACKETS.length]));jm.instanceColor.needsUpdate=true;
@@ -297,6 +325,6 @@ const adTex=cv=>{const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColo
 const logoURL=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#fbf3df';g.beginPath();g.arc(128,128,118,0,7);g.fill();g.fillStyle='#1d3a78';g.beginPath();g.arc(128,128,100,0,7);g.fill();
   g.fillStyle='#e0ad45';g.beginPath();for(let k=0;k<10;k++){const r=k%2?34:82,a=-Math.PI/2+k*Math.PI/5;g.lineTo(128+Math.cos(a)*r,128+Math.sin(a)*r)}g.closePath();g.fill();return c.toDataURL('image/png')})();
 
-export {THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoise,fbm,tick,texCache,canvasTex,pixTex,rep,dotTex,woodTex,plankTex,snowNrm,winTex,signTex,caneTex,WRAPS,phTex,blobTex,puffTex,coneTex,stoneTex,
+export {gastado,THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoise,fbm,tick,texCache,canvasTex,pixTex,rep,dotTex,woodTex,plankTex,snowNrm,winTex,signTex,caneTex,WRAPS,phTex,blobTex,puffTex,coneTex,stoneTex,
   M,HCOL,HMAT,box,cyl,o3,boxU,MD,MODELS,toyCache,loadModels,flat,inst,obj,mergeMeshes,GAUGE,RT,WB,WS,WLEN,WHALF,WTOP,PANEL,PANEL_Y,PANEL_W,PANEL_H,TM,part,geoOnly,fuse,BX,CY,CYX,TOR,DOME,PLN,SPH,roofGeo,ringGeo,bigWheelGeos,smallWheelGeos,wagonGeos,buildLoco,buildTender,buildCaboose,
   buildTree,santaFig,personGeos,JACKETS,crowd,house,AD_W,AD_H,AD_BG,rrect,hostOf,drawAd,loadImg,adTex,logoURL,UPV,ZAX,ONE,QFLIP};

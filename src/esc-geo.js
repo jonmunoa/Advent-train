@@ -1,5 +1,6 @@
 /* Juntar geometría quieta en pocas mallas: los materiales lisos (sin textura) pasan a color por vértice y se reparten en
    tres cubos (mate, satinado y metal) más uno sin luz; los que llevan textura o algo especial se quedan como están. */
+import {uvFoto} from './esc-real.js';
 import {THREE, mergeGeometries, geoOnly, LOWQ, cutMat} from './kit.js';
 
 const CUBO = {
@@ -16,8 +17,9 @@ export function cubo(m) {
 /* lista de [geometría, material] → mallas en «par» */
 export function juntar(list, par, {sombra = true} = {}) {
   const by = new Map();
-  for (const [g0, m] of list) {
-    const k = cubo(m), g = geoOnly(g0); if (k) {const n = g.attributes.position.count, a = new Float32Array(n * 3), {r, g: gg, b} = m.color; for (let i = 0; i < n; i++) {a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b} g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv')}
+  for (let [g0, m] of list) {
+    if (m.userData.fotoJ) g0 = uvFoto(g0, m.userData.fotoJ, m.userData.giro);
+    const k = cubo(m), vc = m.vertexColors && g0.attributes.color && (g0.index ? g0.toNonIndexed().attributes.color : g0.attributes.color), g = geoOnly(g0); if (vc) g.setAttribute('color', vc); if (k) {const n = g.attributes.position.count, a = new Float32Array(n * 3), {r, g: gg, b} = m.color; for (let i = 0; i < n; i++) {a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b} g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv')}
     const key = k ? CUBO[k] : m; if (!by.has(key)) by.set(key, []); by.get(key).push(g);
   }
   const out = []; by.forEach((gs, m) => {const me = new THREE.Mesh(mergeGeometries(gs, false), m); me.castShadow = sombra && m !== CUBO.luz && !m.isMeshBasicMaterial; me.receiveShadow = sombra && me.castShadow; me.matrixAutoUpdate = false; me.updateMatrix(); par.add(me); out.push(me)});
