@@ -52,7 +52,7 @@ const relleno = new THREE.DirectionalLight(0xffe6d2, 0); calle.add(relleno, rell
 /* la luz del escaparate más cercano: la única que da sombra en la calle */
 const vent = new THREE.SpotLight(0xffbb7a, 0, 640, .98, .9, 1.22); if (!LOWQ) {vent.castShadow = true; vent.shadow.autoUpdate = false; vent.shadow.mapSize.set(1024, 1024); vent.shadow.camera.near = 60; vent.shadow.camera.far = 480; vent.shadow.bias = -.0008; vent.shadow.normalBias = .7; vent.shadow.radius = 5; calle.add(vent, vent.target)}
 // luz de dentro: foco cálido con sombras sobre la maqueta que se mira, y relleno azul
-let contraL = 0; const hemiD = new THREE.HemisphereLight(0xa6b8f4, 0x7d7f9c, .86); dentro.add(hemiD); const foco = new THREE.DirectionalLight(0xffe4c4, 1.3); foco.castShadow = !LOWQ; foco.shadow.autoUpdate = false; foco.shadow.mapSize.set(2048, 2048); Object.assign(foco.shadow.camera, {left: -92, right: 92, top: 74, bottom: -56, near: 1, far: 300}); foco.shadow.bias = -.0005; foco.shadow.normalBias = .2; dentro.add(foco, foco.target);
+let contraL = 0; const hemiD = new THREE.HemisphereLight(0x9fb2dc, 0x6f6a6e, .5); dentro.add(hemiD); const foco = new THREE.DirectionalLight(0xffdcb4, 2.1); foco.castShadow = !LOWQ; foco.shadow.autoUpdate = false; foco.shadow.mapSize.set(2048, 2048); Object.assign(foco.shadow.camera, {left: -92, right: 92, top: 74, bottom: -56, near: 1, far: 300}); foco.shadow.bias = -.0005; foco.shadow.normalBias = .2; dentro.add(foco, foco.target);
 const post = LOWQ ? null : new Post(renderer), portrait = () => camera.aspect < .8;
 /* lo que se ve del niño desde dentro: una foto de la calle que se pinta en el cristal solo cuando se mira hacia él */
 const portalRT = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType}), pU = {m: {value: portalRT.texture}, r: {value: new THREE.Vector2()}};
@@ -157,7 +157,7 @@ function camara(dt, t) {
   // dentro: el decorado de caja se funde en el cielo entero y la calle deja de dibujarse
   E.md = E.st === 'dentro' ? Math.min(1, E.md + dt / .9) : Math.max(0, E.md - dt / .45); const m = MU.get(E.k), md = E.md; if (m) m.modo(md); dentro.fog.near = md > 0 ? 170 : 5000; dentro.fog.far = md > 0 ? 430 : 6000; if (m && m.bruma) dentro.fog.color.copy(m.bruma); if (md <= 0) {dentro.fog.near = 5000; dentro.fog.far = 6000}
   // a contraluz (mirando a la calle) hace falta más luz de relleno para que el tren no salga negro
-  contraL = damp(contraL, E.st === 'dentro' ? sstep(.15, -.75, camera.matrixWorld.elements[10]) : 0, 12, dt); hemiD.intensity = lerp(.86, .74, md) + contraL * .95; foco.intensity = lerp(1.3, 1.08, md);
+  contraL = damp(contraL, E.st === 'dentro' ? sstep(.15, -.75, camera.matrixWorld.elements[10]) : 0, 12, dt); hemiD.intensity = lerp(.5, .46, md) + contraL * .7; foco.intensity = lerp(2.1, 1.9, md); if (post) post.aoU.R.value = lerp(E.st === 'mira' ? 9 : 22, 5, md);
   {const c = E.st === 'dentro' && camera.position.z > 1; for (const f of [madre, nino]) if (E.st === 'dentro') f.g.visible = !(c && Math.hypot(f.g.position.x - camera.position.x, f.g.position.z - camera.position.z) < 78)}
   verCalle = !(E.st === 'dentro' && !vista.flying && md >= 1) || false; if (E.st === 'dentro' && md >= .6 && camera.position.z < 40) verCalle = false;
   const ms = E.st === 'dentro' && !verCalle; portal.visible = ms && camera.position.z < -4; verPortal = false; if (portal.visible) {camera.getWorldDirection(v1); portal.position.x = WX(E.n); portal.position.z = -2.2; verPortal = v1.z > -.35} nieve.m.visible = !ms; cristal.forEach((c, k) => {if (ms) c.visible = false});
