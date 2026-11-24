@@ -45,7 +45,7 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 - **Lo que vende cada tienda**: «Llévate uno a casa» enlaza a un producto de Amazon con enlace de afiliado. Se edita en `src/esc-tienda.js` (pon el `asin` para ir a una ficha en concreto) y el código va en `config.js` o en `ADVX_TAG`. Las marcas están guardadas tras `VENDER` en `src/esc-marcas.js`.
 - **En la calle**: la cámara va detrás del niño y el paseo va solo. Arrastra para mirar alrededor, usa la rueda o un pellizco para acercarte y las flechas para ir al escaparate anterior o al siguiente.
 - **Pincha un escaparate y entras en él**: se maneja como un mapa (arrastrar o un dedo mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho o girar dos dedos gira, subir o bajar dos dedos inclina). Tocar un vagón lo sigue, el ojo va con el tren y, mirando hacia el cristal, se ve al niño asomado. «Volver a la calle» o Escape salen. Teclado: flechas o WASD, +, −, Q, E, 0 y C.
-- **Marcas** en el rótulo de cada tienda y en los cuatro vagones de su tren, salvo los días 18, 20 y 24. Se escriben a mano en `src/esc-marcas.js`; no se cobra ni se guarda nada desde la web.
+- **Marcas** en el rótulo de cada tienda y en los cuatro vagones de su tren, salvo el 24 (apagadas por ahora). Se escriben a mano en `src/esc-marcas.js`; no se cobra ni se guarda nada desde la web.
 
 Fuera de temporada es una **vista previa**: un botón cambia de día. `?dia=7` enseña un día (25 son las campanadas, 26 la cabalgata y 27 Reyes), `?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
 
