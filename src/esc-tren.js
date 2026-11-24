@@ -20,7 +20,7 @@ let freeM = null;
 const freeMat = () => {if (freeM) return freeM; const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {text: 'Tu marca aquí', sub: 'Toca el vagón para ponerla', bg: '#16213f', tag: 'Libre'}); return freeM = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.82, .82, .82)})};
 
 /* haz del faro: se apaga en los bordes y cerca de la cámara, para que no se vea el cono */
-const HAZ = new THREE.ShaderMaterial({transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, vertexShader: 'varying vec3 n,p;varying float u;void main(){vec4 m=modelViewMatrix*vec4(position,1.);n=normalMatrix*normal;p=m.xyz;u=uv.y;gl_Position=projectionMatrix*m;}', fragmentShader: 'varying vec3 n,p;varying float u;void main(){float k=pow(abs(dot(normalize(n),normalize(p)))+1e-4,2.2)*pow(max(u,0.),1.5)*smoothstep(9.,34.,-p.z);gl_FragColor=vec4(vec3(.3,.23,.12)*k,1.);}'});
+const HAZ = new THREE.ShaderMaterial({transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, vertexShader: 'varying vec3 n,p;varying float u;void main(){vec4 m=modelViewMatrix*vec4(position,1.);n=normalMatrix*normal;p=m.xyz;u=uv.y;gl_Position=projectionMatrix*m;}', fragmentShader: 'varying vec3 n,p;varying float u;void main(){float k=pow(abs(dot(normalize(n),normalize(p)))+1e-4,3.2)*pow(max(u,0.),1.7)*smoothstep(9.,34.,-p.z);gl_FragColor=vec4(vec3(.2,.15,.08)*k,1.);}'});
 
 export class Tren {
   constructor(par, T, {wagons = 4, body = 0x0e4a31, trim = 0xb3121f, cols = ['#8f1d24', '#16492f', '#1f3a6b', '#e6d8b8']} = {}) {

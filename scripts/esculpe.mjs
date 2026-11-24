@@ -20,7 +20,7 @@ const args = process.argv.slice(2), BASTO = args.includes('--basto'), CUALES = a
 /* simplifica respetando normales y máscaras */
 function simplifica(M, objetivo) {
   const n = M.p.length / 3, at = new Float32Array(n * 7); for (let i = 0; i < n; i++) {at.set([M.n[i * 3], M.n[i * 3 + 1], M.n[i * 3 + 2], M.c[i * 4] * .6, M.c[i * 4 + 1], M.c[i * 4 + 2] * 2.4, M.c[i * 4 + 3]], i * 7)}
-  const w = [.8, .8, .8, .22, .22, .9, .6], [ix] = MeshoptSimplifier.simplifyWithAttributes(M.ix, M.p, 3, at, 7, w, null, objetivo * 3, 1e-2, []);
+  const w = [1, 1, 1, .55, .3, .9, .6], [ix] = MeshoptSimplifier.simplifyWithAttributes(M.ix, M.p, 3, at, 7, w, null, objetivo * 3, 1e-2, []);
   return compacta({...M, ix});
 }
 export async function guarda(nombre, mallas) {
