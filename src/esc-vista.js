@@ -17,14 +17,17 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
   let on = false, M = null, W = null; const Wi = new THREE.Matrix4(), up = V3();
   const CTR = new THREE.Vector3(0, 8, -3), cam = {az: Math.PI / 2, el: .5, d: 100, tgt: CTR.clone(), azT: null, vx: 0, vz: 0, vaz: 0, vel: 0, focus: null, faz: Math.PI / 2, fel: .3, fd: 17, fdT: 17, back: null};
   const cp = V3(), cl = V3(), dir = V3(), t1 = V3(), t2 = V3();                    // cp, cl: cámara que se ve (posición y punto al que mira, en la maqueta)
-  const pp = V3(), ll = V3(), bl = {t: 1, dur: .8, p: V3(), az: 0, el: 0, hop: 0};      // vuelo entre dos vistas: sale siempre de lo que se ve
+  const pp = V3(), ll = V3(), bl = {t: 1, dur: .8, p: V3(), az: 0, el: 0, hop: 0, su: false, fov: FOVD};      // vuelo entre dos vistas: sale siempre de lo que se ve
   const zm = {on: false, l: 0, A: V3(), x: -1e4, y: 0}, ptrs = new Map(), gs = {moved: false, drag: false, far: false, G: V3(), hist: [], lastMove: 0}, pn = {A: V3()};
   let lastIn = 0, tap = null, lastTap = {t: -1e9, x: 0, y: 0}, touched = false, hov = null, cutK = 0, cutOp = 0;
   const now = () => performance.now(), portrait = () => camera.aspect < .8, gy = (x, z) => M.gy(x, z);
   const fitD = () => Math.max((BW - 3) / (tanH * camera.aspect) + 41, (BD * .9 + 16) / tanH) * 1.12, maxD = () => clamp(fitD() * 1.06, 150, 360), defD = () => clamp(fitD() * (portrait() ? .4 : .45), 62, portrait() ? 104 : 130), homeEl = () => portrait() ? .5 : .33;
   const elMin = () => lerp(.05, .3, sstep(12, 90, cp.y)), effD = () => cp.y / Math.max(.3, Math.sin(cam.el));
   const RC = new THREE.Raycaster(), ND = new THREE.Vector2(), R = new THREE.Ray();
-  function ray(sx, sy) {ND.set(sx / innerWidth * 2 - 1, 1 - sy / innerHeight * 2); RC.setFromCamera(ND, camera); R.copy(RC.ray).applyMatrix4(Wi); R.direction.normalize(); return R}
+  /* al soltar la cámara de cine se vuela a una vista de mapa; mientras dura, los gestos se aplican a la vista de destino (vc) */
+  const vc = new THREE.PerspectiveCamera(FOVD, 1, .1, 900), suelta = () => bl.su && bl.t < 1;
+  function vcPose() {vc.aspect = camera.aspect; vc.updateProjectionMatrix(); vc.up.copy(up); vc.position.copy(pp).applyMatrix4(W); vc.lookAt(t2.copy(ll).applyMatrix4(W)); vc.updateMatrixWorld()}
+  function ray(sx, sy) {ND.set(sx / innerWidth * 2 - 1, 1 - sy / innerHeight * 2); RC.setFromCamera(ND, suelta() ? vc : camera); R.copy(RC.ray).applyMatrix4(Wi); R.direction.normalize(); return R}
   /* distancia hasta el suelo a lo largo del rayo (marcha sobre la rejilla de alturas y afina por bisección) */
   function groundT(r, max = 700) {const o = r.origin, d = r.direction; if (o.y < gy(o.x, o.z)) return 0; let t = 0, st = .7; while (t < max) {t += st; const y = o.y + d.y * t; if (y < gy(o.x + d.x * t, o.z + d.z * t)) {let a = t - st, b = t; for (let k = 0; k < 14; k++) {const m = (a + b) / 2; if (o.y + d.y * m < gy(o.x + d.x * m, o.z + d.z * m)) b = m; else a = m} return (a + b) / 2} if (y < -6 && d.y < 0) return null; st = Math.max(.7, t * .012)} return null}
   const groundPt = (sx, sy, out) => {const r = ray(sx, sy), t = groundT(r); return r.at(Math.min(t || 1e9, 2.6 * cam.d), out)};
@@ -34,14 +37,14 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
   function stop() {cam.vx = cam.vz = cam.vaz = cam.vel = 0; cam.azT = null; zm.on = false}
   const look = () => dir.copy(cl).sub(cp).normalize();
   /* el centro de giro pasa a ser el suelo del centro de la pantalla, sin mover la cámara */
-  function anchor() {const fly = bl.t < 1; look(); if (fly) {bl.t = 1; cam.el = Math.asin(clamp(-dir.y, -1, 1)); cam.az = Math.atan2(-dir.z, -dir.x)} let t = groundT(ray(innerWidth / 2, innerHeight / 2)); t = t === null ? cam.d : clamp(t, 4, maxD() * 1.2); cam.tgt.copy(cp).addScaledVector(look(), t); cam.d = t}
-  function blend(dur = -1) {look(); bl.p.copy(cp); bl.az = Math.atan2(-dir.z, -dir.x); bl.el = Math.asin(clamp(-dir.y, -1, 1)); bl.t = 0; bl.hop = -1; bl.fix = dur}
+  function anchor() {if (suelta()) return; const fly = bl.t < 1; look(); if (fly) {bl.t = 1; cam.el = Math.asin(clamp(-dir.y, -1, 1)); cam.az = Math.atan2(-dir.z, -dir.x)} let t = groundT(ray(innerWidth / 2, innerHeight / 2)); t = t === null ? cam.d : clamp(t, 4, maxD() * 1.2); cam.tgt.copy(cp).addScaledVector(look(), t); cam.d = t}
+  function blend(dur = -1) {look(); bl.p.copy(cp); bl.az = Math.atan2(-dir.z, -dir.x); bl.el = Math.asin(clamp(-dir.y, -1, 1)); bl.t = 0; bl.hop = -1; bl.fix = dur; bl.su = false}
   function grab(sx, sy) {const r = ray(sx, sy), t = groundT(r); gs.far = !t || t > Math.max(3.2 * cam.d, 60); if (!gs.far) r.at(t, gs.G); gs.hist.length = 0}
   function dragTo(sx, sy, dx, dy) {let mx, mz; if (gs.far) {const k = 2 * cam.d * tanH / innerHeight, kf = k / Math.max(.35, Math.sin(cam.el)), s = Math.sin(cam.az), c = Math.cos(cam.az); mx = -s * dx * k - c * dy * kf; mz = c * dx * k - s * dy * kf} else {const r = ray(sx, sy), tm = Math.max(4.2 * cam.d, 80); let t = (gs.G.y - r.origin.y) / r.direction.y; if (!(t > 0) || t > tm) t = tm; r.at(t, t1); mx = gs.G.x - t1.x; mz = gs.G.z - t1.z} moveTgt(cam.tgt.x + mx, cam.tgt.z + mz)}
   function rotate(dx, dy) {const k = coarse ? .0075 : .0055; if (cam.focus) {cam.faz += dx * k; cam.fel = clamp(cam.fel + dy * .005, .02, 1.35)} else {cam.az += dx * k; cam.el = clamp(cam.el + dy * .005, elMin(), ELMAX)}}
   const dolly = (A, k) => {cam.tgt.sub(A).multiplyScalar(k).add(A); cam.d *= k};
   const zoomLim = (A, l) => clamp(l, Math.min(0, Math.log(MIND / Math.max(1, cp.distanceTo(A)))), Math.max(0, Math.log(maxD() / effD())));
-  function zoomAt(sx, sy, f) {toca(); setCine(false); if (cam.focus) {cam.fdT *= f; if (cam.fdT > 66 && f > 1) setFocus(null, true); else {cam.fdT = clamp(cam.fdT, 6, 80); return}} if (!zm.on || Math.hypot(sx - zm.x, sy - zm.y) > 14 || bl.t < 1) {anchor(); groundPt(sx, sy, zm.A); zm.x = sx; zm.y = sy; if (!zm.on) zm.l = 0} cam.vx = cam.vz = 0; zm.on = true; zm.l = zoomLim(zm.A, zm.l + Math.log(f))}
+  function zoomAt(sx, sy, f) {toca(); setCine(false); if (cam.focus) {cam.fdT *= f; if (cam.fdT > 66 && f > 1) setFocus(null, true); else {cam.fdT = clamp(cam.fdT, 6, 80); return}} if (suelta()) {cam.d = clamp(cam.d * f, 18, maxD()); return} if (!zm.on || Math.hypot(sx - zm.x, sy - zm.y) > 14 || bl.t < 1) {anchor(); groundPt(sx, sy, zm.A); zm.x = sx; zm.y = sy; if (!zm.on) zm.l = 0} cam.vx = cam.vz = 0; zm.on = true; zm.l = zoomLim(zm.A, zm.l + Math.log(f))}
   function tiltAbout(A, a) {if (A) {t1.set(Math.sin(cam.az), 0, -Math.cos(cam.az)); cam.tgt.sub(A).applyAxisAngle(t1, -a).add(A)} cam.el += a}
   function toca() {touched = true; lastIn = now(); if (onHint) onHint()}
   function home(all) {setCine(false); cam.back = null; if (cam.focus) setFocus(null); blend(); stop(); cam.tgt.copy(CTR); cam.d = all ? Math.min(maxD(), fitD()) : defD(); cam.el = homeEl() + (all ? .16 : 0); cam.az = Math.PI / 2; lastIn = now()}
@@ -53,7 +56,7 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
     const k = pn.d / d; let tw = wrapA(ang - pn.ang); pn.rot += tw; if (Math.abs(pn.rot) < .12 && !pn.turn) tw = 0; else pn.turn = true;
     if (pn.mode === 'tilt') rotate(0, (my - pn.my) * 1.25);
     else if (cam.focus) {cam.fd = cam.fdT = clamp(cam.fd * k, 6, 80); cam.faz -= tw; if (cam.fd > 66 && k > 1) {setFocus(null, true); groundPt(mx, my, pn.A)}}
-    else {const lo = cp.distanceTo(pn.A) < MIND && k < 1, hi = effD() > maxD() && k > 1; dolly(pn.A, lo || hi ? Math.pow(k, .3) : k); if (tw) {cam.az -= tw; const x = cam.tgt.x - pn.A.x, z = cam.tgt.z - pn.A.z, c = Math.cos(-tw), s = Math.sin(-tw); cam.tgt.x = pn.A.x + x * c - z * s; cam.tgt.z = pn.A.z + x * s + z * c} freePose(); put(pp, ll); gs.G.copy(pn.A); gs.far = false; dragTo(mx, my, mx - pn.mx, my - pn.my)}
+    else {const lo = cp.distanceTo(pn.A) < MIND && k < 1, hi = effD() > maxD() && k > 1; dolly(pn.A, lo || hi ? Math.pow(k, .3) : k); if (tw) {cam.az -= tw; const x = cam.tgt.x - pn.A.x, z = cam.tgt.z - pn.A.z, c = Math.cos(-tw), s = Math.sin(-tw); cam.tgt.x = pn.A.x + x * c - z * s; cam.tgt.z = pn.A.z + x * s + z * c} freePose(); if (suelta()) vcPose(); else put(pp, ll); gs.G.copy(pn.A); gs.far = false; dragTo(mx, my, mx - pn.mx, my - pn.my)}
     pn.d = d; pn.ang = ang; pn.mx = mx; pn.my = my;
   }
   function gesture() {if (!gs.moved || !ptrs.size) return; gs.moved = false; if (ptrs.size > 1) {if (ptrs.size === 2) pinchMove(); return} const q = ptrs.values().next().value, dx = q.x - q.px, dy = q.y - q.py; if (!gs.drag) return; q.px = q.x; q.py = q.y; if (cam.focus || q.rot) rotate(dx, dy); else dragTo(q.x, q.y, dx, dy); gs.hist.push({t: now(), x: cam.tgt.x, z: cam.tgt.z, az: cam.focus ? cam.faz : cam.az, el: cam.focus ? cam.fel : cam.el}); if (gs.hist.length > 8) gs.hist.shift()}
@@ -87,7 +90,7 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
     cutK = !fc ? 0 : inT ? Math.min(1, cutK + dt / .5) : Math.max(0, cutK - dt / .5); const dentro = fc && cutK >= .5 && inT;
     if (dentro) {bl.t = 1; const s0 = tr.carS(0), lo = tunel(s0 + 3); if (lo && mod(lo.a - inT.a, M.T.L) < 1) {const sc = lo.a + clamp(lo.u + 12, 4, lo.len - 3.5), q = atM(M.T, sc), k = atM(M.T, s0 - 2); pp.set(q.x - Math.sin(q.a) * 1.5, q.y + 4.2, q.z + Math.cos(q.a) * 1.5); ll.set(k.x, k.y + 2.6, k.z)} else {const fin = inT.a + inT.len; let gap = 1e9; for (const r of M.T.runs) if (r.k === KT) gap = Math.min(gap, mod(r.i * M.T.ds - fin - .5, M.T.L)); const av = clamp(gap * .5, 4, 14), q = atM(M.T, fin + av), k = atM(M.T, fin), sd = Math.sin(cam.faz) >= 0 ? 1 : -1, lat = av < 12 ? 12 : 7.5; pp.set(q.x - Math.sin(q.a) * lat * sd, q.y + (av < 12 ? 8 : 5), q.z + Math.cos(q.a) * lat * sd); const g = gy(pp.x, pp.z) + 1.4; if (pp.y < g) pp.y = g; ll.set(k.x, k.y + 2.6, k.z)} put(pp, ll)}
     else {
-      if (bl.t < 1) {if (bl.hop < 0) {const D = bl.p.distanceTo(pp); bl.dur = REDUCED ? .001 : bl.fix > 0 ? bl.fix : clamp(.5 + D / 220, .55, 1.15); bl.hop = bl.fix > 0 ? 0 : Math.min(14, D * .1)} bl.t = Math.min(1, bl.t + dt / bl.dur); const e = ease(bl.t); dir.copy(pp).sub(ll); const az = Math.atan2(dir.z, dir.x), el = Math.atan2(dir.y, Math.hypot(dir.x, dir.z)), a = bl.az + wrapA(az - bl.az) * e, l = lerp(bl.el, el, e); pp.lerpVectors(bl.p, pp, e); pp.y += bl.hop * Math.sin(Math.PI * e); const g = gy(pp.x, pp.z) + 1.3; if (pp.y < g) pp.y = g; ll.set(pp.x - Math.cos(a) * Math.cos(l), pp.y - Math.sin(l), pp.z - Math.sin(a) * Math.cos(l))}
+      if (suelta()) vcPose(); if (bl.t < 1) {if (bl.hop < 0) {const D = bl.p.distanceTo(pp); bl.dur = REDUCED ? .001 : bl.fix > 0 ? bl.fix : clamp(.5 + D / 220, .55, 1.15); bl.hop = bl.fix > 0 ? 0 : Math.min(14, D * .1)} bl.t = Math.min(1, bl.t + dt / bl.dur); const e = bl.su ? 1 - Math.pow(1 - bl.t, 3) : ease(bl.t); if (bl.su) {camera.fov = lerp(bl.fov, FOVD, e); camera.updateProjectionMatrix()} dir.copy(pp).sub(ll); const az = Math.atan2(dir.z, dir.x), el = Math.atan2(dir.y, Math.hypot(dir.x, dir.z)), a = bl.az + wrapA(az - bl.az) * e, l = lerp(bl.el, el, e); pp.lerpVectors(bl.p, pp, e); pp.y += bl.hop * Math.sin(Math.PI * e); const g = gy(pp.x, pp.z) + 1.3; if (pp.y < g) pp.y = g; ll.set(pp.x - Math.cos(a) * Math.cos(l), pp.y - Math.sin(l), pp.z - Math.sin(a) * Math.cos(l))}
       put(pp, ll);
     }
     const op = Math.round(Math.min(1, (1 - Math.abs(2 * cutK - 1)) * 1.6) * 50) / 50; if (op !== cutOp) {cutOp = op; cut(op)}
@@ -96,7 +99,10 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
   /* cámara de cine: enciende (volando desde lo que se ve) o la suelta justo donde está */
   function setCine(v, dur = 1.3) {
     if (!!v === cineOn || !on) return; if (v) {if (cam.focus) {cam.focus = null; cam.vaz = cam.vel = 0; if (onFocus) onFocus(null)} blend(dur); stop(); cineOn = true; cine.empieza(M, {aspecto: camera.aspect})}
-    else {cineOn = false; look(); bl.t = 1; cam.el = Math.asin(clamp(-dir.y, -1, 1)); cam.az = Math.atan2(-dir.z, -dir.x); let t = groundT(ray(innerWidth / 2, innerHeight / 2)); t = t === null ? 46 : clamp(t, 8, maxD()); cam.tgt.copy(cp).addScaledVector(look(), t); cam.d = t; touched = true}
+    else {
+      // de la toma a una vista de mapa desde el mismo lado: sube, se aparta lo justo y deja el tren en el centro
+      cineOn = false; look(); const L = cine.l, D = Math.hypot(cp.x - L[0], cp.y - L[1], cp.z - L[2]), el = Math.asin(clamp(-dir.y, -1, 1)), b = bounds(); blend(REDUCED ? .001 : .55); bl.su = true; bl.fov = camera.fov; stop(); cam.az = Math.atan2(-dir.z, -dir.x); cam.el = clamp(el + .16, .36, .95); cam.d = clamp(D * 1.5, portrait() ? 58 : 54, Math.max(60, defD())); cam.tgt.set(clamp(L[0], b.x0, b.x1), 0, clamp(L[2], b.z0, b.z1)); cam.tgt.y = gy(cam.tgt.x, cam.tgt.z) + 2; touched = true; freePose(); vcPose();
+    }
     if (onCine) onCine(cineOn);
   }
   /* pegada a un coche (car: 0 máquina, 1 ténder, 2… furgones; chase: desde atrás) o libre */
@@ -109,7 +115,7 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
   function nudge(dx, dy) {toca(); setCine(false); if (cam.focus) return rotate(-dx * 1.2, -dy); if (bl.t < 1) anchor(); const k = 2.1 * cam.d * tanH / innerHeight, s = Math.sin(cam.az), c = Math.cos(cam.az), v = 6; cam.vx = clamp(cam.vx + (s * dx + c * dy) * k * v, -1.4 * cam.d, 1.4 * cam.d); cam.vz = clamp(cam.vz + (-c * dx + s * dy) * k * v, -1.4 * cam.d, 1.4 * cam.d)}
   const toLocal = v => v.applyMatrix4(Wi);
   return {
-    get on() {return on}, get cam() {return cam}, get ptrs() {return ptrs}, get flying() {return bl.t < 1}, get inT() {return cutK >= .5}, get cine() {return cineOn}, get plano() {return cineOn ? cine.tipo : ''}, get planoN() {return cine.num}, get apunta() {return cineOn ? cp2.fromArray(cine.l).applyMatrix4(W) : null}, setCine,
+    get on() {return on}, get cam() {return cam}, get ptrs() {return ptrs}, get flying() {return bl.t < 1}, get soltando() {return suelta()}, get inT() {return cutK >= .5}, get cine() {return cineOn}, get plano() {return cineOn ? cine.tipo : ''}, get planoN() {return cine.num}, get apunta() {return cineOn ? cp2.fromArray(cine.l).applyMatrix4(W) : null}, setCine,
     /* entra en la maqueta m desde la cámara que se ve (o desde delante del cristal) */
     entra(m, {desde, dur = 1.5, cine: conCine = false} = {}) {cineOn = false; M = m; m.g.updateMatrixWorld(true); W = m.g.matrixWorld; Wi.copy(W).invert(); up.set(0, 1, 0).transformDirection(W); on = true; ptrs.clear(); touched = false; cutK = 0; cam.focus = null; stop(); cam.tgt.copy(CTR); cam.d = defD(); cam.el = homeEl(); cam.az = Math.PI / 2; lastIn = now(); if (desde) {cp.copy(desde.p); cl.copy(desde.l)} else {camera.getWorldDirection(dir); cp.copy(camera.position); cl.copy(cp).add(dir); toLocal(cp); toLocal(cl)} blend(dur); if (conCine) {cineOn = true; cine.empieza(M, {aspecto: camera.aspect, delante: true})} if (onFocus) onFocus(null); if (onCine) onCine(cineOn)},
     sale() {on = false; cineOn = false; if (onCine) onCine(false); ptrs.clear(); zm.on = false; cam.focus = null; cutK = 0; cutOp = 0; cut(0); canvas.classList.remove('dr'); camera.up.set(0, 1, 0); if (onFocus) onFocus(null)},

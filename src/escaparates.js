@@ -21,7 +21,7 @@ import CFG from '../config.js';
 import {VENTA} from './esc-tren.js';
 import {TIENDA, enlaceTienda, tagOk, AVISO} from './esc-tienda.js';
 import {CONTACTO, PRECIO_ROTULO, PRECIO_VAGON, MARCAS} from './esc-marcas.js';
-import {au, prepAu, pasos, traqueteo, setCerca, setSonido, sonidoOn, bells, whistle, chime, silencio, campana, suave, viento, clac, chuf, trenSuena} from './musica.js';
+import {au, prepAu, pasos, setCerca, setSonido, sonidoOn, bells, whistle, chime, silencio, campana, suave, viento, clac, chuf, trenSuena, volumen, pista as cancion, otraPista, onPista, oyeTren, callaTren, motor} from './musica.js';
 clearTimeout(window.__boot);
 
 const $ = id => document.getElementById(id), canvas = $('c'), DEBUG = QS.has('debug');
@@ -147,7 +147,7 @@ function camObjetivo(t, P, L) {
 const seg = {x: 0, y: 44}; let segDt = 0;
 function camara(dt, t) {
   segDt = dt; E.u = damp(E.u, E.uT, 3.2, dt); E.zs = damp(E.zs, E.zsT, 4, dt); E.az = damp(E.az, E.azT, 5, dt); E.el = damp(E.el, E.elT, 5, dt); if (E.st === 'paseo' && !ptrs.size && performance.now() - lookT > 1600) {E.azT = damp(E.azT, 0, 1.4, dt); E.elT = damp(E.elT, 0, 1.4, dt)}
-  if (E.st === 'dentro') {vista.update(dt); cam.p.copy(camera.position); cam.l.copy(camera.position).add(camera.getWorldDirection(v1).multiplyScalar(60)); cam.fov = vista.cine ? camera.fov : FOVD}
+  if (E.st === 'dentro') {vista.update(dt); cam.p.copy(camera.position); cam.l.copy(camera.position).add(camera.getWorldDirection(v1).multiplyScalar(60)); cam.fov = vista.cine || vista.soltando ? camera.fov : FOVD}
   else if (casaOn) {cam.p.copy(casa.p); cam.l.copy(casa.l); cam.fov = casa.fov * (portrait() ? 1.3 : 1); camera.fov = cam.fov; camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld(); camera.updateProjectionMatrix()}
   else {const l = camObjetivo(t, v1, v2), k = FAST && !SUAVE ? 1 - Math.exp(-l * dt * 4) : 1 - Math.exp(-l * dt); cam.p.lerp(v1, k); cam.l.lerp(v2, k); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld()}
   const pl = E.st === 'escena' && !casaOn && ESCN.plan, nf = E.st === 'dentro' ? .4 : pl && pl.l.z > 0 && cam.p.z < -13 ? Math.max(2, -cam.p.z - (pl.dos ? 28 : 12)) : 2, f = FAST && !SUAVE ? cam.fov : damp(camera.fov, cam.fov, E.st === 'dentro' ? 4 : 2.2, dt); if (Math.abs(f - camera.fov) > .01 || camera.near !== nf) {camera.fov = f; camera.near = nf; camera.far = E.st === 'dentro' ? 900 : 2600; camera.updateProjectionMatrix()}
@@ -325,13 +325,46 @@ let quietoT = 0; function despierta() {document.body.classList.remove('quieto');
 $('bPrev').onclick = () => {au(); despierta(); ir(E.n - 1)}; $('bNext').onclick = () => {au(); despierta(); ir(E.n + 1)}; $('cap').onclick = () => {despierta(); if (E.st === 'dentro') vista.home(true); else entrar(E.n)};
 $('bVolver').onclick = () => {au(); if (previa) return finPrevia().then(() => openAd()); if (vista.cam.focus) vista.setFocus(null); else salir()};
 const mid = () => [innerWidth / 2, innerHeight / 2]; $('nIn').onclick = () => vista.zoomAt(...mid(), .62); $('nOut').onclick = () => vista.zoomAt(...mid(), 1.6); $('nRot').onclick = () => vista.turn(Math.PI / 4); $('nHome').onclick = () => {vista.toca(); vista.home(true)}; $('bCine').onclick = () => {au(); CINE = !vista.cine; vista.setCine(CINE); E.idle = 0}; $('bCam').onclick = () => {au(); const f = vista.cam.focus; vista.toca(); vista.setFocus(f && f.chase ? null : {car: 0, chase: true})};
-const pintaSon = () => $('bSon').classList.toggle('off', !sonidoOn()); pintaSon(); $('bSon').onclick = () => {setSonido(!sonidoOn()); au(); pintaSon()};
+const pintaSon = () => $('bSon').classList.toggle('off', !sonidoOn()); pintaSon(); pintaMudo();
+/* ---------- música y sonido ---------- */
+const sonAb = () => $('son').classList.contains('on');
+function abreSon(v) {const p = $('son'); p.classList.toggle('on', v); p.inert = !v; $('bSon').setAttribute('aria-expanded', v); if (v) {au(); pintaPista(cancion()); for (const [id, k] of SLID) {const q = $(id); q.value = Math.round(volumen(k) * 100); q.style.setProperty('--v', q.value + '%')}}}
+const SLID = [['vMus', 'musica'], ['vTren', 'tren'], ['vAmb', 'amb']]; for (const [id, k] of SLID) $(id).oninput = e => {volumen(k, e.target.value / 100); e.target.style.setProperty('--v', e.target.value + '%'); pintaSon(); pintaMudo()};
+function pintaMudo() {const m = !sonidoOn(); $('son').classList.toggle('mudo', m); $('sonM').setAttribute('aria-pressed', m); $('sonM').textContent = m ? 'Activar sonido' : 'Silenciar'}
+const mudo = () => {setSonido(!sonidoOn()); au(); pintaSon(); pintaMudo()};
+let ahT = 0; function pintaPista(p) {$('sonT').textContent = $('fonT').textContent = $('ahT').textContent = p.t; $('sonN').textContent = p.n; $('ahN').textContent = `${p.o} · ${p.n}`}
+function anuncia() {if (!FON) return; $('ahora').classList.add('on'); clearTimeout(ahT); ahT = setTimeout(() => $('ahora').classList.remove('on'), 7000)}
+onPista(p => {pintaPista(p); anuncia()}); $('bSon').onclick = e => {e.stopPropagation(); despierta(); abreSon(!sonAb())}; $('sonM').onclick = mudo; $('sonS').onclick = $('fonS').onclick = () => {otraPista(1); pintaSon(); pintaMudo()}; $('sonA').onclick = () => {otraPista(-1); pintaSon(); pintaMudo()}; $('sonF').onclick = () => fondo(true); $('bFon').onclick = () => fondo(true);
+addEventListener('pointerdown', e => {if (sonAb() && !e.target.closest('#son,#bSon')) abreSon(false)}, true);
+/* ---------- de fondo: solo el tren, con la cámara de cine, y otro escaparate cada pocos minutos ---------- */
+let FON = null; const CAMBIO = 200, FULL = document.documentElement, abiertos = () => Array.from({length: Math.max(0, AB())}, (_, k) => k).filter(k => !tapado(k));
+const bloqueo = async v => {try {if (v) {if (navigator.wakeLock && !document.hidden) FON.wl = await navigator.wakeLock.request('screen')} else if (FON && FON.wl) FON.wl.release()} catch (e) {}};
+function fondo(v) {
+  if (!!v === !!FON) return; abreSon(false);
+  if (v) {
+    if (E.st === 'escena' || !listo) return; if (E.st === 'inicio') empezar(); const L = abiertos(); if (!L.length) {toast('Primero mira cómo se enciende el escaparate de hoy'); return}
+    au(); if (!sonidoOn()) mudo(); FON = {t: 0, mov: performance.now(), wl: null, full: false}; document.body.classList.add('fondo'); hideCard(); $('tiSheet').classList.remove('on'); if (modal()) closeAd(); CINE = true;
+    if (E.st !== 'dentro' || tapado(E.n)) entrar(tapado(E.n) ? L[L.length - 1] : E.n); else {vista.setFocus(null); vista.setCine(true)} bloqueo(true); mueve(); anuncia(); pintaPista(cancion());
+    if (FULL.requestFullscreen && !document.fullscreenElement && !FAST) FULL.requestFullscreen({navigationUI: 'hide'}).then(() => {if (FON) FON.full = true}).catch(() => {});
+  } else {bloqueo(false); const f = FON.full; FON = null; document.body.classList.remove('fondo', 'mueve'); $('ahora').classList.remove('on'); if (f && document.fullscreenElement) document.exitFullscreen().catch(() => {}); despierta()}
+}
+function mueve() {if (!FON) return; FON.mov = performance.now(); document.body.classList.add('mueve')}
+function otroTren() {const L = abiertos(); if (L.length < 2 || !FON) return; FON.t = 0; const i = L.indexOf(E.n); cambia(L[(i + 1) % L.length])}
+function pasoFondo(dt, now) {if (!FON) return; if (now - FON.mov > 3200 && !sonAb()) document.body.classList.remove('mueve'); if (E.st !== 'dentro') {if (E.st === 'escena') fondo(false); return} FON.t += dt; if (FON.t > CAMBIO && now - FON.mov > 5000) otroTren(); if (!vista.cine && !vista.flying && now - FON.mov > 14000) {if (vista.cam.focus) vista.setFocus(null); vista.setCine(true)}}
+addEventListener('pointermove', e => {if (FON && (e.movementX || e.movementY || e.pointerType !== 'mouse')) mueve()}, {passive: true}); addEventListener('pointerdown', () => mueve(), {passive: true, capture: true}); $('fonX').onclick = () => fondo(false); $('fonV').onclick = otroTren;
+document.addEventListener('fullscreenchange', () => {if (FON && FON.full && !document.fullscreenElement) {FON.full = false; fondo(false)}}); document.addEventListener('visibilitychange', () => {if (FON && !document.hidden) bloqueo(true)});
+/* lo que se oye del tren desde donde está la cámara */
+const oI = new THREE.Matrix4(), oV = new THREE.Vector3(), oO = {T: null, s: 0, w: 0, off: null, c: [0, 14, 58], d: [1, 0], nivel: 0};
+function escucha() {
+  const m = MU.get(E.k), st = E.st, nv = st === 'dentro' ? 1 : st === 'mira' ? .3 + .35 * E.u : st === 'escena' ? .34 : st === 'llega' || st === 'sale' ? .16 : 0; if (!m || !nv || casaOn || tapado(E.n)) {callaTren(); return}
+  oO.T = m.T; oO.s = m.tren.s; oO.w = m.tren.w; oO.off = m.tren.off; oO.nivel = nv; if (st === 'dentro') {oI.copy(m.g.matrixWorld).invert(); oV.copy(camera.position).applyMatrix4(oI); oO.c[0] = oV.x; oO.c[1] = oV.y; oO.c[2] = oV.z; const e = camera.matrixWorld.elements; oO.d[0] = e[0]; oO.d[1] = e[2]} else {oO.c[0] = 0; oO.c[1] = 14; oO.c[2] = 56; oO.d[0] = 1; oO.d[1] = 0} oyeTren(oO);
+}
 const url = () => window.ADVX_ESC_URL || location.origin + location.pathname;
 $('bShare').onclick = async () => {const m = AB() && !CAL.extra ? `🚂 Día ${AB()} · «${DIAS[AB() - 1].momento}»\n` : '🚂 ', text = `${m}¿Te acuerdas de cuando te quedabas embobado mirando el tren de un escaparate?`; if (navigator.share) try {await navigator.share({title: 'El tren del escaparate', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(url()); toast('Enlace copiado: pégalo donde quieras')} catch (e) {toast('No se ha podido copiar el enlace')}};
 const NAVK = {ArrowLeft: [-34, 0], ArrowRight: [34, 0], ArrowUp: [0, -34], ArrowDown: [0, 34], a: [-34, 0], d: [34, 0], w: [0, -34], s: [0, 34]};
 addEventListener('keydown', e => {
   if (E.st === 'escena') {if (e.key === 'Escape') $('bSaltar').click(); return}
-  if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if ($('tiSheet').classList.contains('on')) cierraTienda(); else if (modal()) closeAd(); else if (E.st === 'dentro' && vista.cam.focus) vista.setFocus(null); else if (!$('card').hidden) hideCard(); else salir(); return} if (modal() || /INPUT|TEXTAREA/.test(e.target.tagName) || !listo) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if (sonAb()) abreSon(false); else if (FON) fondo(false); else if ($('tiSheet').classList.contains('on')) cierraTienda(); else if (modal()) closeAd(); else if (E.st === 'dentro' && vista.cam.focus) vista.setFocus(null); else if (!$('card').hidden) hideCard(); else salir(); return} if (modal() || (/INPUT|TEXTAREA/.test(e.target.tagName) && e.target.type !== 'range') || !listo) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (!e.repeat) {if (k === 'f') {fondo(!FON); return} if (k === 'm') {mudo(); return} if (k === 'n') {otraPista(1); pintaSon(); pintaMudo(); return}} if (FON) {mueve(); if (k === 'ArrowRight' || k === 'ArrowLeft') otroTren(); return} if (e.target.closest && e.target.closest('#son')) return;
   if (E.st === 'dentro') {if (NAVK[k]) {e.preventDefault(); vista.nudge(...NAVK[k])} else if (k === '+' || k === '=') vista.zoomAt(...mid(), .75); else if (k === '-') vista.zoomAt(...mid(), 1.34); else if (k === 'q' && !e.repeat) vista.turn(-Math.PI / 6); else if (k === 'e' && !e.repeat) vista.turn(Math.PI / 6); else if (k === '0') vista.home(true); else if (k === 'c' && !e.repeat) $('bCam').click(); else if (k === 'v' && !e.repeat) $('bCine').click(); return}
   if (k === 'ArrowRight') ir(E.n + 1); else if (k === 'ArrowLeft') ir(E.n - 1); else if (k === 'ArrowUp' || (k === 'Enter' && e.target === document.body)) entrar(E.n); else if (k === '+' || k === '=') zoom(.12); else if (k === '-') zoom(-.12)});
 function empezar() {if (E.st !== 'inicio' || !listo) return; au(); $('intro').classList.add('ido'); document.body.classList.remove('espera'); E.st = 'paseo'; E.t = 0; caption(); despierta(); if (!FAST) bells()}
@@ -340,8 +373,8 @@ $('go').onclick = empezar;
 /* ================= bucle ================= */
 let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, lento = 0, alT = 0, HOLD = false; const dbg = DEBUG ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0;
 function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'dentro' && !casaOn && !E.hoy && (E.st !== 'mira' || f === madre)) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
-let tqA = 0, calT = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
-  if (E.st === 'mira' || E.st === 'dentro') {tqA += raw; if (tqA > .9) {tqA = 0; traqueteo(E.st === 'dentro' ? 1 : E.u)}} if (!CAL.previa && now - calT > 20000) {calT = now; const c = estado(); if (c.abiertos !== CAL.abiertos || c.extra !== CAL.extra) {CAL = c.temporada ? c : previaDe(1)} caption()} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); sobre = !!(q && q.n === E.n && q.sitio !== 'rotulo'); hov = null} if (now - quietoT > 6000 && E.st !== 'escena') document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
+let calT = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
+  if (!FAST || SUAVE) escucha(); pasoFondo(Math.min(.2, raw), now); if (!CAL.previa && now - calT > 20000) {calT = now; const c = estado(); if (c.abiertos !== CAL.abiertos || c.extra !== CAL.extra) {CAL = c.temporada ? c : previaDe(1)} caption()} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); sobre = !!(q && q.n === E.n && q.sitio !== 'rotulo'); hov = null} if (now - quietoT > 6000 && E.st !== 'escena') document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
   if (dbg) renderer.info.reset(); draw(); if (dbg) {dN++; dT += raw; if (dT > .5) {dbg.textContent = `${Math.round(dN / dT)} fps · ${(dT / dN * 1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${renderer.info.render.calls} dc · ${(renderer.info.render.triangles / 1000).toFixed(0)}k · ${E.st}`; dN = dT = 0}}
   adapta(raw, now)}
 /* si va justo: primero baja la resolución hasta 1×, luego sombras y MSAA, y por último el brillo */
@@ -367,7 +400,7 @@ requestAnimationFrame(loop);
 
 /* gancho para las pruebas */
 const aPantalla = v => {v.project(camera); return {x: (v.x * .5 + .5) * innerWidth, y: (.5 - v.y * .5) * innerHeight, z: v.z}};
-window.__esc = {eng: {renderer, post, foco, camera, get verCalle() {return verCalle}, get verPortal() {return verPortal}}, get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, entrar, salir, vista, mundo, MU, locs, escena, verEscena, ponDia, get cal() {return CAL}, get ESCN() {return ESCN}, get casa() {return casaOn}, tapado, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro}, get fly() {return FAST},
+window.__esc = {son: motor, fondo, get fon() {return FON}, eng: {renderer, post, foco, camera, get verCalle() {return verCalle}, get verPortal() {return verPortal}}, get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, entrar, salir, vista, mundo, MU, locs, escena, verEscena, ponDia, get cal() {return CAL}, get ESCN() {return ESCN}, get casa() {return casaOn}, tapado, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro}, get fly() {return FAST},
   step(sec, d = 1 / 30, suave = false) {const f = FAST; SUAVE = suave; for (let i = 0; i < sec / d; i++) {FAST = true; paso(d); if (obra) obraPaso()} FAST = f; SUAVE = false},
   mirar(u) {E.manual = true; E.u = E.uT = u}, cam: () => ({p: cam.p.toArray().map(v => +v.toFixed(1)), l: cam.l.toArray().map(v => +v.toFixed(1))}), setCam: (p, l) => {cam.p.set(...p); cam.l.set(...l); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld(); colocar(0, tG); draw()}, pos: () => ({m: madre.g.position.toArray(), n: nino.g.position.toArray(), ym: madre.yaw, yn: nino.yaw, hn: nino.look.y}),
   manos() {const mi = E.dir > 0 ? 0 : 1, a = v1.clone(), b = v1.clone(), t = (f, i, o) => {f.g.updateMatrixWorld(true); return f.manoPos(i, o)}; t(madre, mi, a); t(nino, 1 - mi, b); return a.distanceTo(b)},
