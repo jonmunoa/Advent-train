@@ -44,6 +44,7 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 - **Un momento cada día**: en cada escaparate, una escena sin palabras de 6–15 segundos que se entiende sola (la nariz en el cristal, una bola de nieve, la foto que sale mal…). El 24 se cierra con el niño ya mayor. El 31 hay campanadas, el 5 de enero cabalgata y el 6 Reyes. Están en `src/esc-escenas.js`.
 - **Lo que vende cada tienda**: «Llévate uno a casa» enlaza a un producto de Amazon con enlace de afiliado. Se edita en `src/esc-tienda.js` (pon el `asin` para ir a una ficha en concreto) y el código va en `config.js` o en `ADVX_TAG`. Las marcas están guardadas tras `VENDER` en `src/esc-marcas.js`.
 - **En la calle**: la cámara va detrás del niño y el paseo va solo. Arrastra para mirar alrededor, usa la rueda o un pellizco para acercarte y las flechas para ir al escaparate anterior o al siguiente.
+- **Para dejarlo de fondo** (botón de la pantalla o tecla F): solo el tren con la cámara de cine, otro escaparate cada pocos minutos y tres horas de villancicos lofi sintetizados en el navegador, con el sonido del tren (resoplidos, carriles, vapor, silbato). El botón del altavoz abre la canción que suena y los volúmenes de música, tren y fuego.
 - **Pincha un escaparate (o «Ver el tren de cerca») y entras en él**: una cámara de cine graba el tren desde fuera y va cambiando de plano sola (botón de la cámara o tecla V). En cuanto mueves la vista, mandas tú: se maneja como un mapa (arrastrar o un dedo mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho o girar dos dedos gira, subir o bajar dos dedos inclina). Tocar un vagón lo sigue, el ojo va con el tren y, mirando hacia el cristal, se ve al niño asomado. «Volver a la calle» o Escape salen. Teclado: flechas o WASD, +, −, Q, E, 0 y C.
 - **Marcas** en el rótulo de cada tienda y en los cuatro vagones de su tren, salvo el 24 (apagadas por ahora). Se escriben a mano en `src/esc-marcas.js`; no se cobra ni se guarda nada desde la web.
 
@@ -88,6 +89,7 @@ python tests/perf.py           # coste por fotograma frente a tests/perf-baselin
 python tests/idle.py --shots   # prototipo idle en Chromium: reparto, tienda, vía, guardado y ausencia
 node tests/idle.test.mjs       # economía y trazado del idle, sin navegador
 python tests/tren.py --shots   # tren de Navidad en Chromium: navegación, vagones, túnel, cruces, tu casa, calendario, marcas, sin red y móvil
+node tests/lofi.test.mjs      # música: compases, armonía, duración y afinación
 python tests/esc.py --shots    # escaparates en Chromium: calendario, las 27 escenas, paseo, navegación por dentro, marcas, sin red y móvil
 node tests/esc.test.mjs        # los 24 circuitos, el calendario y las marcas, sin navegador
 node tests/tren.test.mjs       # maqueta (agujas, túneles, puentes, terreno), calendario, marcas y guardado, sin navegador
