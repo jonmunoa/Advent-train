@@ -278,22 +278,21 @@ async def main():
         check('«Ver cómo queda» la pone en el letrero y al volver se quita', r['ad'] != r['antes'] and r['b'] and r['after'] != r['ad'], str(r))
         await pg.click('#adX')
 
-        # 6b) la historia entera
-        await pg.evaluate("__esc.hold(true);window.ESCENAS=async()=>{const out=[];for(let d=1;d<=27;d++){__esc.ponDia(d);await new Promise(r=>setTimeout(r,420));const e=__esc.ESCN;for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);const ini=__esc.st,id=e.id,c0=__esc.scene.calle.children.length;let t=0,bad=0,casa=0;while(__esc.st==='escena'&&t<120){__esc.step(1/30);t+=1/30;if(__esc.casa)casa=1;const c=__esc.cam();if([...c.p,...c.l].some(v=>!isFinite(v)))bad++}await new Promise(r=>setTimeout(r,300));__esc.step(.2);out.push({d,ini,id,t:+t.toFixed(1),bad,casa,fin:__esc.st,props:e.props.length+e.ext.length,ropa:__esc.ropa,vis:__esc.pos().n.every(isFinite),fin2:document.getElementById('fin').classList.contains('on')})}return out}")
+        # 6b) todos los momentos
+        await pg.evaluate("__esc.hold(true);window.ESCENAS=async()=>{const out=[];for(let d=1;d<=27;d++){__esc.ponDia(d);await new Promise(r=>setTimeout(r,420));const e=__esc.ESCN;for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);const ini=__esc.st,id=e.id,c0=__esc.scene.calle.children.length;let t=0,bad=0,casa=0;while(__esc.st==='escena'&&t<120){__esc.step(1/30);t+=1/30;if(__esc.casa)casa=1;const c=__esc.cam();if([...c.p,...c.l].some(v=>!isFinite(v)))bad++}await new Promise(r=>setTimeout(r,300));__esc.step(.2);out.push({d,ini,id,t:+t.toFixed(1),bad,casa,fin:__esc.st,props:e.props.length+e.ext.length,vis:__esc.pos().n.every(isFinite),fin2:document.getElementById('fin').classList.contains('on')})}return out}")
         r = await pg.evaluate('ESCENAS()')
-        malas = [x for x in r if x['ini'] != 'escena' or not 7 < x['t'] < 100 or x['bad'] or x['fin'] not in ('mira', 'paseo', 'sale') or x['props'] or not x['vis']]
+        malas = [x for x in r if x['ini'] != 'escena' or not 5.5 < x['t'] < 45 or x['bad'] or x['fin'] not in ('mira', 'paseo', 'sale') or x['props'] or not x['vis']]
         check('las 24 escenas y las 3 del final se ven enteras y no dejan nada puesto', len(r) == 27 and not malas, str(malas[:3]) + f" · duran de {min(x['t'] for x in r)} a {max(x['t'] for x in r)} s")
         check('cada escena es la de su día', [x['id'] for x in r] == [*range(1, 25), 'campanadas', 'cabalgata', 'reyes'])
-        check('la casa sale el 10 (de noche) y el 6 de enero', [x['d'] for x in r if x['casa']] == [10, 27])
-        ab = {x['d']: x['ropa'] for x in r}
-        check('desde el 16 la madre va sin el abrigo rojo, y desde el 17 con la bufanda del niño', ab[15]['abrigo'] and not ab[16]['abrigo'] and not ab[17]['abrigo'] and ab[17]['bufandaRoja'] and not ab[17]['bufandaNino'] and not ab[24]['abrigo'] and ab[5]['guantes'] and not ab[6]['guantes'])
-        check('el final acaba con «Llámala» y el botón para mandárselo', r[-1]['fin2'] and not any(x['fin2'] for x in r[:-1]))
+        check('los momentos del 1 al 22 son cortos (6–15 s)', all(5.5 < x['t'] < 15 for x in r[:22]), str([x['t'] for x in r]))
+        check('la casa solo sale el 6 de enero', [x['d'] for x in r if x['casa']] == [27])
+        check('el 24 acaba con «Llámala» y el botón para mandárselo', [x['d'] for x in r if x['fin2']] == [24], str([x['d'] for x in r if x['fin2']]))
         await pg.evaluate("document.getElementById('fin').classList.remove('on');__esc.ponDia(18)")
         await pg.wait_for_timeout(500)
         await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);__esc.step(2)})()")
         r = await pg.evaluate("({st:__esc.st,p:__esc.mundo(17).tren.g.visible})")
-        check('el 18 el tren ya no está', r['st'] == 'escena' and not r['p'])
-        check('los días sin marca, los vagones van lisos', await pg.evaluate('[17,19,23].every(n=>!__esc.mundo(n).tren.ads.length)') and await pg.evaluate('__esc.mundo(6).tren.ads.length===4'))
+        check('en todos los escaparates hay tren', r['st'] == 'escena' and r['p'])
+        check('el 24 los vagones van lisos y los demás días llevan marca', await pg.evaluate('!__esc.mundo(23).tren.ads.length') and await pg.evaluate('__esc.mundo(6).tren.ads.length===4&&__esc.mundo(17).tren.ads.length===4'))
         await pg.click('#bSaltar')
         await pg.wait_for_timeout(700)
         await pg.evaluate('__esc.step(1)')

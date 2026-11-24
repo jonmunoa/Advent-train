@@ -1,6 +1,5 @@
 /* Lo que hay en cada escaparate del calendario: el tema de color de cada día (TEMAS) y su decorado (métodos de Mundo).
    Los tres de partida (pueblo, esqui y polo) están en esc-mundos.js. Todo lo quieto va a this.S; lo que se mueve, a this.anim. */
-import {abrigoVacio} from './esc-gente.js';
 import {THREE, rng, sstep, lerp, clamp, fbm, LOWQ, M, TM, canvasTex, dotTex, signTex, stoneTex, flat, inst, obj, santaFig, fuse, BX, CY, CYX, TOR, SPH, PLN, o3, rep, WRAPS} from './kit.js';
 import {atM, BW, BD, ICE_Y, pondE} from './esc-vias.js';
 import {Mundo, X} from './esc-mundos.js';
@@ -26,9 +25,9 @@ export const TEMAS = {
   zapateria: T(['#14304a', '#3a7088', '#b0c8b0', '#f8dca0'], ['#5a7a80', '#90a890', '#dcd4a8'], '#b8c4a8', [1, .97, .92], 0x6b3a1c, 0xe0ad45, ['#6b3a1c', '#8f1d24', '#23405f', '#3f2a1c'], {bosque: .5}),
   luces: T(['#03040c', '#0a1030', '#1c2458', '#5a4080'], ['#121a40', '#1c2656', '#30386e'], '#34386c', [.74, .78, .95], 0x1a2350, 0xf2c53d, ['#23308a', '#8a1f5c', '#1c6b45', '#8a5a1c'], {bosque: .6, noche: 1}),
   estrellas: T(['#02020c', '#0a0a34', '#2a1c6a', '#5a3a9a'], ['#14124a', '#241c66', '#40308a'], '#3a3080', [.38, .42, .82], 0x3a2a8a, 0xd9c45a, ['#2a2470', '#5a2a80', '#1c3a7a', '#403090'], {bosque: 0, noche: 1}),
-  vacia: T(['#05070f', '#0e1428', '#28304a', '#4a5068'], ['#1c2238', '#2c344c', '#424a62'], '#3c4258', [.66, .7, .82], 0x0e4a31, 0xb3121f, ['#8f1d24'], {bosque: 1, noche: 1, apagado: 1}),
+  modelismo: T(['#0a1038', '#2c3a8a', '#c0708a', '#ffc890'], ['#3c4688', '#8a78a0', '#e0a8a0'], '#a88aa0', [1, .98, .99], 0x1d3f8a, 0xd9a63a, ['#1f3a6b', '#b3162a', '#f0e4cc', '#1c6b45'], {bosque: 1}),
   orquesta: T(['#1c0610', '#4a1020', '#9a3038', '#e0a060'], ['#4a1824', '#7a2c34', '#b86048'], '#8a4444', [.9, .72, .7], 0x6a1020, 0xe0ad45, ['#6a1020', '#1d2f5c', '#8a6a2c', '#3a1420'], {bosque: .2}),
-  ropa: T(['#14161c', '#343a44', '#808488', '#c0bcb0'], ['#4c5258', '#787c80', '#a8a8a0'], '#8c9090', [.88, .88, .9], 0x4a4f5a, 0xa8a49a, ['#5a5f6a', '#7a6a5a', '#3f464f', '#8a8478'], {bosque: .25}),
+  sastre: T(['#1c1238', '#5a3a7a', '#e08a7a', '#ffd8a8'], ['#6a4a80', '#a880a0', '#f0c0a8'], '#c8a4a8', [1, .96, .93], 0x8a1f3a, 0xe0ad45, ['#8a1f3a', '#1d4a6b', '#e0ad45', '#2f5d4a'], {bosque: .35}),
   sombreros: T(['#1a1c40', '#4a5490', '#b0a0c8', '#f4dcd0'], ['#5c6498', '#9490b8', '#d4c4d4'], '#b0a8c4', [.9, .95, .88], 0x17181d, 0xb8182a, ['#17181d', '#4a1a2a', '#1c3a2c', '#3a2a5a'], {bosque: .6}),
   terminal: T(['#0c1440', '#3a4a90', '#d08a70', '#ffd8a0'], ['#5a6098', '#a088a8', '#e8c4b0'], '#b89cac', [1, .98, .97], 0x0e4a31, 0xb3121f, ['#16492f', '#8f1d24', '#1f3a6b', '#e6d8b8'], {bosque: .8}),
   pinturas: T(['#2a3a7a', '#5a8ad0', '#c0dcec', '#fff0d8'], ['#8ab0dc', '#b8d4e8', '#f0e8d8'], '#cfdcec', [1, 1, .98], 0x2a6fd6, 0xf2c53d, ['#d0202f', '#f0b93c', '#1f8a52', '#8a5aa8'], {bosque: .3}),
@@ -182,10 +181,10 @@ const H = {
     const com = new THREE.Sprite(new THREE.SpriteMaterial({map: dotTex, color: new THREE.Color(2.4, 2.4, 2.8), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false})); com.scale.set(5, 5, 1); this.g.add(com); const cola = Array.from({length: 10}, (_, q) => {const s = com.clone(); s.material = com.material.clone(); s.material.opacity = .6 - q * .055; s.scale.setScalar(4.4 - q * .36); this.g.add(s); return s}); this.anim.push(t => {[com, ...cola].forEach((s, q) => {const a = t * .24 - q * .035; s.position.set(Math.cos(a) * 70, 44 + Math.sin(a * 2) * 10, -16 + Math.sin(a) * 18)})});
     this.patinadores(6); this.corro(this.m.fab[0], this.m.fab[1] + 17, 3, 8); this.lago(K.azul);
   },
-  /* ===== 18 · La Estación, vacía ===== */
-  vacia() {
-    this.iglesia(-12, -24, .12); this.arbol(-28, 23, .4); [[-64, -24, .1], [-52, -25, -.1], [-40, -24, .15], [-28, -24, 0], [20, -26, -.2], [-46, -1.5, .1], [-34, -2, -.1], [-21, -1.5, .12], [-8, -2, 0], [30, -5, -.3], [42, -4, .2], [-66, 22, .4], [57, 19, -.5], [70, -6, -.9], [-62, 30.2, .1]].forEach(([x, z, r], k) => this.casa(x, z, r, k, .86));
-    const tx = canvasTex(1024, 384, (g, w, h) => {g.fillStyle = '#f4ead2'; g.fillRect(0, 0, w, h); g.strokeStyle = '#8a1422'; g.lineWidth = 16; g.strokeRect(22, 22, w - 44, h - 44); g.fillStyle = '#b3122a'; g.font = '400 190px "Alfa Slab One"'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('VENDIDO', w / 2, h / 2 + 10)}, 'vendido'); const G = new THREE.Group(), m = new THREE.Mesh(PLN(34, 12.75), new THREE.MeshBasicMaterial({map: tx, side: THREE.DoubleSide, color: new THREE.Color(.8, .8, .8)})); m.position.y = -20; G.add(m); for (const q of [-12, 12]) {const s = new THREE.Mesh(CY(.08, .08, 16, 4), K.hierro); s.position.set(q, -6, 0); G.add(s)} G.position.set(0, 46, 33); this.g.add(G); this.anim.push(t => {G.rotation.z = Math.sin(t * .9) * .035; G.rotation.y = Math.sin(t * .5) * .05}); this.cartel = G;
+  /* ===== 18 · el pueblo del modelista ===== */
+  modelismo() {
+    this.iglesia(-12, -24, .12); this.arbol(-28, 23, 1.15); [[-64, -24, .1], [-52, -25, -.1], [-40, -24, .15], [-28, -24, 0], [20, -26, -.2], [-46, -1.5, .1], [-34, -2, -.1], [-21, -1.5, .12], [-8, -2, 0], [30, -5, -.3], [42, -4, .2], [-66, 22, .4], [57, 19, -.5], [70, -6, -.9], [-62, 30.2, .1]].forEach(([x, z, r], k) => this.casa(x, z, r, k + 3, .86));
+    this.farolas([[-40, 25], [-16, 25], [-34, 12], [2, 26], [20, 28], [-52, 26]]); this.corro(-28, 33, 3, 6); this.lago(K.azul); this.patinadores(6);
   },
   /* ===== 19 · la orquesta mecánica ===== */
   orquesta() {
@@ -199,10 +198,10 @@ const H = {
   },
   /* abrigo en una percha; rojo con cuello blanco es el de la madre */
   abrigoEn(x, z, m, cuello, s = 1, ry = 0) {const B = this.A(x, z, ry, s); B(CY(.16, .16, 12, 8), K.madera, 0, 6, 0); B(CY(1.8, 2, .4, 16), K.madera, 0, .2, 0); B(BX(5.4, .3, .4), K.madera, 0, 11, 0); const pr = [[3.2, 1.6], [3, 4], [2.1, 7], [2.2, 9.4], [1.5, 10.6], [.5, 11]].map(p => new THREE.Vector2(...p)); B(new THREE.LatheGeometry(new THREE.SplineCurve(pr).getPoints(18), 28).scale(1, 1, .62), m, 0, 0, 0); for (const sd of [-1, 1]) B(new THREE.CapsuleGeometry(.75, 4.4, 5, 10), m, sd * 2.6, 7.6, 0, 0, 0, sd * .16); if (cuello) {B(TOR(1.15, .55, 22).rotateX(Math.PI / 2), cuello, 0, 10.9, 0); B(TOR(3.15, .4, 30).rotateX(Math.PI / 2).scale(1, 1, .64), cuello, 0, 1.7, 0); for (const sd of [-1, 1]) B(TOR(.7, .32, 14).rotateX(Math.PI / 2), cuello, sd * 2.95, 5.2, 0); B(TOR(2.1, .24, 24).rotateX(Math.PI / 2).scale(1, 1, .64), K.cuero, 0, 7, 0)} for (let q = 0; q < 4; q++) B(SPH(.18, 8, 6), K.laton, 0, 8.6 - q * 1.5, 1.45 + q * .12); this.take(x, z, 3.4 * s)},
-  /* ===== 20 · ropa de segunda mano ===== */
-  ropa() {
-    {const B = this.A(-6, 20, .1, 1.28); B(CY(.16, .16, 12, 8), K.madera, 0, 6, 0); B(CY(1.8, 2, .4, 16), K.madera, 0, .2, 0); B(BX(5.4, .3, .4), K.madera, 0, 10.6, 0); const f = abrigoVacio(); f.g.scale.setScalar(12.6); f.g.position.set(-6, this.gy(-6, 20) - 3.6, 20); f.g.rotation.y = -Math.PI / 2 + .1; this.g.add(f.g); this.take(-6, 20, 4.4)} const cs = [0x5a5f6a, 0x6b5a48, 0x3f464f, 0x7a7468, 0x4a5548, 0x55485a].map(c => C(c, {roughness: 1})); [[-26, 6, 0], [-14, -4, 1], [2, 0, 2], [16, -6, 3], [28, 4, 4], [-38, -4, 5], [40, -6, 0], [10, 14, 1], [-30, 18, 2], [26, 18, 3]].forEach(([x, z, k]) => {if (this.libre(x, z, 3)) this.abrigoEn(x, z, cs[k % 6], null, .9 + (k % 3) * .12, (k % 3 - 1) * .4)});
-    this.pon(9, 2, (x, z, k) => {const B = this.A(x, z, this.r()); B(BX(4, 2.6, 1.6), [K.cuero, K.cuero2, K.marino][k % 3], 0, 1.4, 0); for (const q of [-1.2, 1.2]) B(BX(.3, 2.7, 1.7), K.laton, q, 1.4, 0); B(TOR(.5, .1, 12), K.negro, 0, 2.9, 0)}); this.pon(8, 1.4, (x, z, k) => {const B = this.A(x, z); B(CY(.12, .12, 6, 6), K.madera, 0, 3, 0); B(CY(1, 1.2, .3, 16), K.madera, 0, .15, 0); B(CY(1, 1, 1.2, 18), cs[k % 6], 0, 6.2, 0); B(CY(1.7, 1.7, .2, 20), cs[k % 6], 0, 5.7, 0)}); for (const [x, z, k] of [[-58, 14, 0], [56, 14, 4], [-20, -18, 5]]) if (this.libre(x, z, 4.4)) this.casa(x, z, 0, k, .82); this.farolas([[-44, 22], [40, 22], [0, 26], [-34, 10]]); this.corro(20, 24, 2, 4, 0);
+  /* ===== 20 · la sastrería ===== */
+  sastre() {
+    const cs = [0xa81e34, 0x1d4a6b, 0x2f6d4a, 0xd9962c, 0x6a3a7a, 0xd8cbb0].map(c => C(c, {roughness: 1})), bl = C(0xf1ebe0, {roughness: 1}); [[-26, 6, 0], [-14, -4, 1], [2, 0, 2], [16, -6, 3], [28, 4, 4], [-38, -4, 5], [40, -6, 0], [10, 14, 1], [-30, 18, 2], [26, 18, 3], [-6, 20, 4]].forEach(([x, z, k]) => {if (this.libre(x, z, 3)) this.abrigoEn(x, z, cs[k % 6], k % 2 ? null : bl, .9 + (k % 3) * .12, (k % 3 - 1) * .4)});
+    this.pon(8, 2.4, (x, z, k) => {const B = this.A(x, z, this.r()); B(CY(1.7, 1.7, .4, 24), K.madera, 0, .2, 0); B(CY(1.2, 1.2, 3, 22), cs[k % 6], 0, 1.9, 0); B(CY(1.7, 1.7, .4, 24), K.madera, 0, 3.6, 0); for (let q = 0; q < 5; q++) B(TOR(1.22, .08, 20).rotateX(Math.PI / 2), cs[k % 6], 0, .8 + q * .55, 0)}); this.pon(8, 1.4, (x, z, k) => {const B = this.A(x, z); B(CY(.12, .12, 6, 6), K.madera, 0, 3, 0); B(CY(1, 1.2, .3, 16), K.madera, 0, .15, 0); B(CY(1, 1, 1.2, 18), cs[(k + 2) % 6], 0, 6.2, 0); B(CY(1.7, 1.7, .2, 20), cs[(k + 2) % 6], 0, 5.7, 0)}); for (const [x, z, k] of [[-58, 14, 0], [56, 14, 4], [-20, -18, 5]]) if (this.libre(x, z, 4.4)) this.casa(x, z, 0, k, .82); this.farolas([[-44, 22], [40, 22], [0, 26], [-34, 10]]); this.corro(20, 24, 3, 6, 0);
   },
   /* ===== 21 · el bosque de sombreros ===== */
   sombreros() {

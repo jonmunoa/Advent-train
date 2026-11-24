@@ -48,7 +48,6 @@ export class Mundo {
   pasos() {
     return [() => this.terreno(), () => {this.via(); this.puentes()}, () => this.bocas(), () => this[this.m.id](), () => this.bosque(), () => this.escenario(), () => this.cerrar(), () => {
       this.tren = new Tren(this.g, this.T, {wagons: this.m.wagons, ...this.cfg}); this.tren.s = this.T.L * .1; if (this.trenes) {this.mas = []; for (let k = 1; k < this.trenes; k++) {const c = CFG[k], t = new Tren(this.g, this.T, {wagons: 3, ...c}); t.s = this.T.L * (.1 + k / this.trenes); this.mas.push(t)}}
-      if (this.tema && this.tema.apagado) {this.tren.g.visible = false; this.tren.parado = true}
     }];
   }
   /* ---------- terreno, hielo y canto ---------- */

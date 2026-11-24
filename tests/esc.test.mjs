@@ -3,7 +3,7 @@
 import {strict as assert} from 'node:assert';
 import {MAPS, mapaOf, atM, BW, BD, KG, KT, KB, pondE, pisteD} from '../src/esc-vias.js';
 import {marcasEsc, pedirTexto, sitioDe, FACH, ESC, VAGONES} from '../src/esc-eco.js';
-import {N, DIAS, EXTRAS, ULTIMO, estado, previa, pedido, falta, tope, ropaDe, ropaAntes} from '../src/esc-historia.js';
+import {N, DIAS, EXTRAS, ULTIMO, estado, previa, pedido, falta, tope} from '../src/esc-historia.js';
 import {readFileSync} from 'node:fs';
 import {MARCAS, PRECIO_ROTULO, PRECIO_VAGON} from '../src/esc-marcas.js';
 
@@ -37,11 +37,8 @@ ok('cuánto falta se dice con palabras y la vista previa no se sale del calendar
   const h = new Date(2026, 11, 7, 18); assert.equal(falta(h, new Date(2026, 11, 7, 17, 48)), 'en 12 min'); assert.equal(falta(h, new Date(2026, 11, 7, 9)), 'hoy a las 18:00'); assert.equal(falta(h, new Date(2026, 11, 6, 20)), 'mañana a las 18:00'); assert.equal(falta(h, new Date(2026, 10, 24)), 'el 7 de diciembre'); assert.equal(falta(h, new Date(2026, 11, 8)), 'ahora');
   assert.equal(previa(7).abiertos, 7); assert.equal(previa(0).abiertos, 1); assert.equal(previa(99).extra, 'reyes'); assert.equal(previa(26).extra, 'cabalgata'); assert.equal(pedido('?dia=7', ''), 7); assert.equal(pedido('', '#dia-27'), 27); assert.equal(pedido('?dia=99', ''), 0); assert.equal(pedido('', '#otra'), 0); assert.equal(tope(0), 0); assert.equal(tope(7), 7); assert.equal(tope(24), 23);
 });
-ok('la ropa cuenta la historia: guantes hasta el 5, abrigo rojo hasta el 15 y la bufanda del niño desde el 17', () => {
-  assert.ok(!ropaAntes(16).abrigo && ropaAntes(16).bufandaNino && ropaAntes(15).abrigo && ropaAntes(17).bufandaNino && ropaAntes(6).guantes); assert.ok(ropaDe(5).guantes && !ropaDe(6).guantes && ropaDe(6).manoplas); assert.ok(ropaDe(15).abrigo && !ropaDe(16).abrigo && !ropaDe(24).abrigo); assert.ok(ropaDe(16).bufandaNino && !ropaDe(17).bufandaNino && ropaDe(17).bufandaRoja); assert.ok(!ropaDe(14).botas && ropaDe(15).botas);
-});
-ok('cada día tiene escaparate, tema y escena; los días clave van sin marca', () => {
-  const es = readFileSync(new URL('../src/esc-escenas.js', import.meta.url), 'utf8'), di = readFileSync(new URL('../src/esc-dias.js', import.meta.url), 'utf8'); assert.equal(DIAS.length, N); assert.equal(ULTIMO, N + Object.keys(EXTRAS).length); for (let d = 1; d <= N; d++) assert.ok(es.includes(`*d${d}()`), `escena ${d}`); for (const x of Object.values(EXTRAS)) assert.ok(es.includes(`*${x}()`), x); for (const m of MAPS) if (!['pueblo', 'esqui', 'polo'].includes(m.id)) assert.ok(di.includes(`  ${m.id}: T(`) && di.includes(`  ${m.id}() {`), m.id); assert.deepEqual(DIAS.filter(d => d.sinMarca).map(d => d.d), [18, 20, 24]);
+ok('cada día tiene escaparate, tema, momento y escena; solo el 24 va sin marca', () => {
+  const es = readFileSync(new URL('../src/esc-escenas.js', import.meta.url), 'utf8'), di = readFileSync(new URL('../src/esc-dias.js', import.meta.url), 'utf8'); assert.equal(DIAS.length, N); assert.equal(ULTIMO, N + Object.keys(EXTRAS).length); for (let d = 1; d <= N; d++) assert.ok(es.includes(`*d${d}()`), `escena ${d}`); for (const x of Object.values(EXTRAS)) assert.ok(es.includes(`*${x}()`), x); for (const m of MAPS) if (!['pueblo', 'esqui', 'polo'].includes(m.id)) assert.ok(di.includes(`  ${m.id}: T(`) && di.includes(`  ${m.id}() {`), m.id); assert.deepEqual(DIAS.filter(d => d.sinMarca).map(d => d.d), [24]); assert.equal(new Set(DIAS.map(d => d.momento)).size, N); assert.ok(DIAS.every(d => d.momento && d.momento.length < 30)); for (const q of ['vendido', 'abrigoVacio', 'ropaDe']) assert.ok(!es.toLowerCase().includes(q.toLowerCase()) && !di.toLowerCase().includes(q.toLowerCase()), q);
 });
 ok('las marcas salen solo en sus fechas y en sitios que existen, y una línea mal escrita no rompe nada', () => {
   const L = [{escaparate: 1, sitio: 'rotulo', desde: '2026-12-05', hasta: '2026-12-06', texto: 'Panadería <b>Ogi</b>', url: 'panaderiaogi.es', img: 'm/marcas/ogi.png', fondo: '#1d3a78'}, {escaparate: 2, sitio: 4, desde: '2026-12-05', texto: 'Un día', fondo: 'rojo'}, {escaparate: 25, sitio: 1, desde: '2026-12-05', texto: 'No existe'}, {escaparate: 2, sitio: 9, desde: '2026-12-05', texto: 'No existe'}, {escaparate: 3, sitio: 1, desde: '2026-12-05', texto: '', img: 'https://otra/x.png'}, null, 7, {escaparate: 3, sitio: 2, desde: '2026-12-05', texto: 'Raro', url: 'javascript:alert(1)'}];

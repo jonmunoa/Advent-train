@@ -12,6 +12,9 @@ const m1 = new THREE.Matrix4(), m2 = new THREE.Matrix4(), q1 = new THREE.Quatern
 let freeM = null;
 const freeMat = () => {if (freeM) return freeM; const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {text: 'Tu marca aquí', sub: 'Toca el vagón para ponerla', bg: '#16213f', tag: 'Libre'}); return freeM = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.82, .82, .82)})};
 
+/* haz del faro: se apaga en los bordes y cerca de la cámara, para que no se vea el cono */
+const HAZ = new THREE.ShaderMaterial({transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, vertexShader: 'varying vec3 n,p;varying float u;void main(){vec4 m=modelViewMatrix*vec4(position,1.);n=normalMatrix*normal;p=m.xyz;u=uv.y;gl_Position=projectionMatrix*m;}', fragmentShader: 'varying vec3 n,p;varying float u;void main(){float k=pow(abs(dot(normalize(n),normalize(p)))+1e-4,2.2)*pow(max(u,0.),1.5)*smoothstep(9.,34.,-p.z);gl_FragColor=vec4(vec3(.3,.23,.12)*k,1.);}'});
+
 export class Tren {
   constructor(par, T, {wagons = 4, body = 0x0e4a31, trim = 0xb3121f, cols = ['#8f1d24', '#16492f', '#1f3a6b', '#e6d8b8']} = {}) {
     this.T = T; this.s = 0; this.w = 0; this.g = new THREE.Group(); par.add(this.g); this.ads = []; this.wag = [];
@@ -30,7 +33,7 @@ export class Tren {
     // faro con su haz y luces de cola
     const L = this.cars[0], lp = L.userData.lamp, lens = new THREE.Mesh(SPH(.21, 14, 10), M.lamp); lens.position.copy(lp); L.add(lens);
     const cg = new THREE.ConeGeometry(3.6, 20, 24, 1, true); cg.translate(0, -10, 0); cg.rotateZ(Math.PI / 2);
-    this.beam = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({map: coneTex, color: new THREE.Color(.22, .17, .09), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false})); this.beam.position.set(lp.x + .2, lp.y, lp.z); L.add(this.beam);
+    this.beam = new THREE.Mesh(cg, HAZ); this.beam.position.set(lp.x + .2, lp.y, lp.z); L.add(this.beam);
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(11, 7).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({map: dotTex, color: new THREE.Color(.5, .36, .16), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending})); glow.position.set(9, RT + .05, 0); L.add(glow);
     this.pose();
   }

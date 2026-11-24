@@ -1,11 +1,12 @@
 /* El calendario: qué escaparate toca cada día, a qué hora se enciende y qué escenas especiales hay. Sin DOM ni red.
    Todo sale del reloj del dispositivo: no hay servidor. */
 export const N = 24, HORA = 18;
-/* un escaparate por día: rótulo de la tienda y si admite marca (en los días clave de la historia, no) */
+/* un escaparate por día: rótulo de la tienda, nombre de su momento y si va sin marca (el 24) */
 export const DIAS = [
-  ['La Estación'], ['Confitería'], ['Relojería'], ['La Cumbre'], ['Librería'], ['Mercería'], ['La Feria'], ['Polo Norte'], ['Correos'], ['La Ciudad'], ['Panadería'], ['Fotografía'],
-  ['El Refugio'], ['Juguetería'], ['Zapatería'], ['Bombillas'], ['Planetario'], ['La Estación', 1], ['Música'], ['Ropa usada', 1], ['Sombrerería'], ['Viajes'], ['Bellas Artes'], ['Feliz Navidad', 1],
-].map(([rotulo, sinMarca], i) => ({d: i + 1, rotulo, sinMarca: !!sinMarca}));
+  ['La Estación', 'La nariz en el cristal'], ['Confitería', 'Sin quitar ojo'], ['Relojería', 'Que no me voy'], ['La Cumbre', '¡Bola va!'], ['Librería', 'Chu-chu'], ['Mercería', 'Manos calentitas'], ['La Feria', 'La noria'], ['Polo Norte', 'Dibujar en el vaho'],
+  ['Correos', 'La carta'], ['La Ciudad', '¿Qué miran?'], ['Panadería', '¡Quema!'], ['Fotografía', 'La foto'], ['El Refugio', 'La gran nevada'], ['Juguetería', 'El silbato'], ['Zapatería', 'Las huellas'], ['Bombillas', 'Se hizo la luz'],
+  ['Planetario', 'Pide un deseo'], ['Modelismo', 'La carrera'], ['Música', 'El baile'], ['Sastrería', 'El señor de rojo'], ['Sombrerería', 'La chistera'], ['Viajes', '¡Pasajeros al tren!'], ['Bellas Artes', 'Todos los trenes'], ['Feliz Navidad', 'Como entonces', 1],
+].map(([rotulo, momento, sinMarca], i) => ({d: i + 1, rotulo, momento, sinMarca: !!sinMarca}));
 /* después del 24: campanadas, cabalgata y mañana de Reyes (días 25, 26 y 27 de la vista previa) */
 export const EXTRAS = {25: 'campanadas', 26: 'cabalgata', 27: 'reyes'}, ULTIMO = 27;
 const at = (y, m, d, h = HORA) => new Date(y, m, d, h, 0, 0, 0);
@@ -30,7 +31,3 @@ export function falta(hasta, now = new Date()) {
 }
 /* hasta qué escaparate se puede andar (el último es el de mañana, tapado) */
 export const tope = ab => Math.min(N - 1, ab);
-/* ropa de cada día: guantes hasta el 5, abrigo rojo hasta el 15; desde el 6 el niño lleva los guantes de ella, desde el 15 botas nuevas y desde el 17 ella lleva su bufanda */
-export const ropaDe = d => ({guantes: d < 6, abrigo: d < 16, botas: d >= 15, manoplas: d >= 6, bufandaNino: d < 17, bufandaRoja: d >= 17});
-/* con la escena del día aún por ver: la de la víspera, salvo el 16 (ya llega sin el abrigo) */
-export const ropaAntes = d => ropaDe(d === 16 ? 16 : Math.max(1, d - 1));
