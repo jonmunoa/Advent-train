@@ -14,7 +14,7 @@ button{font:inherit;color:inherit;-webkit-user-select:none;user-select:none;touc
 body.lowq::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 95% at 50% 46%,transparent 55%,rgba(4,6,16,.55) 100%)}
 
 .hud{transition:opacity 500ms ease}
-body.quieto .hud{opacity:.28}
+body.quieto .hud{opacity:.28}body.quieto #bTi{opacity:.8}
 body.espera .hud{opacity:0;pointer-events:none}
 .top{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:calc(12px + var(--safe-t)) 16px 0;pointer-events:none}
 .top>*{pointer-events:auto}
