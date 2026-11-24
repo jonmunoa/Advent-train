@@ -2,7 +2,9 @@
    mirar los trenes de los escaparates: uno por día, y en cada uno una escena de la historia (esc-escenas.js). El paseo va solo y la cámara va detrás del niño. Al pinchar un escaparate se entra en él y se recorre con la
    cámara de mapa (esc-vista.js). Dos escenas con la misma cámara: la calle y lo que hay dentro de los escaparates, con su
    propia luz (ahí van también el cristal y la nieve que cae). Sin servidor: las marcas salen de esc-marcas.js. */
-import {THREE, QS, coarse, LOWQ, REDUCED, CUT, lerp, clamp, sstep, tick, canvasTex, dotTex, puffTex, loadModels, drawAd, hostOf, AD_W, AD_H, AD_BG, logoURL, loadImg, BX} from './kit.js';
+import {TIPOS, TREN_DE} from './esc-trenes.js';
+import {haceJuguetes} from './esc-juguetes.js';
+import {THREE, QS, coarse, LOWQ, REDUCED, CUT, lerp, clamp, sstep, tick, canvasTex, dotTex, puffTex, drawAd, hostOf, AD_W, AD_H, AD_BG, logoURL, loadImg, BX} from './kit.js';
 import {Post} from './esc-post.js';
 import {Vista, FOVD} from './esc-vista.js';
 import {Mundo} from './esc-mundos.js';
@@ -254,7 +256,7 @@ function entrar(n, {car} = {}) {
   const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = n; E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundo(n); m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.envolver(); separa(m.domo, 'dentro'); reflejos(m.domo, .5); vista.entra(m, {...(directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.9}), cine: car === undefined && CINE}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
   if (cerca) fn(false); else dip(() => fn(true));
 }
-function cambia(n) {dip(() => {const v = MU.get(E.k); if (v) {v.modo(0); v.g.visible = false} E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = E.k = n; E.x = WX(n); aLaVentana(); const m = mundo(n); m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5, cine: CINE}); caption(); hideCard(); if (!FAST) bells()})}
+function cambia(n) {dip(() => {const v = MU.get(E.k); if (v) {v.modo(0); v.g.visible = false} E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = E.k = n; E.x = WX(n); aLaVentana(); const m = mundo(n); m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5, cine: CINE}); caption(); diCual(); hideCard(); if (!FAST) bells()})}
 function salir() {
   if (E.st !== 'dentro') return; hideCard(); camera.getWorldDirection(v1); const lej = camera.position.z < -30 || v1.z > -.25; const fn = corte => {vista.sale(); madre.g.visible = nino.g.visible = true; E.st = 'mira'; E.t = 0; E.idle = 0; E.u = corte ? .7 : .95; E.uT = .12; E.manual = false; E.az = E.azT = E.el = E.elT = 0; if (corte) {E.md = 0; const m = MU.get(E.k); if (m) m.modo(0); cam.p.set(WX(E.n), 66, 34); cam.l.set(WX(E.n), 52, -36)} document.body.classList.remove('dentro'); verCalle = true; caption()};
   if (lej) dip(() => fn(true)); else fn(false);
@@ -279,7 +281,7 @@ function rayo(x, y) {ND.set(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2); RC
 /* qué hay bajo el dedo: un vagón o un rótulo (su marca) o el hueco de un escaparate */
 function queHay(x, y) {
   const R = rayo(x, y), px = 2 * Math.tan(camera.fov * Math.PI / 360) / innerHeight; let best = null, bt = 1e9;
-  {const m = MU.get(E.n); if (m && m.g.visible && E.st === 'mira' && !tapado(E.n) && m.tren.g.visible) m.tren.wag.forEach((W, i) => {if (m.tren.inTunnel(i + 2)) return; W.updateWorldMatrix(true, false); inv.copy(W.matrixWorld).invert(); ry.copy(R).applyMatrix4(inv); const e = 7 * px * v3.setFromMatrixPosition(W.matrixWorld).distanceTo(R.origin) / K; bx.min.set(-3.7 - e, .4 - e, -1.6 - e); bx.max.set(3.7 + e, 4.7 + e, 1.6 + e); const h = ry.intersectBox(bx, v2); if (h) {const t = h.applyMatrix4(W.matrixWorld).distanceTo(R.origin); if (t < bt) {bt = t; best = {n: E.n, sitio: i + 1}}}})}
+  {const m = MU.get(E.n); if (m && m.g.visible && E.st === 'mira' && !tapado(E.n) && m.tren.g.visible) m.tren.wag.forEach((W, i) => {if (m.tren.inTunnel(W.userData.ci)) return; W.updateWorldMatrix(true, false); inv.copy(W.matrixWorld).invert(); ry.copy(R).applyMatrix4(inv); const e = 7 * px * v3.setFromMatrixPosition(W.matrixWorld).distanceTo(R.origin) / K; bx.min.set(-3.7 - e, .4 - e, -1.6 - e); bx.max.set(3.7 + e, 4.7 + e, 1.6 + e); const h = ry.intersectBox(bx, v2); if (h) {const t = h.applyMatrix4(W.matrixWorld).distanceTo(R.origin); if (t < bt) {bt = t; best = {n: E.n, sitio: i + 1}}}})}
   for (const L of locs) {if (!L.rot.visible) continue; L.g.updateMatrixWorld(); const h = RC.intersectObject(L.rot, false)[0]; if (h && h.distance < bt) {bt = h.distance; best = {n: L.n, sitio: 'rotulo'}}}
   if (best) return best; const t = -R.origin.z / R.direction.z; if (!(t > 0)) return null; const X = R.origin.x + R.direction.x * t, Y = R.origin.y + R.direction.y * t, n = Math.round(X / PASO); return n >= 0 && n < N && Math.abs(X - n * PASO) < VX + 16 && Y > 4 && Y < VY1 + 8 && Math.abs(X - camera.position.x) < 1300 ? {n, sitio: 'cristal'} : null;
 }
@@ -315,7 +317,10 @@ $('adSee').onclick = async () => {if (cleanUrl(ed.url) === null) {adOk(); return
 $('prevBack').onclick = async () => {await finPrevia(); openAd()};
 
 /* ================= interfaz ================= */
-function caption() {const n = E.n, c = tapado(n); $('capN').textContent = c ? `${n + 1} de diciembre` : MAPS[n].nombre; $('capS').textContent = E.st === 'dentro' ? `Escaparate ${n + 1} de ${N}` : c ? n === AB() - 1 ? 'A punto de encenderse' : `Se enciende ${n === AB() ? cuando() : `el ${n + 1}`}` : E.st === 'mira' ? `Escaparate ${n + 1} de ${N} · entrar` : E.st === 'inicio' ? '' : `De camino al escaparate ${n + 1}`; $('bPrev').disabled = n <= 0; $('bNext').disabled = n >= TOPE(); document.body.classList.toggle('conesc', E.st === 'mira' && !c); document.body.classList.toggle('contienda', (E.st === 'mira' || E.st === 'dentro') && hayTienda(n)); document.body.classList.toggle('previa', !!CAL.previa); if (CAL.previa) $('pvT').textContent = CAL.extra ? {campanadas: '31 de diciembre', cabalgata: '5 de enero', reyes: '6 de enero'}[CAL.extra] : `${CAL.previa} de diciembre`}
+const nomTren = n => TIPOS[TREN_DE[n]].nombre; let cualT = 0;
+/* en el modo de fondo, el nombre del tren al cambiar de escaparate */
+function diCual() {if (!FON) return; $('cuN').textContent = nomTren(E.n); $('cuS').textContent = `Escaparate ${E.n + 1} · ${MAPS[E.n].nombre}`; $('cual').classList.add('on'); clearTimeout(cualT); cualT = setTimeout(() => $('cual').classList.remove('on'), 6500)}
+function caption() {const n = E.n, c = tapado(n); $('capN').textContent = c ? `${n + 1} de diciembre` : MAPS[n].nombre; $('capS').textContent = E.st === 'dentro' ? `${nomTren(n)} · ${n + 1} de ${N}` : c ? n === AB() - 1 ? 'A punto de encenderse' : `Se enciende ${n === AB() ? cuando() : `el ${n + 1}`}` : E.st === 'mira' ? `Escaparate ${n + 1} de ${N} · entrar` : E.st === 'inicio' ? '' : `De camino al escaparate ${n + 1}`; $('bPrev').disabled = n <= 0; $('bNext').disabled = n >= TOPE(); document.body.classList.toggle('conesc', E.st === 'mira' && !c); document.body.classList.toggle('contienda', (E.st === 'mira' || E.st === 'dentro') && hayTienda(n)); document.body.classList.toggle('previa', !!CAL.previa); if (CAL.previa) $('pvT').textContent = CAL.extra ? {campanadas: '31 de diciembre', cabalgata: '5 de enero', reyes: '6 de enero'}[CAL.extra] : `${CAL.previa} de diciembre`}
 /* vista previa: cambiar de día */
 function ponDia(d) {d = clamp(d, 1, ULTIMO); dip(() => {if (E.st === 'dentro') {vista.sale(); document.body.classList.remove('dentro'); const m = MU.get(E.k); if (m) m.modo(0); E.md = 0} ESCN.fin(true); document.body.classList.remove('escena'); $('fin').classList.remove('on'); CAL = previaDe(d); vistas.clear(); E.oscuro = 1; coloca0(); E.st = 'paseo'; caption()})}
 function coloca0() {E.n = CAL.extra ? especial[CAL.extra] : Math.max(0, AB() - 1); E.dir = 1; E.rumbo = 1; E.x = WX(E.n) - 262; E.vel = 0; E.t = 0; E.k = E.n; vestir(); madre.g.position.set(E.x, 0, ZM); nino.g.position.set(E.x + DX, 0, ZN); madre.yaw = nino.yaw = 0; E.az = E.azT = E.el = E.elT = E.zs = E.zsT = 0; detras(0, cam.p, cam.l, 46)}
@@ -344,9 +349,9 @@ function fondo(v) {
   if (v) {
     if (E.st === 'escena' || !listo) return; if (E.st === 'inicio') empezar(); const L = abiertos(); if (!L.length) {toast('Primero mira cómo se enciende el escaparate de hoy'); return}
     au(); if (!sonidoOn()) mudo(); FON = {t: 0, mov: performance.now(), wl: null, full: false}; document.body.classList.add('fondo'); hideCard(); $('tiSheet').classList.remove('on'); if (modal()) closeAd(); CINE = true;
-    if (E.st !== 'dentro' || tapado(E.n)) entrar(tapado(E.n) ? L[L.length - 1] : E.n); else {vista.setFocus(null); vista.setCine(true)} bloqueo(true); mueve(); anuncia(); pintaPista(cancion());
+    if (E.st !== 'dentro' || tapado(E.n)) entrar(tapado(E.n) ? L[L.length - 1] : E.n); else {vista.setFocus(null); vista.setCine(true)} bloqueo(true); mueve(); anuncia(); diCual(); pintaPista(cancion());
     if (FULL.requestFullscreen && !document.fullscreenElement && !FAST) FULL.requestFullscreen({navigationUI: 'hide'}).then(() => {if (FON) FON.full = true}).catch(() => {});
-  } else {bloqueo(false); const f = FON.full; FON = null; document.body.classList.remove('fondo', 'mueve'); $('ahora').classList.remove('on'); if (f && document.fullscreenElement) document.exitFullscreen().catch(() => {}); despierta()}
+  } else {bloqueo(false); const f = FON.full; FON = null; document.body.classList.remove('fondo', 'mueve'); $('ahora').classList.remove('on'); $('cual').classList.remove('on'); if (f && document.fullscreenElement) document.exitFullscreen().catch(() => {}); despierta()}
 }
 function mueve() {if (!FON) return; FON.mov = performance.now(); document.body.classList.add('mueve')}
 function otroTren() {const L = abiertos(); if (L.length < 2 || !FON) return; FON.t = 0; const i = L.indexOf(E.n); cambia(L[(i + 1) % L.length])}
@@ -357,7 +362,7 @@ document.addEventListener('fullscreenchange', () => {if (FON && FON.full && !doc
 const oI = new THREE.Matrix4(), oV = new THREE.Vector3(), oO = {T: null, s: 0, w: 0, off: null, c: [0, 14, 58], d: [1, 0], nivel: 0};
 function escucha() {
   const m = MU.get(E.k), st = E.st, nv = st === 'dentro' ? 1 : st === 'mira' ? .5 + .4 * E.u : st === 'escena' ? .45 : st === 'llega' || st === 'sale' ? .16 : 0; if (!m || !nv || casaOn || tapado(E.n)) {callaTren(); return}
-  oO.T = m.T; oO.s = m.tren.s; oO.w = m.tren.w; oO.off = m.tren.off; oO.nivel = nv; if (st === 'dentro') {oI.copy(m.g.matrixWorld).invert(); oV.copy(camera.position).applyMatrix4(oI); oO.c[0] = oV.x; oO.c[1] = oV.y; oO.c[2] = oV.z; const e = camera.matrixWorld.elements; oO.d[0] = e[0]; oO.d[1] = e[2]} else {oO.c[0] = 0; oO.c[1] = 14; oO.c[2] = 56; oO.d[0] = 1; oO.d[1] = 0} oyeTren(oO);
+  oO.T = m.T; oO.s = m.tren.s; oO.w = m.tren.w; oO.off = m.tren.off; oO.clase = m.tren.clase; oO.nivel = nv; if (st === 'dentro') {oI.copy(m.g.matrixWorld).invert(); oV.copy(camera.position).applyMatrix4(oI); oO.c[0] = oV.x; oO.c[1] = oV.y; oO.c[2] = oV.z; const e = camera.matrixWorld.elements; oO.d[0] = e[0]; oO.d[1] = e[2]} else {oO.c[0] = 0; oO.c[1] = 14; oO.c[2] = 56; oO.d[0] = 1; oO.d[1] = 0} oyeTren(oO);
 }
 const url = () => window.ADVX_ESC_URL || location.origin + location.pathname;
 $('bShare').onclick = async () => {const m = AB() && !CAL.extra ? `🚂 Día ${AB()} · «${DIAS[AB() - 1].momento}»\n` : '🚂 ', text = `${m}¿Te acuerdas de cuando te quedabas embobado mirando el tren de un escaparate?`; if (navigator.share) try {await navigator.share({title: 'El tren del escaparate', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(url()); toast('Enlace copiado: pégalo donde quieras')} catch (e) {toast('No se ha podido copiar el enlace')}};
@@ -391,7 +396,7 @@ const LM = THREE.DefaultLoadingManager, fotos = {n: 0, t: 0}; LM.onProgress = (u
 const texturas = async () => {const t0 = performance.now(); while (fotos.n < fotos.t && performance.now() - t0 < 5000) await new Promise(r => setTimeout(r, 40))};
 async function boot() {
   resize(); $('intro').classList.add('carga'); prog(.05); const fonts = document.fonts ? Promise.all(['400 80px "Alfa Slab One"', '500 40px Rubik', '400 40px Yesteryear'].map(f => document.fonts.load(f))).catch(() => {}) : null;
-  await Promise.all([loadModels(p => prog(.05 + p * .4)), cargaGente(['nino', 'madre', 'manos'])]); await fonts; const resto = cargaGente(['mayor', 'hombre', 'viejo']); if (REPARTO[CAL.abiertos] || CAL.extra) await resto;
+  await cargaGente(['nino', 'madre', 'manos', 'juguetes']); haceJuguetes(); prog(.4); await fonts; const resto = cargaGente(['mayor', 'hombre', 'viejo']); if (REPARTO[CAL.abiertos] || CAL.extra) await resto;
   for (let k = 0; k < 3; k++) {prog(.5 + k * .08, 'Abriendo las tiendas…'); await tick(); const t = new Tienda(k, ''); calle.add(t.g); tiendas.push(t); const cp = t.copia(); locs.push(new Local(t.g, k)); lejos.push(new Local(cp, k)); calle.add(cp)}
   prog(.76, 'Colgando las luces…'); await tick(); barrio = new Barrio(calle); huellas = new Huellas(calle); nieve = nevada(dentro, LOWQ ? 420 : 900); cristales(); await ponMarcas();
   prog(.86, 'Poniendo la bufanda…'); await tick(); vestir(); if (LOWQ) {ligero(dentro); ligero(calle)} else {barrio.planos[0].receiveShadow = barrio.planos[1].receiveShadow = true} separa(calle, 'calle'); separa(dentro, 'dentro'); reflejos(calle, .22);

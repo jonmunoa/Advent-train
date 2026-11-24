@@ -3,10 +3,11 @@
 import {THREE, mergeGeometries, rng, sstep, lerp, clamp, hash2, vnoise, fbm, LOWQ, M, HMAT, TM, canvasTex, phTex, dotTex, puffTex, blobTex, signTex, stoneTex, flat, inst, obj, house, santaFig, crowd, JACKETS, buildTree, mergeMeshes, geoOnly, fuse,
   BX, CY, CYX, TOR, DOME, SPH, PLN, roofGeo, GAUGE, boxU, o3, rep, WRAPS} from './kit.js';
 import {mapaOf, atM, KG, KT, KB, BW, BD, ICE_Y, pondE, pisteD, riverD} from './esc-vias.js';
+import {TREN_DE, TIPOS} from './esc-trenes.js';
 import {Tren} from './esc-tren.js';
 import {juntar} from './esc-geo.js';
 import {nevada} from './esc-calle.js';
-import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, cerca} from './esc-real.js';
+import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, catenaria, cerca} from './esc-real.js';
 
 const C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .6, ...o}), glow = (r, g, b) => new THREE.MeshBasicMaterial({color: new THREE.Color(r, g, b)});
 export const X = {
@@ -30,7 +31,7 @@ const CFG = [
 const mezcla = (s, j) => j === 0 ? s[0] : j === 1 ? '#' + new THREE.Color(s[0]).lerp(new THREE.Color(s[1]), .5).getHexString() : s[j - 1];
 export class Mundo {
   /* i: día - 1. q: estilo de partida (0 pueblo, 1 montaña, 2 polo); tema: colores del día (esc-dias.js) */
-  constructor(i, tema) {this.i = i; this.m = mapaOf(i); this.q = this.m.sem; this.tema = tema || null; const q = i; this.T = this.m.T; this.g = new THREE.Group(); this.anim = []; this.S = []; this.bulbs = [[], [], []]; this.smokeAt = []; this.r = rng(77 + q * 31); this.glows = []; this.taken = []; this.cfg = {...CFG[this.q], ...(tema ? tema.tren : null)}}
+  constructor(i, tema) {this.i = i; this.m = mapaOf(i); this.q = this.m.sem; this.tema = tema || null; const q = i; this.T = this.m.T; this.g = new THREE.Group(); this.anim = []; this.S = []; this.bulbs = [[], [], []]; this.smokeAt = []; this.r = rng(77 + q * 31); this.glows = []; this.taken = []; this.cfg = {...CFG[this.q], ...(tema ? tema.tren : null), tipo: TREN_DE[i] || 'americana'}}
   /* ---------- ayudas ---------- */
   gy(x, z) {const G = this.GR, fx = clamp((x - G.x0) / G.dx, 0, G.nx - 1.001), fz = clamp((z - G.z0) / G.dz, 0, G.nz - 1.001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, h = G.h, n = G.nx; return lerp(lerp(h[j * n + i], h[j * n + i + 1], u), lerp(h[(j + 1) * n + i], h[(j + 1) * n + i + 1], u), v)}
   slope(x, z) {return Math.hypot(this.gy(x + 1, z) - this.gy(x - 1, z), this.gy(x, z + 1) - this.gy(x, z - 1)) / 2}
@@ -47,7 +48,7 @@ export class Mundo {
   /* los pasos de montaje por separado: se pueden repartir entre fotogramas */
   pasos() {
     return [() => this.terreno(), () => {this.via(); this.puentes()}, () => this.bocas(), () => this[this.m.id](), () => this.bosque(), () => this.escenario(), () => this.cerrar(), () => {
-      this.tren = new Tren(this.g, this.T, {wagons: this.m.wagons, ...this.cfg}); this.tren.s = this.T.L * .1; if (this.trenes) {this.mas = []; for (let k = 1; k < this.trenes; k++) {const c = CFG[k], t = new Tren(this.g, this.T, {wagons: 3, ...c}); t.s = this.T.L * (.1 + k / this.trenes); this.mas.push(t)}}
+      this.tren = new Tren(this.g, this.T, this.cfg); this.tren.s = this.T.L * .1; if (this.trenes) {this.mas = []; for (let k = 1; k < this.trenes; k++) {const c = CFG[k], t = new Tren(this.g, this.T, {...c, wagons: 3, tipo: ['', 'grande', 'diesel'][k]}); t.s = this.T.L * (.1 + k / this.trenes); this.mas.push(t)}}
     }];
   }
   /* ---------- terreno, hielo y canto ---------- */
@@ -157,13 +158,18 @@ export class Mundo {
   /* globo aerostático */
   globo(x, y, z, a = X.red, b = X.icing) {const G = new THREE.Group(), L = [], pr = [[0, 0], [1.2, .4], [2.9, 2.6], [3.6, 5], [3, 7.2], [1.6, 8.6], [0, 9]].map(p => new THREE.Vector2(...p)); for (let k = 0; k < 12; k++) L.push([new THREE.LatheGeometry(new THREE.SplineCurve(pr).getPoints(18), 2, k / 12 * Math.PI * 2, Math.PI / 6), k % 2 ? a : b]); L.push([BX(1.5, 1.1, 1.5).translate(0, -2.6, 0), X.log]); for (const [p, q] of [[-.6, -.6], [.6, -.6], [-.6, .6], [.6, .6]]) L.push([CY(.04, .04, 2.6, 4).translate(p, -1.1, q), X.dark]); fuse(L, G); const f = new THREE.Mesh(new THREE.ConeGeometry(.4, 1.1, 8), glow(4, 1.8, .5)); f.position.y = -.9; G.add(f); this.g.add(G); this.anim.push(t => {G.position.set(x + Math.sin(t * .13) * 9, y + Math.sin(t * .4) * 1.6, z + Math.cos(t * .11) * 4); G.rotation.y = t * .1; f.scale.y = 1 + Math.sin(t * 13) * .25})}
   /* Papá Noel en el trineo, dando vueltas por el cielo del escaparate */
-  trineo(cx, cy, cz, rx, rz, w = .16) {const G = new THREE.Group(), P = []; const sl = obj('sled', 1.9); sl.rotation.y = Math.PI / 2; P.push(sl); const sa = santaFig(); sa.g.scale.setScalar(.72); sa.g.position.set(-.3, .55, 0); P.push(sa.g); for (const [x, z] of [[4.4, -.8], [4.4, .8], [7.2, -.8], [7.2, .8]]) {const d = obj('deer', 2.5); d.position.set(x, 0, z); d.rotation.y = Math.PI / 2; P.push(d)} P.forEach(o => G.add(o)); G.updateMatrixWorld(true); const ms = []; G.traverse(o => {if (o.isMesh) ms.push(o)}); const mm = mergeMeshes(ms); G.clear(); mm.forEach(m => {m.castShadow = false; G.add(m)}); this.g.add(G);
+  trineo(cx, cy, cz, rx, rz, w = .16) {const G = new THREE.Group(), P = []; const sl = obj('sleigh', 2.1); sl.rotation.y = Math.PI / 2; P.push(sl); const sa = santaFig(); sa.g.scale.setScalar(.72); sa.g.position.set(-.3, .55, 0); P.push(sa.g); for (const [x, z] of [[4.4, -.8], [4.4, .8], [7.2, -.8], [7.2, .8]]) {const d = obj('deer', 2.5); d.position.set(x, 0, z); d.rotation.y = Math.PI / 2; P.push(d)} P.forEach(o => G.add(o)); G.updateMatrixWorld(true); const ms = []; G.traverse(o => {if (o.isMesh) ms.push(o)}); const mm = mergeMeshes(ms); G.clear(); mm.forEach(m => {m.castShadow = false; G.add(m)}); this.g.add(G);
     this.anim.push(t => {const a = t * w; G.position.set(cx + Math.cos(a) * rx, cy + Math.sin(a * 2) * 2.4, cz + Math.sin(a) * rz); G.rotation.set(0, -Math.atan2(Math.cos(a) * rz, -Math.sin(a) * rx), Math.cos(a * 2) * .12, 'YZX')})}
   /* lo que hay junto a la vía: postes con sus cables, cercas, piedras y hierba seca */
   orilla() {
     const T = this.T, R = rng(500 + this.i * 13), m = this.m, campo = this.q !== 2 && (!this.tema || this.tema.bosque > 0), suelo = (x, z, r, d) => Math.abs(x) < BW - 2 && z > -BD + 2 && z < BD - 2 && m.near(x, z, 12).d > d && pondE(m, x, z) > 1.08 + r / 20 && riverD(m, x, z) > r + 2.4 && pisteD(m, x, z) > r + 4 && this.gy(x, z) > ICE_Y + .5 && this.taken.every(([a, b, q]) => Math.hypot(a - x, b - z) > q + r);
-    if (campo) {
+    if ((TIPOS[this.cfg.tipo] || {}).catenaria) {
+      const paso = 12, n = Math.floor(T.L / paso), d = T.L / n, L = [], P = [], bajo = p => {for (let i = 0; i < T.N; i += 2) if (T.y[i] > p.y + 3 && T.y[i] < p.y + 10 && Math.hypot(T.x[i] - p.x, T.z[i] - p.z) < 4) return true; return false}; let sd = -1; for (let i = 0; i < n; i++) {const s = i * d, p = atM(T, s), k = T.k[Math.floor(s / T.ds) % T.N]; if (Math.abs(Math.cos(p.a)) > .3) sd = Math.cos(p.a) > 0 ? -1 : 1; const x = p.x - Math.sin(p.a) * sd * 2.7, z = p.z + Math.cos(p.a) * sd * 2.7; if (k === KT || bajo(p) || this.taken.some(([a, b, q]) => Math.hypot(a - x, b - z) < q) || m.other(Math.floor(s / T.ds) % T.N, x, z, 2.4)) {L.push(null); continue} L.push([x, p.y, z, p.a, sd, k === KB ? -.8 : this.gy(x, z) - p.y - .1]); this.take(x, z, .4, 7)}
+      for (let i = 0; i < n * 8; i++) {const s = i * d / 8, p = atM(T, s), k = T.k[Math.floor(s / T.ds) % T.N], u = (i % 8) / 8; P.push(k === KT || bajo(p) ? null : [p.x, p.y, p.z, Math.sin(u * Math.PI)])} P.push(P[0]); catenaria(L, P, (x, y, z, r) => this.at(x, y, z, r), this.g);
+    } else if (campo) {
       const L = []; let sd = -1, quita = 0; for (let s = 0; s < T.L - 6; s += 12.5) {const p = atM(T, s), k = T.k[Math.floor(s / T.ds) % T.N]; if (Math.abs(Math.cos(p.a)) > .3) sd = Math.cos(p.a) > 0 ? -1 : 1; const x = p.x - Math.sin(p.a) * sd * 3.7, z = p.z + Math.cos(p.a) * sd * 3.7; if (k !== KG || !suelo(x, z, .3, 3) || this.slope(x, z) > .9) {L.push(null); continue} L.push([x, this.gy(x, z), z, p.a]); quita++} const L2 = L.map((q, i) => q && (L[i - 1] || L[i + 1]) ? q : null); telegrafo(L2, (x, y, z, r) => this.at(x, y, z, r), this.g); for (const q of L2) if (q) this.take(q[0], q[2], .5, 5.4);
+    }
+    if (campo) {
       let nc = 0; for (let t = 0; t < 160 && nc < 7; t++) {const s0 = R() * T.L, l = 8 + R() * 8, lado = R() < .5 ? -1 : 1, d = 3.5 + R() * 1.6, P = []; let ok = true; for (let q = 0; q <= l && ok; q += 1.9) {const p = atM(T, s0 + q), x = p.x - Math.sin(p.a) * lado * d, z = p.z + Math.cos(p.a) * lado * d; ok = T.k[Math.floor(((s0 + q) % T.L) / T.ds) % T.N] === KG && suelo(x, z, .4, 3) && this.slope(x, z) < .5; P.push([x, this.gy(x, z), z])} if (!ok) continue; cerca(P, (x, y, z, r) => this.at(x, y, z, r)); P.forEach(([x, , z]) => this.take(x, z, .7)); nc++}
     }
     const pi = [], hi = [], br = []; for (let t = 0; t < 900 && pi.length < (LOWQ ? 40 : 80); t++) {const s = R() * T.L, p = atM(T, s); if (T.k[Math.floor(s / T.ds) % T.N] !== KG) continue; const d = (2.3 + Math.pow(R(), 2) * 5) * (R() < .5 ? -1 : 1), x = p.x - Math.sin(p.a) * d, z = p.z + Math.cos(p.a) * d; if (!suelo(x, z, .2, 2.1)) continue; pi.push({x, z, y: this.gy(x, z) - .04, h: .12 + Math.pow(R(), 3) * .42, r: R() * 6})} rocas(pi, this.g, true);
@@ -314,7 +320,7 @@ export class Mundo {
   puff(x, y, z, vx, vy, vz, sz, op, life) {const p = this.sm[this.smI = (this.smI + 1) % this.sm.length]; Object.assign(p, {l: 1, ml: life, x, y, z, vx, vy, vz, sz, op})}
   update(dt, t) {
     if (!this.tren.parado) this.tren.step(dt); if (this.mas) for (const k of this.mas) k.step(dt); for (const f of this.anim) f(t, dt);
-    this.smT += dt; if (this.smT > .16) {this.smT = 0; if (!this.tren.parado && !this.tren.inTunnel(0)) {this.g.updateWorldMatrix(true, false); const c = this.g.worldToLocal(this.tren.chimney(_v2)); this.puff(c.x, c.y, c.z, (Math.random() - .5) * .8, 3.6 + Math.random(), (Math.random() - .5) * .8, 1.5, .34, 2)} if (this.smokeAt.length && ++this.smC % 2) {const s = this.smokeAt[this.smC % this.smokeAt.length | 0] || this.smokeAt[0], q = this.smokeAt[Math.random() * this.smokeAt.length | 0]; this.puff(q.x, q.y, q.z, .3, 1.6, 0, 1.1, .26, 2.6)}}
+    this.smT += dt; if (this.smT > .16) {this.smT = 0; {const ch = this.tren.cars[0].userData.chorro; if (ch && !this.tren.parado && !this.tren.inTunnel(0)) {const c0 = this.tren.cars[0], r = c0.rotation.y; for (const s of [-1, 1]) {_v2.set(ch.x, ch.y, s * ch.z); c0.localToWorld(_v2); this.g.worldToLocal(_v2); this.puff(_v2.x, _v2.y, _v2.z, Math.sin(r) * s * 3.4 + (Math.random() - .5), 2.2 + Math.random() * 1.4, Math.cos(r) * s * 3.4 + (Math.random() - .5), .8, .42, 1.1)}}} if (!this.tren.parado && !this.tren.inTunnel(0)) {this.g.updateWorldMatrix(true, false); const h = this.tren.chimney(_v2), c = h && this.g.worldToLocal(h); if (c)  this.puff(c.x, c.y, c.z, (Math.random() - .5) * .8, 3.6 + Math.random(), (Math.random() - .5) * .8, 1.5, .34, 2)} if (this.smokeAt.length && ++this.smC % 2) {const s = this.smokeAt[this.smC % this.smokeAt.length | 0] || this.smokeAt[0], q = this.smokeAt[Math.random() * this.smokeAt.length | 0]; this.puff(q.x, q.y, q.z, .3, 1.6, 0, 1.1, .26, 2.6)}}
     const pos = this.smG.attributes.position.array, sa = this.smG.attributes.sa.array; this.sm.forEach((p, i) => {if (p.l <= 0) {sa[i * 2 + 1] = 0; return} p.l -= dt / p.ml; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vy *= Math.exp(-.5 * dt); p.sz += dt * 1.3; pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; sa[i * 2] = p.sz; sa[i * 2 + 1] = Math.max(0, p.l) * p.op}); this.smG.attributes.position.needsUpdate = this.smG.attributes.sa.needsUpdate = true;
   }
 }

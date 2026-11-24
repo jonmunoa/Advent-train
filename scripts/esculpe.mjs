@@ -11,6 +11,7 @@ import {quantize, reorder} from '@gltf-transform/functions';
 import {MeshoptEncoder, MeshoptSimplifier} from 'meshoptimizer';
 import {CABEZAS, OJOS} from './esculpe-cabezas.mjs';
 import {manos} from './esculpe-manos.mjs';
+import {juguetes} from './esculpe-juguetes.mjs';
 import {rejilla, malla, compacta, normales} from './esculpe-sdf.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'), OUT = join(ROOT, 'm/gente'); mkdirSync(OUT, {recursive: true});
@@ -48,4 +49,4 @@ for (const id of Object.keys(CABEZAS)) {
   await guarda(id, mallas); console.log('  ', bruto, '→', M.ix.length / 3, '·', ((Date.now() - t0) / 1000).toFixed(1) + ' s');
 }
 writeFileSync(join(ROOT, 'src/esc-medidas.js'), `/* generado por scripts/esculpe.mjs: los ojos de cada cabeza */\nexport const MEDIDAS = ${JSON.stringify(OJOS)};\n`);
-if (!CUALES.length || CUALES.includes('manos')) {const o = {}; for (const [id, H] of Object.entries(manos())) {const g = rejilla(H.caja, H.paso * (BASTO ? 1.7 : 1)); let M = malla(H.f, g); normales(H.f, M, 4e-4); M.c = H.pinta(M); M = simplifica(M, H.tris); normales(H.f, M, 4e-4); M.c = H.pinta(M); o[id] = une([M, ...(H.extras ? H.extras() : [])])} await guarda('manos', o)}
+for (const [grupo, hace] of [['manos', manos], ['juguetes', juguetes]]) if (!CUALES.length || CUALES.includes(grupo)) {const o = {}; for (const [id, H] of Object.entries(hace())) {const g = rejilla(H.caja, H.paso * (BASTO ? 1.7 : 1)); let M = malla(H.f, g); normales(H.f, M, 4e-4); M.c = H.pinta(M); M = simplifica(M, H.tris); normales(H.f, M, 4e-4); M.c = H.pinta(M); o[id] = une([M, ...(H.extras ? H.extras() : [])])} await guarda(grupo, o)}

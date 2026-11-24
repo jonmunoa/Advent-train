@@ -234,6 +234,7 @@ body.fondo.mueve .fon{opacity:1;visibility:visible;transform:translate(-50%,0);t
 .ahora{position:fixed;left:22px;bottom:calc(22px + var(--safe-b));z-index:9;display:flex;gap:12px;align-items:baseline;margin:0;max-width:min(420px,70vw);pointer-events:none;text-shadow:0 1px 10px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.6);opacity:0;transform:translateY(6px);transition:opacity 700ms ease,transform 700ms var(--ease-out)}
 .ahora.on{opacity:1;transform:none}
 body.mueve .ahora,body:not(.fondo) .ahora{opacity:0}
+.cual{left:auto;right:22px;text-align:right}
 .ahora i{font-size:22px}.ahora b{display:block;font:400 19px/1.2 'Alfa Slab One',Georgia,serif}.ahora small{font-size:13.5px;opacity:.85}
 @media (max-width:560px){.son{left:12px;right:12px;top:auto;bottom:calc(14px + var(--safe-b));width:auto;z-index:16;transform-origin:50% 100%;transform:translateY(16px)}.son label{min-height:46px}.fon{flex-wrap:wrap;justify-content:center;width:calc(100vw - 24px);padding:10px;border-radius:22px}.fon-c{width:100%;justify-content:center;margin:0 0 4px}.fon button{flex:1;padding:0 8px;background:rgba(251,243,223,.1)}.ahora b{font-size:17px}}
 @media (prefers-reduced-motion:reduce){.son,.fon,.ahora{transition-duration:1ms!important}}

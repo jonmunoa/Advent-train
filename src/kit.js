@@ -2,7 +2,6 @@
    y los paneles de las marcas. Sin escena ni cámara: quien lo usa monta lo suyo. Sale de tren.js. */
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {rng} from './sim.js';
 
 export const QS=new URLSearchParams(location.search),coarse=matchMedia('(pointer:coarse)').matches,LOWQ=coarse||QS.has('movil'),REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -92,24 +91,20 @@ Object.assign(M,{
 function boxU(w,h,d,k=3){const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv,dims=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];for(let f=0;f<6;f++)for(let v=0;v<4;v++){const i=f*4+v;uv.setXY(i,uv.getX(i)*dims[f][0]/k,uv.getY(i)*dims[f][1]/k)}return g}
 
 /* ================= modelos 3D (Kenney, CC0) ================= */
-const MD={};const toyCache=new Map();
+const MD={};
 /* los árboles y juguetes que quedan entre la cámara y el coche que se sigue no se dibujan (un cono que descarta sus píxeles) */
 const CUT={a:{value:new THREE.Vector3()},b:{value:new THREE.Vector3()},r:{value:0}};
 function cutMat(m,k=1,t=.985){m.onBeforeCompile=sh=>{sh.uniforms.cutA=CUT.a;sh.uniforms.cutB=CUT.b;sh.uniforms.cutR=CUT.r;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vCutP;').replace('#include <project_vertex>','#include <project_vertex>\n{vec4 cp=vec4(transformed,1.);\n#ifdef USE_INSTANCING\ncp=instanceMatrix*cp;\n#endif\nvCutP=(modelMatrix*cp).xyz;}');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vCutP;uniform vec3 cutA,cutB;uniform float cutR;').replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif(cutR>.01){vec3 ab=cutB-cutA;float t=clamp(dot(vCutP-cutA,ab)/dot(ab,ab),0.,1.);if(t<'+t.toFixed(3)+'&&length(vCutP-cutA-ab*t)<cutR*'+k.toFixed(2)+'*(.25+.75*t))discard;}')};m.customProgramCacheKey=()=>'cut'+k+t;return m}
-function toyMat(m,phys,kit){const k=(m.map?'kit:'+kit:'c'+m.color.getHex())+(phys?'p':'');/* mismo kit = misma textura: un solo material */if(!toyCache.has(k)){if(m.map)m.map.anisotropy=4;const o={map:m.map||null,color:m.map?0xffffff:m.color,roughness:phys?.36:.5,metalness:0,side:THREE.FrontSide};toyCache.set(k,cutMat(phys?new THREE.MeshPhysicalMaterial({...o,clearcoat:.7,clearcoatRoughness:.14}):new THREE.MeshStandardMaterial(o)))}return toyCache.get(k)}
-const MODELS={treeA:'holiday/tree-snow-a.glb',treeB:'holiday/tree-snow-b.glb',treeC:'holiday/tree-snow-c.glb',treeD:'holiday/tree-decorated-snow.glb',deer:'holiday/reindeer.glb',snowman:'holiday/snowman-hat.glb',nut:'holiday/nutcracker.glb',ginger:'holiday/gingerbread-man.glb',ginger2:'holiday/gingerbread-woman.glb',lantern:'holiday/lantern.glb',presA:'holiday/present-a-cube.glb',presB:'holiday/present-b-round.glb',presC:'holiday/present-a-rectangle.glb',presD:'holiday/present-b-cube.glb',caneR:'holiday/candy-cane-red.glb',caneG:'holiday/candy-cane-green.glb',sled:'holiday/sled.glb',bench:'holiday/bench.glb',flakeA:'holiday/snowflake-a.glb',flakeB:'holiday/snowflake-b.glb',rocks:'holiday/rocks-medium.glb',pile:'holiday/snow-pile.glb',sock:'holiday/sock-red-cane.glb',sock2:'holiday/sock-green-cane.glb',wreath:'holiday/wreath-decorated.glb'};
-async function loadModels(onp){const L=new GLTFLoader(),keys=Object.keys(MODELS);let n=0;
-  await Promise.all(keys.map(async k=>{const g=await L.loadAsync('m/'+MODELS[k]),sc=g.scene,toy=MODELS[k].startsWith('train/');
-    sc.traverse(o=>{if(o.isMesh){o.material=toyMat(o.material,toy,MODELS[k].split('/')[0]);o.castShadow=true;o.receiveShadow=true}});sc.updateMatrixWorld(true);MD[k]={scene:sc,box:new THREE.Box3().setFromObject(sc)};n++;onp&&onp(n/keys.length)}))}
+/* juguetes: los prepara esc-juguetes.js */
 function flat(k){const D=MD[k];if(D.flat)return D.flat;const gs=[];let mat=null;D.scene.traverse(o=>{if(o.isMesh){let g=o.geometry.clone();for(const a of Object.keys(g.attributes))if(!['position','normal','uv'].includes(a))g.deleteAttribute(a);if(g.index)g=g.toNonIndexed();g.applyMatrix4(o.matrixWorld);gs.push(g);mat=mat||o.material}});
   const geo=mergeGeometries(gs,false),b=D.box;geo.translate(-(b.min.x+b.max.x)/2,-b.min.y,-(b.min.z+b.max.z)/2);return D.flat={geo,mat,h:b.max.y-b.min.y,w:Math.max(b.max.x-b.min.x,b.max.z-b.min.z)}}
 function inst(k,list,shadow,par){if(!list.length)return null;const f=flat(k),m=new THREE.InstancedMesh(f.geo,f.mat,list.length);list.forEach((t,i)=>{o3.position.set(t.x,t.y||0,t.z);o3.rotation.set(0,t.r||0,0);o3.scale.setScalar(t.h/f.h);o3.updateMatrix();m.setMatrixAt(i,o3.matrix)});m.castShadow=shadow;m.receiveShadow=true;par.add(m);return m}
 function obj(k,h){const f=flat(k),m=new THREE.Mesh(f.geo,f.mat);m.scale.setScalar(h/f.h);m.castShadow=true;m.receiveShadow=true;return m}
 /* une mallas por material (menos draw calls); las mallas deben tener matrixWorld al día */
 function mergeMeshes(list){const groups=new Map();
-  for(const o of list){let g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();for(const k of Object.keys(g.attributes))if(!['position','normal','uv'].includes(k))g.deleteAttribute(k);
+  for(const o of list){let g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();for(const k of Object.keys(g.attributes))if(!['position','normal','uv',o.material.vertexColors?'color':''].includes(k))g.deleteAttribute(k);
     if(!g.attributes.normal)g.computeVertexNormals();if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));
     g.clearGroups();g.applyMatrix4(o.matrixWorld);const k=o.material.uuid+(o.castShadow?'s':'');if(!groups.has(k))groups.set(k,{m:o.material,c:o.castShadow,gs:[]});groups.get(k).gs.push(g)}
   const out=[];groups.forEach(v=>{const mg=mergeGeometries(v.gs,false);v.gs.forEach(g=>g.dispose());if(!mg)return;const m=new THREE.Mesh(mg,v.m);m.castShadow=v.c;m.receiveShadow=true;out.push(m)});return out}
@@ -326,5 +321,5 @@ const logoURL=(()=>{const c=document.createElement('canvas');c.width=c.height=25
   g.fillStyle='#e0ad45';g.beginPath();for(let k=0;k<10;k++){const r=k%2?34:82,a=-Math.PI/2+k*Math.PI/5;g.lineTo(128+Math.cos(a)*r,128+Math.sin(a)*r)}g.closePath();g.fill();return c.toDataURL('image/png')})();
 
 export {gastado,THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoise,fbm,tick,texCache,canvasTex,pixTex,rep,dotTex,woodTex,plankTex,snowNrm,winTex,signTex,caneTex,WRAPS,phTex,blobTex,puffTex,coneTex,stoneTex,
-  M,HCOL,HMAT,box,cyl,o3,boxU,MD,MODELS,toyCache,loadModels,flat,inst,obj,mergeMeshes,GAUGE,RT,WB,WS,WLEN,WHALF,WTOP,PANEL,PANEL_Y,PANEL_W,PANEL_H,TM,part,geoOnly,fuse,BX,CY,CYX,TOR,DOME,PLN,SPH,roofGeo,ringGeo,bigWheelGeos,smallWheelGeos,wagonGeos,buildLoco,buildTender,buildCaboose,
+  M,HCOL,HMAT,box,cyl,o3,boxU,MD,flat,inst,obj,mergeMeshes,GAUGE,RT,WB,WS,WLEN,WHALF,WTOP,PANEL,PANEL_Y,PANEL_W,PANEL_H,TM,part,geoOnly,fuse,BX,CY,CYX,TOR,DOME,PLN,SPH,roofGeo,ringGeo,bigWheelGeos,smallWheelGeos,wagonGeos,buildLoco,buildTender,buildCaboose,
   buildTree,santaFig,personGeos,JACKETS,crowd,house,AD_W,AD_H,AD_BG,rrect,hostOf,drawAd,loadImg,adTex,logoURL,UPV,ZAX,ONE,QFLIP};
