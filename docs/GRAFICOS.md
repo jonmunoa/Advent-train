@@ -20,12 +20,27 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 6. Maquetas: montañas moradas, terreno liso, casas simples.
 
 ## Bloques
-- [ ] A. Motor: GTAO a media resolución, niebla con luz (dispersión analítica de farolas y escaparates), bloom sin umbral, AgX con revelado, exposición automática, escalado con nitidez, reflejos del entorno capturados de la propia calle.
-- [ ] B. Luz horneada de la calle (trazado de rayos sin conexión con `three-mesh-bvh`, por vértice, con dirección dominante); capas: cielo, luces, escaparates. Sondas para las personas.
-- [ ] C. Suelo: adoquín mojado, nieve pisada y charcos con reflejos en pantalla (SSR) en ordenador y reflejos estirados en el móvil.
-- [ ] D. Personas: MakeHuman (proporciones y piel reales) sobre el esqueleto de las escenas; abrigos con pliegues simulados.
-- [ ] E. Fachadas y atrezo con más detalle (molduras, cantos romos, nieve acumulada, suciedad).
-- [ ] F. Maquetas: oclusión, luz de farolas en el terreno, sierra y cielo fotográficos, materiales.
-- [ ] G. 60 fps: menos llamadas, escalado dinámico, móvil sin tope de 40.
+- [x] A. Motor: GTAO a media resolución, niebla con luz (dispersión analítica de farolas y escaparates), bloom sin umbral, AgX con revelado, exposición automática, escalado con nitidez, reflejos del entorno capturados de la propia calle.
+- [x] B. Luz horneada de la calle (trazado de rayos sin conexión con `three-mesh-bvh`, por vértice, con dirección dominante); capas: cielo, luces, escaparates. Sondas para las personas.
+- [x] C. Suelo: adoquín mojado, nieve pisada y charcos con reflejos en pantalla (SSR) en ordenador y reflejos estirados en el móvil.
+- [x] D. Personas: MakeHuman (proporciones y piel reales) sobre el esqueleto de las escenas; abrigos con pliegues simulados.
+- [x] E. Fachadas y atrezo con más detalle (molduras, cantos romos, nieve acumulada, suciedad).
+- [x] F. Maquetas: oclusión, luz de farolas en el terreno, sierra y cielo fotográficos, materiales.
+- [x] G. 60 fps: menos llamadas, escalado dinámico, móvil sin tope de 40.
 
 ## Bitácora
+
+**v25 (24-11-2026).** Motor nuevo, calle horneada, personas de MakeHuman, cielo y montañas. 1600×900 a 1×: 16,4 / 15,1 / 13,2 ms.
+
+**v26 (25-11-2026).**
+- Personas: canesú sin arrugas falsas, cuello vuelto, bufandas con pliegues, melena metida en la bufanda, oclusión en piel y pelo, paño jaspeado, falda que sigue a la pierna, Papá Noel con ribete.
+- Calle: portales con su puerta (el arco iba relleno por un hueco mal recortado), faroles con la llama dentro, nieve redonda, comercios de enfrente con estanterías, puesto de castañas nuevo, árbol del fondo con ramas, tres paseantes más, fotos de verdad en las tiendas lejanas.
+- Maquetas: luz local horneada, faro, luz de cada día, niebla con farolas, ciudad con fachadas, bosque y montones delante del tablero, bombillas con filamento.
+- 60 fps: montaje en trozos de 3–4 ms, subida por adelantado, envoltura premontada, sonido calculado en la portada.
+- Medidas: PC 59–60 fps (1600×900); móvil CPU ×4 47/55/58/59/56 fps. 89/89 pruebas.
+
+## Lo que falta para acercarse más
+- Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
+- Atrezo de las escenas (buzón, chistera, balón…): materiales lisos.
+- Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.
+- Probar en un Android de verdad.

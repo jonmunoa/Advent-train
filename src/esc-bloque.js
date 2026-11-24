@@ -1,6 +1,6 @@
 /* La calle horneada: carga el bloque que se repite (m/calle, hecho por scripts/ciudad/hornea.mjs), con su luz ya calculada (dos rebotes,
    sombras suaves y dirección dominante), y le pone materiales con foto, nieve, agua y ventanas con habitación dentro. */
-import {THREE, LOWQ, canvasTex, rng, lerp, clamp, sstep} from './kit.js';
+import {THREE, LOWQ, canvasTex, rng, lerp, clamp, sstep, bombilla} from './kit.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 
 const DIR = 'm/calle/', url = f => new URL(DIR + f, document.baseURI).href;
@@ -154,7 +154,7 @@ export async function materiales() {
 export class Bloques {
   constructor(sc, D, M) {
     this.D = D; this.grupos = []; this.g = new THREE.Group(); sc.add(this.g); const PAL = [[6, .55, .5], [6, 3.6, 1.1], [.8, 2.2, 6.4], [.7, 5, 1.5], [6, 4.6, 2.6]];
-    const vent = ventanas(D.ventanas), nb = D.bombillas.length / 4, bg = new THREE.IcosahedronGeometry(.82, LOWQ ? 0 : 1), bm = new THREE.MeshBasicMaterial({color: 0xffffff}), im0 = new THREE.InstancedMesh(bg, bm, nb), o = new THREE.Object3D(), c = new THREE.Color(); for (let i = 0; i < nb; i++) {o.position.set(D.bombillas[i * 4], D.bombillas[i * 4 + 1], D.bombillas[i * 4 + 2]); o.scale.set(1, 1.35, 1); o.updateMatrix(); im0.setMatrixAt(i, o.matrix); im0.setColorAt(i, c.setRGB(...PAL[D.bombillas[i * 4 + 3]]))} this.bm = bm; this.nb = nb; this.bomb = [];
+    const vent = ventanas(D.ventanas), nb = D.bombillas.length / 4, bg = new THREE.IcosahedronGeometry(.82, 1), bm = bombilla(new THREE.MeshBasicMaterial({color: 0xffffff})), im0 = new THREE.InstancedMesh(bg, bm, nb), o = new THREE.Object3D(), c = new THREE.Color(); for (let i = 0; i < nb; i++) {o.position.set(D.bombillas[i * 4], D.bombillas[i * 4 + 1], D.bombillas[i * 4 + 2]); o.scale.set(1, 1.35, 1); o.updateMatrix(); im0.setMatrixAt(i, o.matrix); im0.setColorAt(i, c.setRGB(...PAL[D.bombillas[i * 4 + 3]]))} this.bm = bm; this.nb = nb; this.bomb = [];
     for (let q = 0; q < (LOWQ ? 2 : 3); q++) {const G = new THREE.Group(); G.userData.zonas = [[], []]; for (const {m, z, g} of D.geos) {const mat = m.startsWith('prop:') ? this.prop(m.slice(5)) : M[m]; if (!mat) {console.warn('sin material', m); continue} const me = new THREE.Mesh(g, mat); me.matrixAutoUpdate = false; me.receiveShadow = !LOWQ && mat.userData.horno; me.castShadow = false; G.add(me); G.userData.zonas[z].push(me); if (m === 'hielo') me.visible = false}
       const v = q ? vent.clone() : vent; G.add(v); const im = q ? new THREE.InstancedMesh(bg, bm, nb) : im0; if (q) {im.instanceMatrix = im0.instanceMatrix; im.instanceColor = im0.instanceColor} im.frustumCulled = false; G.add(im); this.bomb.push(im); this.g.add(G); this.grupos.push(G)}
   }
