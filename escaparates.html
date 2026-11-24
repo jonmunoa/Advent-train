@@ -24,6 +24,7 @@
 <header class="top hud">
   <div class="brand">El tren <span>del escaparate</span></div>
   <div class="tools">
+    <button class="tb" id="bDias" aria-label="Calendario" aria-haspopup="dialog" aria-controls="diSheet" title="Calendario (L)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 2.8v3.7M16 2.8v3.7"/><path class="pt" d="M8 13.7h.01M12 13.7h.01M16 13.7h.01M8 17h.01M12 17h.01"/></svg></button>
     <button class="tb" id="bShare" aria-label="Compartir" title="Compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.3 10.7l6.900-3.900M8.300 13.300l6.900 3.900"/></svg></button>
     <button class="tb" id="bFon" aria-label="Dejarlo de fondo" title="Dejarlo de fondo (F)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M14.800 12.800a3.600 3.600 0 0 1-4.600-4.700 3.600 3.600 0 1 0 4.600 4.700z"/></svg></button>
     <button class="tb" id="bSon" aria-label="Sonido" aria-haspopup="dialog" aria-expanded="false" aria-controls="son" title="Música y sonido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/><path class="of" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -111,6 +112,15 @@
     <p class="lead">Una idea de cada escaparate encendido.</p>
     <ul class="tienda" id="tiList"></ul>
     <p class="fine" id="tiFine"></p>
+  </div>
+</div>
+
+<div id="diSheet" class="modal" role="dialog" aria-modal="true" aria-labelledby="diTtl">
+  <div class="card noche">
+    <button class="x" id="diX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="diTtl">El calendario</h2>
+    <p class="lead" id="diLead" aria-live="polite"></p>
+    <ol class="cal" id="diList"></ol>
   </div>
 </div>
 

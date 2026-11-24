@@ -89,7 +89,7 @@ const AB = () => CAL.abiertos, TOPE = () => tope(AB());
 /* el escaparate n está cerrado (con papel) si aún no toca o si es el de hoy y todavía no se ha visto encender */
 const vistas = new Set(CAL.todos ? [N] : []), pendiente = n => n + 1 === AB() && !vistas.has(n + 1), tapado = n => n < 0 || n >= N || n >= AB() || (pendiente(n) && E.st !== 'escena');
 const cuando = () => CAL.proximo ? falta(CAL.proximo) : CAL.previa ? 'mañana a las 18:00' : 'pronto';
-function ir(n) {if (E.st === 'inicio' || E.st === 'escena') return; const q = clamp(n, 0, TOPE()); if (q !== n && n > E.n && AB() < N) toast(`El siguiente se enciende ${cuando()}`); n = q; if (n === E.n) return; if (E.st === 'dentro') {if (n >= AB()) {toast(`Se enciende ${cuando()}`); return} cambia(n); return} if (E.st === 'llega') {E.pend = n; return} E.dir = n > E.n ? 1 : -1; E.n = n; if (E.st === 'mira') {E.st = 'sale'; E.t = 0} caption(); hideCard()}
+function ir(n) {if (E.st === 'inicio' || E.st === 'escena') return; const q = clamp(n, 0, TOPE()); if (q !== n && n > aqui() && AB() < N) toast(`El siguiente se enciende ${cuando()}`); n = q; if (n === aqui()) return; if (E.st === 'dentro') {if (n >= AB()) {toast(`Se enciende ${cuando()}`); return} cambia(n); return} if (E.st === 'llega') {E.pend = n; return} E.dir = n > E.n ? 1 : -1; E.n = n; if (E.st === 'mira') {E.st = 'sale'; E.t = 0} caption(); hideCard()}
 const sigue = () => {if (E.n >= TOPE()) E.rumbo = -1; if (E.n <= 0) E.rumbo = 1; return E.n + (E.rumbo || 1)};
 /* dónde se paran: el niño en medio del cristal (o a un lado del agujero) y su madre un paso atrás */
 const sitioN = () => tapado(E.n) ? -24 * E.dir : 0, sitioM = () => -E.dir * (tapado(E.n) ? 52 : portrait() ? 40 : 37);
@@ -103,7 +103,7 @@ function paseo(dt, t) {
     const X = WX(E.n), fin = X - E.dir * 46, d = (fin - E.x) * E.dir; E.vel = damp(E.vel, d > 0 ? clamp(d * 1.1 + 6, 8, 42) : 0, 2.2, dt); E.x += E.vel * E.dir * dt; sm = sn = E.vel;
     M.g.position.x = damp(M.g.position.x, E.x, 8, dt); M.g.position.z = damp(M.g.position.z, ZM, 3, dt); N.g.position.x = damp(N.g.position.x, E.x + DX * E.dir, 8, dt); N.g.position.z = damp(N.g.position.z, ZN, 3, dt); const a = E.dir > 0 ? 0 : Math.PI; giro(M, a, 5, dt); giro(N, a, 5, dt); mano = true; N.tip = Math.max(0, Math.sin(t * .37)) > .93 ? Math.abs(Math.sin(t * 7)) * .05 : 0;
     const cerca = sstep(190, 50, d), s = E.dir > 0 ? 1 : -1; N.look.y = damp(N.look.y, s * (cerca * 1.05 + (d > 230 ? .75 * sstep(230, 330, d) : 0)) + Math.sin(t * .9) * .14, 3, dt); N.look.p = damp(N.look.p, .08 + .16 * Math.max(0, Math.sin(t * .4)), 3, dt); M.look.y = damp(M.look.y, s * (.42 * Math.max(0, Math.sin(t * .31)) + cerca * .3), 2, dt); M.look.p = damp(M.look.p, -.2 * Math.max(0, Math.sin(t * .31)) - .06, 2, dt);
-    if (d < 300) prepara(E.n); if (d <= .5) {mundo(E.n); if (pendiente(E.n)) escena(E.n + 1); else {E.st = 'llega'; E.t = 0}}
+    if (d < 300) prepara(E.n); if (d <= .5) {mundo(E.n); if (pendiente(E.n)) {if (!calAb()) escena(E.n + 1)} else {E.st = 'llega'; E.t = 0}}
   } else if (E.st === 'escena') {
     ESCN.paso(dt); sm = ESCN.vel.get(madre) || 0; sn = ESCN.vel.get(nino) || 0; for (const f of ESCN.ext) if (!f.fija) {f.update(dt, t, ESCN.vel.get(f) || 0); f.g.updateMatrixWorld(true); for (const i of [0, 1]) if (f.reach[i]) f.aim(i, f.reach[i])}
   } else if (E.st === 'llega') {
@@ -200,6 +200,13 @@ function prepara(n) {if (n < 0 || n >= N || MU.has(n) || obra) return; obra = nu
 function obraPaso() {const o = obra; if (!o) return; o.q.shift()(); if (!o.q.length) {obra = null; termina(o, true)}}
 /* la maqueta n, montada ya */
 function mundo(n) {n = clamp(n, 0, N - 1); if (MU.has(n)) return MU.get(n); const o = obra && obra.n === n ? obra : nueva(n); if (obra === o) obra = null; o.q.forEach(f => f()); termina(o); return o.m}
+/* monta la maqueta n sin congelar la imagen y sigue cuando está lista (si entretanto se pide otra, gana la última) */
+let cita = 0;
+async function conMundo(n, fn) {
+  const c = ++cita; if (MU.has(n) || FAST || HOLD) {fn(); return} if (obra && obra.n !== n) obra = null;
+  for (const t0 = performance.now(); !MU.has(n) && performance.now() - t0 < 8000;) {prepara(n); await new Promise(r => requestAnimationFrame(r)); if (c !== cita) return}
+  await Promise.race([compila(dentro), new Promise(r => setTimeout(r, 1500))]); if (c === cita) fn();
+}
 function termina({n, m}, luego) {
   m.g.scale.setScalar(K); m.g.position.set(WX(n), VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = false; if (LOWQ) ligero(m.g); separa(m.g, 'dentro'); reflejos(m.g, .5); dentro.add(m.g); m.tren.s = m.T.L * .04; MU.set(n, m); const A = SITIOS[n + 1] || {}; if (!DIAS[n].sinMarca || !VENTA) for (let v = 1; v <= 4; v++) m.tren.setAd(v - 1, A[v] || null); if (!FO.has(n) && !SINFOTO) {const f = () => {if (MU.get(n) === m && !FO.has(n)) {fotografia(n); version++}}; if (luego && !FAST) compila(dentro, FOTORT).then(f); else f()}
   for (const q of [...MU.keys()].sort((a, b) => Math.abs(b - E.n) - Math.abs(a - E.n))) {if (MU.size <= (LOWQ ? 3 : 5) || Math.abs(q - E.n) <= 1 || q === n || q === E.k) continue; const w = MU.get(q); dentro.remove(w.g); w.g.traverse(o => {if (o.geometry) o.geometry.dispose()}); MU.delete(q)}
@@ -254,9 +261,11 @@ function entrar(n, {car} = {}) {
   const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = n; E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundo(n); m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.envolver(); separa(m.domo, 'dentro'); reflejos(m.domo, .5); vista.entra(m, {...(directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.9}), cine: car === undefined && CINE}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
   if (cerca) fn(false); else dip(() => fn(true));
 }
-function cambia(n) {dip(() => {const v = MU.get(E.k); if (v) {v.modo(0); v.g.visible = false} E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = E.k = n; E.x = WX(n); aLaVentana(); const m = mundo(n); m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5, cine: CINE}); caption(); diCual(); hideCard(); if (!FAST) bells()})}
+let yendo = null; const aqui = () => E.st === 'dentro' && yendo !== null ? yendo : E.n;   // a qué escaparate se está yendo, mientras se monta
+function cambia(n) {yendo = n; if (!MU.has(n)) {$('capN').textContent = MAPS[n].nombre; $('capS').textContent = 'Encendiendo…'} conMundo(n, () => {if (E.st === 'dentro' && n !== E.n) cambiaYa(n); else {yendo = null; clearTimeout(dipT); $('dip').classList.remove('on'); caption()}})}
+function cambiaYa(n) {yendo = n; dip(() => {yendo = null; if (E.st !== 'dentro') return; const v = MU.get(E.k); if (v) {v.modo(0); v.g.visible = false} E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = E.k = n; E.x = WX(n); aLaVentana(); const m = mundo(n); m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5, cine: CINE}); caption(); diCual(); hideCard(); if (!FAST) bells()})}
 function salir() {
-  if (E.st !== 'dentro') return; hideCard(); camera.getWorldDirection(v1); const lej = camera.position.z < -30 || v1.z > -.25; const fn = corte => {vista.sale(); madre.g.visible = nino.g.visible = true; E.st = 'mira'; E.t = 0; E.idle = 0; E.u = corte ? .7 : .95; E.uT = .12; E.manual = false; E.az = E.azT = E.el = E.elT = 0; if (corte) {E.md = 0; const m = MU.get(E.k); if (m) m.modo(0); cam.p.set(WX(E.n), 66, 34); cam.l.set(WX(E.n), 52, -36)} document.body.classList.remove('dentro'); verCalle = true; caption()};
+  if (E.st !== 'dentro') return; if (yendo !== null) {yendo = null; cita++} hideCard(); camera.getWorldDirection(v1); const lej = camera.position.z < -30 || v1.z > -.25; const fn = corte => {vista.sale(); madre.g.visible = nino.g.visible = true; E.st = 'mira'; E.t = 0; E.idle = 0; E.u = corte ? .7 : .95; E.uT = .12; E.manual = false; E.az = E.azT = E.el = E.elT = 0; if (corte) {E.md = 0; const m = MU.get(E.k); if (m) m.modo(0); cam.p.set(WX(E.n), 66, 34); cam.l.set(WX(E.n), 52, -36)} document.body.classList.remove('dentro'); verCalle = true; caption()};
   if (lej) dip(() => fn(true)); else fn(false);
 }
 function onFocus(f) {const b = $('bCam'); b.classList.toggle('on', !!(f && f.chase)); b.setAttribute('aria-pressed', !!(f && f.chase)); $('bVolverT').textContent = f ? 'Volver a la maqueta' : 'Volver a la calle'; document.body.classList.toggle('foc', !!f); if (E.st !== 'dentro') return; const w = f ? f.car - 1 : 0; if (f && !f.chase && w >= 1 && w <= 4) showCard(E.n, w); else hideCard()}
@@ -323,13 +332,38 @@ function caption() {const n = E.n, c = tapado(n); $('capN').textContent = c ? `$
 function ponDia(d) {d = clamp(d, 1, N); store.set('advx-esc-todos', '0'); dip(() => {if (E.st === 'dentro') {vista.sale(); document.body.classList.remove('dentro'); const m = MU.get(E.k); if (m) m.modo(0); E.md = 0} ESCN.fin(true); document.body.classList.remove('escena'); $('fin').classList.remove('on'); CAL = previaDe(d); vistas.clear(); E.oscuro = 1; coloca0(); E.st = 'paseo'; caption()})}
 function coloca0() {E.n = CAL.todos ? 0 : Math.max(0, AB() - 1); E.dir = 1; E.rumbo = 1; E.x = WX(E.n) - 262; E.vel = 0; E.t = 0; E.k = E.n; vestir(); madre.g.position.set(E.x, 0, ZM); nino.g.position.set(E.x + DX, 0, ZN); madre.yaw = nino.yaw = 0; E.az = E.azT = E.el = E.elT = E.zs = E.zsT = 0; detras(0, cam.p, cam.l, 46)}
 $('pvA').onclick = () => ponDia((CAL.previa || 1) - 1); $('pvB').onclick = () => ponDia((CAL.previa || 1) + 1); $('pvS').onclick = () => CAL.todos ? abreDias() : ponDia(CAL.previa || 1);
-/* la lista de todos los días: entrar en cualquier circuito o ver cualquier escena */
+/* deja a los dos delante del escaparate n sin andar hasta él (si se enciende hoy y aún no se ha visto, llegan andando los últimos pasos) */
+function planta(n) {
+  yendo = null; if (E.st === 'dentro') {vista.sale(); document.body.classList.remove('dentro'); const m = MU.get(E.k); if (m) m.modo(0)} if (E.st === 'escena') ESCN.fin(true); document.body.classList.remove('escena'); $('fin').classList.remove('on'); hideCard();
+  E.md = 0; verCalle = true; E.oscuro = 1; madre.g.visible = nino.g.visible = true; E.n = E.k = n; E.dir = E.rumbo = 1; E.pend = undefined; E.t = E.idle = 0; E.manual = false; E.az = E.azT = E.el = E.elT = E.zs = E.zsT = 0;
+  if (pendiente(n)) {E.st = 'paseo'; E.x = WX(n) - 150; E.vel = 24; madre.g.position.set(E.x, 0, ZM); nino.g.position.set(E.x + DX, 0, ZN); madre.yaw = nino.yaw = 0; detras(tG, cam.p, cam.l)}
+  else {mundo(n); aLaVentana(); E.st = 'mira'; E.u = E.uT = .06; cam.p.set(WX(n), 76, 168); cam.l.set(WX(n), 60, -8); if (!FAST && !tapado(n)) bells()}
+  camera.position.copy(cam.p); caption();
+}
+/* el calendario: los 24 escaparates en pequeño; se va directo a cualquiera de los encendidos y, al de mañana, a asomarse */
+const calAb = () => $('diSheet').classList.contains('on'), pronto = () => {const t = CAL.proximo ? falta(CAL.proximo) : 'mañana'; return t.startsWith('mañana') ? 'Mañana' : t.charAt(0).toUpperCase() + t.slice(1).replace(' a las', ',')};
+let calFoto = null; function fotoCal() {return calFoto ||= new Promise(ok => {const im = new Image(); im.onload = () => ok(true); im.onerror = () => {calFoto = null; ok(false)}; im.src = 'm/esc/dias.webp'})}
+function pintaCal() {
+  const L = $('diList'), ab = AB(); if (!L.children.length) DIAS.forEach((q, n) => {const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--i', n); b.style.setProperty('--x', `${n % 6 * 20}%`); b.style.setProperty('--y', `${Math.floor(n / 6) * 100 / 3}%`); b.innerHTML = '<span class="ven-r"></span><span class="ven-c"><i></i></span><b></b>'; b.querySelector('b').textContent = n + 1; b.onclick = () => irDia(n); li.append(b); L.append(li)});
+  [...L.children].forEach((li, n) => {
+    const b = li.firstChild, nuevo = pendiente(n), lit = n < ab && !nuevo, man = n === ab; b.className = `ven r${n % 3} ${lit ? 'lit' : nuevo ? 'papel nuevo' : man ? 'papel man' : 'papel'}`; b.querySelector('.ven-r').textContent = lit ? DIAS[n].rotulo : nuevo ? '¡Nuevo!' : man ? pronto() : '';
+    b.setAttribute('aria-label', lit ? `${n + 1} de diciembre: ${DIAS[n].rotulo}, ${nomTren(n)}` : nuevo ? `${n + 1} de diciembre: a punto de encenderse` : `${n + 1} de diciembre: se enciende ${man ? cuando() : `el ${n + 1}`}`); if (lit || nuevo || man) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true'); if (n === E.n) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current')});
+  $('diLead').textContent = ab >= N ? 'Los 24 están encendidos, hasta el 10 de enero.' : ab ? `${ab} de ${N} encendidos. El siguiente, ${cuando()}.` : `El primero se enciende ${cuando()}.`;
+}
+function abreCal() {
+  if (E.st === 'inicio' || E.st === 'escena' || FON || modal()) return; abreSon(false); hideCard(); pintaCal(); const L = $('diList'); L.classList.remove('listo'); $('diSheet').classList.add('on'); $('diSheet').firstElementChild.scrollTop = 0; $('diX').focus({preventScroll: true});
+  fotoCal().then(ok => {if (!ok) return; L.style.setProperty('--sp', `url("${new URL('m/esc/dias.webp', document.baseURI)}")`); requestAnimationFrame(() => requestAnimationFrame(() => L.classList.add('listo')))});
+}
+function cierraCal(foco = true) {if (!calAb()) return; cita++; $('diList').querySelectorAll('.va').forEach(b => b.classList.remove('va')); $('diSheet').classList.remove('on'); if (foco) $('bDias').focus({preventScroll: true}); else if (document.activeElement) document.activeElement.blur()}
+function irDia(n) {
+  if (n > AB()) {$('diLead').textContent = `El ${n + 1} se enciende el ${n + 1} de diciembre a las 18:00.`; return} au(); despierta();
+  if (n === E.n && (E.st === 'mira' || E.st === 'llega' || (E.st === 'dentro' && !tapado(n)))) {cierraCal(false); return} $('diList').children[n]?.firstChild.classList.add('va'); conMundo(n, () => {cierraCal(false); if (E.st === 'escena') return; if (E.st === 'dentro' && !tapado(n)) cambiaYa(n); else dip(() => {if (E.st !== 'escena') planta(n)})});
+}
+$('bDias').onclick = () => {au(); despierta(); abreCal()}; $('bDias').addEventListener('pointerenter', fotoCal); $('diX').onclick = () => cierraCal(); $('diSheet').addEventListener('click', e => {if (e.target === $('diSheet')) cierraCal()});
+/* modo pruebas: la lista de todos los días, para entrar en cualquier circuito o ver cualquier escena */
 function verDia(n, que) {
-  cierraDias(); au(); if (E.st === 'inicio') empezar(); store.set('advx-esc-todos', '1');
-  dip(() => {
-    if (E.st === 'dentro') {vista.sale(); document.body.classList.remove('dentro'); const m = MU.get(E.k); if (m) m.modo(0)} E.md = 0; verCalle = true; if (E.st === 'escena') ESCN.fin(true); document.body.classList.remove('escena'); $('fin').classList.remove('on'); hideCard(); E.oscuro = 1; CAL = TODOS; vistas.add(N);
-    madre.g.visible = nino.g.visible = true; E.n = E.k = n; E.dir = E.rumbo = 1; E.pend = undefined; mundo(n); aLaVentana(); E.st = 'mira'; E.t = 0; E.u = E.uT = .06; E.manual = false; E.idle = 0; E.az = E.azT = E.el = E.elT = E.zs = E.zsT = 0; cam.p.set(WX(n), 76, 168); cam.l.set(WX(n), 60, -8); camera.position.copy(cam.p); caption(); setTimeout(() => {if (E.st !== 'mira' || E.n !== n) return; if (que === 'escena') verEscena(n); else if (que === 'tren') entrar(n)}, FAST ? 0 : 420);
-  });
+  au(); if (E.st === 'inicio') empezar(); store.set('advx-esc-todos', '1');
+  conMundo(n, () => {cierraDias(); dip(() => {CAL = TODOS; vistas.add(N); planta(n); setTimeout(() => {if (E.st !== 'mira' || E.n !== n) return; if (que === 'escena') verEscena(n); else if (que === 'tren') entrar(n)}, FAST ? 0 : 420)})});
 }
 function abreDias() {
   hideCard(); const L = $('pdList'); if (!L.children.length) {
@@ -342,7 +376,7 @@ function cierraDias() {$('pvSheet').classList.remove('on')}
 $('pvD').onclick = $('iTodos').onclick = abreDias; $('pdX').onclick = cierraDias; $('pvSheet').addEventListener('click', e => {if (e.target === $('pvSheet')) cierraDias()}); $('pdFin').onclick = () => {cierraDias(); if (E.st === 'inicio') empezar(); ponDia(1)};
 let toastT = 0; function toast(m) {const el = $('toast'); el.textContent = m; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600)}
 let quietoT = 0; function despierta() {document.body.classList.remove('quieto'); quietoT = performance.now()}
-$('bPrev').onclick = () => {au(); despierta(); ir(E.n - 1)}; $('bNext').onclick = () => {au(); despierta(); ir(E.n + 1)}; $('cap').onclick = () => {despierta(); if (E.st === 'dentro') vista.home(true); else entrar(E.n)};
+$('bPrev').onclick = () => {au(); despierta(); ir(aqui() - 1)}; $('bNext').onclick = () => {au(); despierta(); ir(aqui() + 1)}; $('cap').onclick = () => {despierta(); if (E.st === 'dentro') vista.home(true); else entrar(E.n)};
 $('bVolver').onclick = () => {au(); if (previa) return finPrevia().then(() => openAd()); if (vista.cam.focus) vista.setFocus(null); else salir()};
 const mid = () => [innerWidth / 2, innerHeight / 2]; $('nIn').onclick = () => vista.zoomAt(...mid(), .62); $('nOut').onclick = () => vista.zoomAt(...mid(), 1.6); $('nRot').onclick = () => vista.turn(Math.PI / 4); $('nHome').onclick = () => {vista.toca(); vista.home(true)}; $('bCine').onclick = () => {au(); CINE = !vista.cine; vista.setCine(CINE); E.idle = 0}; $('bCam').onclick = () => {au(); const f = vista.cam.focus; vista.toca(); vista.setFocus(f && f.chase ? null : {car: 0, chase: true})};
 const pintaSon = () => $('bSon').classList.toggle('off', !sonidoOn()); pintaSon(); pintaMudo();
@@ -363,13 +397,13 @@ function fondo(v) {
   if (!!v === !!FON) return; abreSon(false);
   if (v) {
     if (E.st === 'escena' || !listo) return; if (E.st === 'inicio') empezar(); const L = abiertos(); if (!L.length) {toast('Primero mira cómo se enciende el escaparate de hoy'); return}
-    au(); if (!sonidoOn()) mudo(); FON = {t: 0, mov: performance.now(), wl: null, full: false}; document.body.classList.add('fondo'); hideCard(); cierraDias(); $('tiSheet').classList.remove('on'); if (modal()) closeAd(); CINE = true;
+    au(); if (!sonidoOn()) mudo(); FON = {t: 0, mov: performance.now(), wl: null, full: false}; document.body.classList.add('fondo'); hideCard(); cierraDias(); cierraCal(false); $('tiSheet').classList.remove('on'); if (modal()) closeAd(); CINE = true;
     if (E.st !== 'dentro' || tapado(E.n)) entrar(tapado(E.n) ? L[L.length - 1] : E.n); else {vista.setFocus(null); vista.setCine(true)} bloqueo(true); mueve(); anuncia(); diCual(); pintaPista(cancion());
     if (FULL.requestFullscreen && !document.fullscreenElement && !FAST) FULL.requestFullscreen({navigationUI: 'hide'}).then(() => {if (FON) FON.full = true}).catch(() => {});
   } else {bloqueo(false); const f = FON.full; FON = null; document.body.classList.remove('fondo', 'mueve'); $('ahora').classList.remove('on'); $('cual').classList.remove('on'); if (f && document.fullscreenElement) document.exitFullscreen().catch(() => {}); despierta()}
 }
 function mueve() {if (!FON) return; FON.mov = performance.now(); document.body.classList.add('mueve')}
-function otroTren() {const L = abiertos(); if (L.length < 2 || !FON) return; FON.t = 0; const i = L.indexOf(E.n); cambia(L[(i + 1) % L.length])}
+function otroTren() {const L = abiertos(); if (L.length < 2 || !FON) return; FON.t = 0; const i = L.indexOf(aqui()); cambia(L[(i + 1) % L.length])}
 function pasoFondo(dt, now) {if (!FON) return; if (now - FON.mov > 3200 && !sonAb()) document.body.classList.remove('mueve'); if (E.st !== 'dentro') {if (E.st === 'escena') fondo(false); return} FON.t += dt; if (FON.t > CAMBIO && now - FON.mov > 5000) otroTren(); if (!vista.cine && !vista.flying && now - FON.mov > 14000) {if (vista.cam.focus) vista.setFocus(null); vista.setCine(true)}}
 addEventListener('pointermove', e => {if (FON && (e.movementX || e.movementY || e.pointerType !== 'mouse')) mueve()}, {passive: true}); addEventListener('pointerdown', () => mueve(), {passive: true, capture: true}); $('fonX').onclick = () => fondo(false); $('fonV').onclick = otroTren;
 document.addEventListener('fullscreenchange', () => {if (FON && FON.full && !document.fullscreenElement) {FON.full = false; fondo(false)}}); document.addEventListener('visibilitychange', () => {if (FON && !document.hidden) bloqueo(true)});
@@ -384,7 +418,7 @@ $('bShare').onclick = async () => {const m = AB() ? `🚂 Día ${AB()} · «${DI
 const NAVK = {ArrowLeft: [-34, 0], ArrowRight: [34, 0], ArrowUp: [0, -34], ArrowDown: [0, 34], a: [-34, 0], d: [34, 0], w: [0, -34], s: [0, 34]};
 addEventListener('keydown', e => {
   if (E.st === 'escena') {if (e.key === 'Escape') $('bSaltar').click(); return}
-  if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if (sonAb()) abreSon(false); else if (FON) fondo(false); else if ($('pvSheet').classList.contains('on')) cierraDias(); else if ($('tiSheet').classList.contains('on')) cierraTienda(); else if (modal()) closeAd(); else if (E.st === 'dentro' && vista.cam.focus) vista.setFocus(null); else if (!$('card').hidden) hideCard(); else salir(); return} if (modal() || (/INPUT|TEXTAREA/.test(e.target.tagName) && e.target.type !== 'range') || !listo) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (!e.repeat) {if (k === 'f') {fondo(!FON); return} if (k === 'm') {mudo(); return} if (k === 'n') {otraPista(1); pintaSon(); pintaMudo(); return}} if (FON) {mueve(); if (k === 'ArrowRight' || k === 'ArrowLeft') otroTren(); return} if (e.target.closest && e.target.closest('#son')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Escape') {if (sonAb()) abreSon(false); else if (FON) fondo(false); else if (calAb()) cierraCal(); else if ($('pvSheet').classList.contains('on')) cierraDias(); else if ($('tiSheet').classList.contains('on')) cierraTienda(); else if (modal()) closeAd(); else if (E.st === 'dentro' && vista.cam.focus) vista.setFocus(null); else if (!$('card').hidden) hideCard(); else salir(); return} if (modal() || (/INPUT|TEXTAREA/.test(e.target.tagName) && e.target.type !== 'range') || !listo) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (!e.repeat) {if (k === 'f') {fondo(!FON); return} if (k === 'm') {mudo(); return} if (k === 'l') {abreCal(); return} if (k === 'n') {otraPista(1); pintaSon(); pintaMudo(); return}} if (FON) {mueve(); if (k === 'ArrowRight' || k === 'ArrowLeft') otroTren(); return} if (e.target.closest && e.target.closest('#son')) return;
   if (E.st === 'dentro') {if (NAVK[k]) {e.preventDefault(); vista.nudge(...NAVK[k])} else if (k === '+' || k === '=') vista.zoomAt(...mid(), .75); else if (k === '-') vista.zoomAt(...mid(), 1.34); else if (k === 'q' && !e.repeat) vista.turn(-Math.PI / 6); else if (k === 'e' && !e.repeat) vista.turn(Math.PI / 6); else if (k === '0') vista.home(true); else if (k === 'c' && !e.repeat) $('bCam').click(); else if (k === 'v' && !e.repeat) $('bCine').click(); return}
   if (k === 'ArrowRight') ir(E.n + 1); else if (k === 'ArrowLeft') ir(E.n - 1); else if (k === 'ArrowUp' || (k === 'Enter' && e.target === document.body)) entrar(E.n); else if (k === '+' || k === '=') zoom(.12); else if (k === '-') zoom(-.12)});
 function empezar() {if (E.st !== 'inicio' || !listo) return; au(); $('intro').classList.add('ido'); document.body.classList.remove('espera'); E.st = 'paseo'; E.t = 0; caption(); despierta(); if (!FAST) bells()}
@@ -394,7 +428,7 @@ $('go').onclick = empezar;
 let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, lento = 0, alT = 0, HOLD = false; const dbg = DEBUG ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0;
 function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'dentro' && !E.hoy && (E.st !== 'mira' || f === madre)) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
 let calT = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
-  if (!FAST || SUAVE) escucha(); pasoFondo(Math.min(.2, raw), now); if (!CAL.previa && now - calT > 20000) {calT = now; const c = estado(); if (c.abiertos !== CAL.abiertos) {CAL = c.temporada ? c : previaDe(1)} caption()} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); sobre = !!(q && q.n === E.n && q.sitio !== 'rotulo'); hov = null} if (now - quietoT > 6000 && E.st !== 'escena') document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
+  if (!FAST || SUAVE) escucha(); pasoFondo(Math.min(.2, raw), now); if (!CAL.previa && now - calT > 20000) {calT = now; const c = estado(); if (c.abiertos !== CAL.abiertos) {CAL = c.temporada ? c : previaDe(1)} caption(); if (calAb()) pintaCal()} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); sobre = !!(q && q.n === E.n && q.sitio !== 'rotulo'); hov = null} if (now - quietoT > 6000 && E.st !== 'escena') document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
   if (dbg) renderer.info.reset(); draw(); if (dbg) {dN++; dT += raw; if (dT > .5) {dbg.textContent = `${Math.round(dN / dT)} fps · ${(dT / dN * 1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${renderer.info.render.calls} dc · ${(renderer.info.render.triangles / 1000).toFixed(0)}k · ${E.st}`; dN = dT = 0}}
   adapta(raw, now)}
 /* si va justo: primero baja la resolución hasta 1×, luego sombras y MSAA, y por último el brillo */
@@ -423,7 +457,7 @@ requestAnimationFrame(loop);
 
 /* gancho para las pruebas */
 const aPantalla = v => {v.project(camera); return {x: (v.x * .5 + .5) * innerWidth, y: (.5 - v.y * .5) * innerHeight, z: v.z}};
-window.__esc = {son: motor, fondo, get fon() {return FON}, eng: {renderer, post, foco, camera, get verCalle() {return verCalle}, get verPortal() {return verPortal}}, get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, entrar, salir, vista, mundo, MU, locs, escena, verEscena, ponDia, get cal() {return CAL}, get ESCN() {return ESCN}, tapado, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro}, get fly() {return FAST},
+window.__esc = {son: motor, fondo, get fon() {return FON}, eng: {renderer, post, foco, camera, get verCalle() {return verCalle}, get verPortal() {return verPortal}}, get listo() {return listo}, get st() {return E.st}, get n() {return E.n}, get E() {return {...E}}, empezar, ir, entrar, salir, vista, mundo, MU, locs, escena, verEscena, ponDia, abreCal, irDia, get cal() {return CAL}, get ESCN() {return ESCN}, tapado, sitios: () => SITIOS, zoom, queHay, hold: v => {HOLD = v}, scene: {calle, dentro}, get fly() {return FAST},
   step(sec, d = 1 / 30, suave = false) {const f = FAST; SUAVE = suave; for (let i = 0; i < sec / d; i++) {FAST = true; paso(d); if (obra) obraPaso()} FAST = f; SUAVE = false},
   mirar(u) {E.manual = true; E.u = E.uT = u}, cam: () => ({p: cam.p.toArray().map(v => +v.toFixed(1)), l: cam.l.toArray().map(v => +v.toFixed(1))}), setCam: (p, l) => {cam.p.set(...p); cam.l.set(...l); camera.position.copy(cam.p); camera.lookAt(cam.l); camera.updateMatrixWorld(); colocar(0, tG); draw()}, pos: () => ({m: madre.g.position.toArray(), n: nino.g.position.toArray(), ym: madre.yaw, yn: nino.yaw, hn: nino.look.y}),
   manos() {const mi = E.dir > 0 ? 0 : 1, a = v1.clone(), b = v1.clone(), t = (f, i, o) => {f.g.updateMatrixWorld(true); return f.manoPos(i, o)}; t(madre, mi, a); t(nino, 1 - mi, b); return a.distanceTo(b)},

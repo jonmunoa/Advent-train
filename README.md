@@ -40,7 +40,7 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 `http://localhost:5173/escaparates.html` es el enfoque actual: un **calendario de Adviento** sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada de **24 escaparates, uno por día**, con un circuito de tren distinto en cada uno.
 
-- **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta el 10 de enero: puedes volver a cualquiera, entrar en su circuito y repetir su escena.
+- **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta el 10 de enero: puedes volver a cualquiera, entrar en su circuito y repetir su escena. El botón del calendario (o la tecla L) te lleva directo al que elijas.
 - **Un momento cada día**: en cada escaparate, una escena sin palabras de 6–15 segundos que se entiende sola (la nariz en el cristal, una bola de nieve, la foto que sale mal…). El 24 se cierra con el niño ya mayor. Están en `src/esc-escenas.js`.
 - **Lo que vende cada tienda**: «Llévate uno a casa» enlaza a un producto de Amazon con enlace de afiliado. Se edita en `src/esc-tienda.js` (pon el `asin` para ir a una ficha en concreto) y el código va en `config.js` o en `ADVX_TAG`. Las marcas están guardadas tras `VENDER` en `src/esc-marcas.js`.
 - **Un tren distinto cada día**: 23 trenes (vapor, eléctrica, diésel, tranvía, quitanieves, de madera, de galleta, de cuerda…) con su sonido. El catálogo está en `src/esc-trenes.js`.

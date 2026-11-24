@@ -186,6 +186,36 @@ body.previa .intro:not(.carga) #iTodos{display:block}
 @media (hover:hover){.dias button:hover{background:rgba(60,40,20,.08)}}
 @media (max-width:640px){body.dentro .pv{top:auto;bottom:calc(96px + var(--safe-b))}}
 @media (max-width:420px){.dias li{gap:7px;padding:5px 2px}.dias button{padding:0 9px;font-size:12.5px}}
+/* el calendario: 24 escaparates en pequeño sobre la fachada de noche */
+#bDias .pt{stroke-width:2.6}
+.card.noche{width:min(920px,100%);padding:24px 30px 34px;border:1px solid rgba(224,173,69,.32);background:linear-gradient(180deg,#1d2856,#0c1330);color:var(--cream)}
+.noche h2{color:var(--cream)}.noche .lead{margin-top:6px;text-wrap:balance;color:#cfd6ea;min-height:1.45em}.noche .x{background:rgba(251,243,223,.12);color:var(--cream)}
+.cal{list-style:none;margin:24px 0 0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:26px 18px}
+.ven{position:relative;display:block;width:100%;padding:0 4px 4px;border:0;border-radius:5px;background:#2b1a12;box-shadow:0 8px 16px rgba(0,0,0,.42);cursor:pointer;transition:transform 160ms var(--ease-out)}
+.ven::before,.ven::after{content:"";position:absolute;left:-5px;right:-5px;pointer-events:none}
+.ven::before{z-index:1;top:-7px;height:13px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 14' preserveAspectRatio='none'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='.3' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23b9c8e8'/%3E%3C/linearGradient%3E%3Cpath fill='url(%23g)' d='M0 8C0 4 4 2 10 2 22 -1 30 2 42 1 58 0 70 2 84 1 94 1 100 4 100 8 98 12 93 11 91 8 85 7 84 13 79 13 75 13 75 8 70 8 58 8 50 7 44 9 40 12 36 11 34 9 24 7 16 8 11 9 7 13 1 12 0 8Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}.ven.r1::before{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 14' preserveAspectRatio='none'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='.3' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23b9c8e8'/%3E%3C/linearGradient%3E%3Cpath fill='url(%23g)' d='M0 7C1 3 8 1 18 1 34 0 48 3 60 1 76 -1 90 1 96 3 100 4 100 10 97 11 92 12 90 8 86 8 76 7 70 8 66 9 63 14 57 13 55 9 44 7 36 8 28 8 24 11 18 12 16 9 10 8 8 10 5 11 1 11 -1 9 0 7Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}.ven.r2::before{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 14' preserveAspectRatio='none'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='.3' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23b9c8e8'/%3E%3C/linearGradient%3E%3Cpath fill='url(%23g)' d='M0 9C-1 4 6 1 14 2 28 3 40 0 54 1 68 2 80 0 90 2 98 3 101 6 100 9 98 11 95 9 92 8 84 7 74 9 64 8 58 8 55 12 50 13 45 13 45 8 40 8 30 7 26 8 22 9 18 13 11 13 9 10 6 8 2 12 0 9Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.ven::after{bottom:-5px;height:7px;border-radius:5px 7px 4px 5px/6px 5px 3px 3px;background:linear-gradient(#fff,#b9c8e8)}
+.ven-r{display:block;height:24px;margin:0 -4px;padding-top:2px;border-radius:5px 5px 0 0;overflow:hidden;font:600 12px/22px Rubik,system-ui,sans-serif;color:#f0c96f;text-align:center;white-space:nowrap;text-overflow:ellipsis}
+.ven.r0 .ven-r{background:#123a30}.ven.r1 .ven-r{background:#4d101b}.ven.r2 .ven-r{background:#1c3159}
+.ven-c{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;border-radius:2px;background:radial-gradient(circle at 50% 70%,#6b4a22,#2a1a0e)}
+.ven-c i{position:absolute;inset:0;background:var(--sp) var(--x) var(--y)/600% 400%;opacity:0}
+.cal.listo .ven.lit .ven-c i{opacity:1;transition:opacity 420ms var(--ease-out) calc(var(--i)*16ms)}
+.ven-c::after{content:"";position:absolute;inset:0;background:linear-gradient(112deg,rgba(255,255,255,.2),rgba(255,255,255,0) 30%);box-shadow:inset 0 0 12px rgba(30,12,0,.6)}
+.ven b{position:absolute;left:8px;top:28px;display:grid;place-items:center;min-width:26px;height:26px;border-radius:13px;background:var(--red);color:var(--cream);font:400 14px/1 'Alfa Slab One',Georgia,serif;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.ven.lit{box-shadow:0 8px 16px rgba(0,0,0,.42),0 0 22px rgba(255,190,100,.26)}
+.ven.papel .ven-c{background:linear-gradient(90deg,rgba(255,236,200,0) 24.2%,rgba(255,236,200,.2) 25%,rgba(40,20,4,.2) 25.8%,rgba(40,20,4,0) 30%,rgba(255,236,200,0) 49.2%,rgba(255,236,200,.2) 50%,rgba(40,20,4,.2) 50.8%,rgba(40,20,4,0) 55%,rgba(255,236,200,0) 74.2%,rgba(255,236,200,.2) 75%,rgba(40,20,4,.2) 75.8%,rgba(40,20,4,0) 80%),radial-gradient(120% 120% at 30% 10%,#b58c58,#8a6539)}.ven.papel .ven-c::after{background:none;box-shadow:inset 0 0 16px rgba(20,8,0,.55)}
+.ven.papel b{left:0;right:0;top:24px;bottom:4px;height:auto;border-radius:0;background:none;box-shadow:none;color:#3c0e0c;font-size:clamp(24px,3.4vw,34px)}
+.ven[aria-disabled]{cursor:default}.ven[aria-disabled] .ven-r{opacity:.6}
+.ven.papel.man b{bottom:38%}.ven.man .ven-c::before{content:"";position:absolute;left:34%;right:34%;bottom:9%;height:27%;border-radius:52% 48% 57% 43%/60% 46% 54% 40%;background:radial-gradient(#fff3cf,#ffb54a);box-shadow:0 0 0 2px #e6d0a0,0 0 22px 5px rgba(255,178,78,.5)}
+.ven.nuevo{box-shadow:0 8px 16px rgba(0,0,0,.42),0 0 26px 4px rgba(255,190,100,.5)}.ven.nuevo .ven-c::after{box-shadow:inset 0 0 18px 5px rgba(255,196,96,.75)}.ven.nuevo .ven-r{background:var(--red);color:var(--cream)}
+.ven[aria-current]{outline:3px solid var(--gold);outline-offset:8px}.ven[aria-current]:focus-visible{outline-color:#fff}
+.ven.va .ven-c{animation:va 700ms ease-in-out infinite alternate}@keyframes va{to{filter:brightness(1.45)}}
+.ven:not([aria-disabled]):active{transform:scale(.96)}
+@media (hover:hover) and (pointer:fine){.ven:not([aria-disabled]):hover{transform:translateY(-3px)}.ven:not([aria-disabled]):hover:active{transform:scale(.97)}}
+@media (max-width:640px){#diSheet{padding:10px}.card.noche{padding:18px 18px 26px}.cal{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 14px;margin-top:20px}.ven{padding:0 3px 3px}.ven-r{height:20px;margin:0 -3px;font-size:clamp(9.4px,2.65vw,10.8px);line-height:19px;letter-spacing:-.015em}.ven b{left:4px;top:21px;min-width:20px;height:20px;font-size:11px}.ven.papel b{left:0;top:20px;bottom:3px;height:auto;font-size:26px}.ven[aria-current]{outline-offset:6px}}
+@media (max-height:520px) and (orientation:landscape){.card.noche{width:min(1000px,100%)}.cal{grid-template-columns:repeat(8,minmax(0,1fr));gap:20px 14px}.ven-r{font-size:10.5px}}
+@media (max-width:430px){.brand{line-height:1.02}.brand span{display:block;margin-left:.5em}}
+@media (prefers-reduced-motion:reduce){.ven,.cal.listo .ven.lit .ven-c i{transition:none}.ven.va .ven-c{animation:none;filter:brightness(1.3)}}
 .pv button{border:0;background:none;color:var(--gold);min-width:44px;height:44px;font-size:22px;cursor:pointer}
 #pvS{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px;line-height:1.1;font-size:13px;min-width:120px}
 #pvS small{font-size:10px;color:#cfd6ea;letter-spacing:.04em}#pvS b{color:var(--cream);font-weight:600}
