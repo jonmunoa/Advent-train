@@ -69,7 +69,7 @@
 <button class="entra" id="entra" type="button" tabindex="-1" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10l5.200 1.100a2 2 0 0 1 1.600 2.200l-.6 4.200a3 3 0 0 1-3 2.5h-3.700a3 3 0 0 1-2.300-1.100L5.5 14.600a1.5 1.5 0 0 1 2.300-1.900L9 14"/></svg><span>Ver el tren de cerca</span></button>
 <button class="marca hud" id="bEsc" type="button">Ver el momento</button>
 <button class="saltar" id="bSaltar" type="button">Saltar</button>
-<div class="pv hud" id="pv" role="group" aria-label="Vista previa del calendario"><button id="pvA" aria-label="Día anterior">‹</button><button id="pvS" title="Volver a empezar este día"><small>Vista previa</small><b id="pvT"></b></button><button id="pvB" aria-label="Día siguiente">›</button></div>
+<div class="pv hud" id="pv" role="group" aria-label="Vista previa del calendario"><button id="pvA" aria-label="Día anterior">‹</button><button id="pvS" title="Volver a empezar este día"><small>Vista previa</small><b id="pvT"></b></button><button id="pvB" aria-label="Día siguiente">›</button><button id="pvD" type="button">Todos los días</button></div>
 <section id="fin" class="fin" aria-label="Fin"><button class="mano" id="finGo" type="button">Mándaselo a tu madre</button><button class="lnk" id="finX" type="button">Seguir paseando</button></section>
 
 <div id="card" class="adcard" hidden role="region" aria-label="Ficha">
@@ -115,11 +115,22 @@
   </div>
 </div>
 
+<div id="pvSheet" class="modal" role="dialog" aria-modal="true" aria-labelledby="pdTtl">
+  <div class="card">
+    <button class="x" id="pdX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="pdTtl">Todos los días</h2>
+    <p class="lead">Modo pruebas: los 24 escaparates encendidos a la vez.</p>
+    <ol class="dias" id="pdList"></ol>
+    <button class="lnk" id="pdFin" type="button">Verlo día a día, como la gente</button>
+  </div>
+</div>
+
 <section id="intro" class="intro" aria-labelledby="iTtl">
   <div class="in">
     <h1 id="iTtl">El tren <span>del escaparate</span></h1>
     <p>¿Te acuerdas de cuando te quedabas embobado <br>mirando pasar el tren detrás de un cristal?</p>
     <button id="go" class="mano" type="button" disabled>Preparando la calle…</button>
+    <button id="iTodos" type="button">Modo pruebas: ver todos los días</button>
     <div class="bar" aria-hidden="true"><i id="lBar"></i></div>
   </div>
 </section>
