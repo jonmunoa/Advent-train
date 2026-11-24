@@ -6,42 +6,42 @@ const BASE = {
   paso: .0026, tris: 8200, ci: [-.02, -.09, 0], cs: [.145, .25, .14],
   cr: [-.012, .126, 0], crR: [.114, .106, .111], ca: [.022, .078, 0], caR: [.085, .08, .09], k1: .05,
   me: [.054, .056, .047], meR: .04, meK: .036, ba: [.071, .014, 0], baR: [.027, .023, .032], baK: .042, mand: null,
-  E: [.073, .1, .0445], R: .027, yaw: .16, pico: 0, iris: .6, lash: .00085, hoc: null, cuenca: .8, w: .9, au: .64, al: .54, inc: .03, pliegue: .0009, bolsa: .0005,
-  ceja: {y: .138, h: .0065, z0: .02, z1: .066, r: .0011, l: .012, n: 46, arco: .006, k: .0015}, arcoCeja: 0,
+  E: [.073, .1, .0445], R: .027, yaw: .16, pico: 0, pk: 0, iris: .6, lash: .00085, hoc: null, cuenca: .8, w: .9, au: .64, al: .54, inc: .03, pliegue: .0009, bolsa: .0005,
+  ceja: {y: .138, h: .0065, z0: .02, z1: .066, g: .003, r: .0009, l: .011, n: 46, arco: .006, k: .0015}, arcoCeja: 0,
   nz: {a: [.1, .1, 0], b: [.1235, .0715, 0], r0: .0062, r: .0125, w: .0098, ala: .0078, k: .016},
   my: .0365, w2: .0195, hu: .0034, hl: .0046, lx: .0046, bc: .0016, surco: .0008,
   or: [-.006, .088, .112], orR: [.021, .031, .011], cue: [[-.012, .05, 0], [-.018, -.09, 0], .05, .05], arrugas: [], mejRubor: [.074, .062, .06, .03], pest: 0, dientes: 1,
 };
 const con = (a, b) => ({...a, ...b, nz: {...a.nz, ...(b.nz || {})}, ceja: {...a.ceja, ...(b.ceja || {})}});
 const NINO = con(BASE, {
-  tris: 14500, cr: [-.014, .127, 0], crR: [.114, .105, .111], ca: [.022, .084, 0], caR: [.0845, .079, .0855], me: [.0545, .0565, .0475], meR: .0432, meK: .038, ba: [.0705, .0115, 0], baR: [.0225, .0195, .025], baK: .042, hoc: [.0745, .038, 0, .022, .0185, .027, .03],
-  E: [.0682, .0955, .0445], R: .0342, cuenca: .56, w: .93, au: .63, al: .48, inc: .03, pico: .14, bolsa: 0, pliegue: .0009, iris: .59, ceja: {y: .1345, h: .0062, z0: .0212, z1: .0652, r: .0016, l: .0125, n: 120, k: .0014, arco: .003},
-  nz: {a: [.097, .094, 0], b: [.114, .0715, 0], r: .0104, w: .0074, ala: .0044, r0: .0046, k: .02, nar: .2}, my: .0375, w2: .0198, hu: .002, hl: .0034, lx: .003, bc: .0026, surco: .0005, mejRubor: [.078, .0595, .059, .032], lash: .0018,
+  tris: 14500, cr: [-.014, .127, 0], crR: [.114, .105, .111], ca: [.022, .084, 0], caR: [.0845, .079, .0845], me: [.0545, .056, .046], meR: .0428, meK: .038, ba: [.07, .0115, 0], baR: [.0225, .0195, .0235], baK: .04, hoc: [.0745, .038, 0, .022, .0185, .027, .03],
+  E: [.0672, .0945, .0438], R: .0356, cuenca: .52, w: .95, au: .7, al: .53, inc: .015, pico: .05, pk: -.05, bolsa: 0, pliegue: .0006, iris: .655, ceja: {y: .1345, h: .0062, z0: .0185, z1: .0645, g: .0035, n: 44, r: .0008, l: .0105, k: .0012, arco: .001},
+  nz: {a: [.0945, .094, 0], b: [.1132, .0725, 0], r: .0088, w: .0064, ala: .0041, r0: .0038, k: .0145, nar: .2}, my: .0382, w2: .0206, hu: .0017, hl: .0026, lx: .0025, bc: .0034, surco: .0005, mejRubor: [.078, .0605, .057, .03], narRubor: .85, lash: .0022,
 });
 const MADRE = con(BASE, {
-  tris: 11500, cr: [-.02, .138, 0], crR: [.105, .103, .098], ca: [.021, .087, 0], caR: [.08, .085, .077], k1: .045, me: [.0525, .079, .043], meR: .0315, meK: .032, ba: [.0725, .0125, 0], baR: [.0195, .0185, .0215], baK: .04, mand: [[.0, .05, .052], [.056, .0145, .0145], .019, .0125, .036], hoc: [.0765, .0455, 0, .019, .0165, .0245, .024],
-  E: [.0635, .1085, .0405], R: .0297, yaw: .14, cuenca: .66, w: .96, au: .56, al: .37, inc: .1, pico: .12, pliegue: .0011, iris: .55, ceja: {y: .1415, h: .0072, z0: .0165, z1: .0625, r: .0014, l: .0125, n: 110, arco: .005, k: .0011}, arcoCeja: 0,
-  nz: {a: [.091, .112, 0], b: [.1115, .0785, 0], r0: .0048, r: .0092, w: .0074, ala: .0052, k: .016}, my: .0455, w2: .0232, hu: .0034, hl: .005, lx: .0044, bc: .0026, surco: .0008,
-  or: [-.012, .092, .0955], orR: [.018, .029, .009], cue: [[-.014, .06, 0], [-.022, -.1, 0], .04, .042], mejRubor: [.07, .078, .054, .03], pest: 1, lash: .0021, bolsa: .0001,
+  tris: 12500, cr: [-.02, .138, 0], crR: [.105, .103, .098], ca: [.021, .0885, 0], caR: [.08, .083, .077], k1: .045, me: [.0525, .0765, .043], meR: .0325, meK: .032, ba: [.0705, .0165, 0], baR: [.0185, .0175, .0195], baK: .038, mand: [[.0, .053, .051], [.055, .0185, .0135], .0185, .012, .036], hoc: [.0755, .0455, 0, .0185, .016, .0235, .024],
+  E: [.0632, .1055, .0405], R: .0322, yaw: .14, cuenca: .6, w: .96, au: .61, al: .43, inc: .07, pico: .06, pk: -.1, pliegue: .0009, iris: .615, ceja: {y: .1385, h: .0064, z0: .0165, z1: .0615, g: .0025, n: 40, r: .0007, l: .0095, arco: .001, k: .0009}, arcoCeja: 0,
+  nz: {a: [.0895, .109, 0], b: [.1085, .0765, 0], r0: .0042, r: .0077, w: .0062, ala: .0042, k: .0135}, my: .0445, w2: .0226, hu: .003, hl: .0038, lx: .0036, bc: .0034, surco: .0007,
+  or: [-.014, .092, .0895], orR: [.0135, .022, .006], cue: [[-.014, .06, 0], [-.022, -.1, 0], .04, .042], mejRubor: [.07, .075, .054, .03], pest: 1, lash: .0023, bolsa: .0001,
 });
 const MAYOR = con(MADRE, {
-  tris: 12500, me: [.05, .069, .043], meR: .033, baR: [.021, .018, .025], mand: [[.0, .046, .055], [.058, .012, .018], .021, .016, .03], au: .52, al: .36, inc: 0, pliegue: .001, bolsa: .0012, hu: .0028, hl: .0044, lx: .0042, ceja: {n: 70, r: .0012, y: .1405}, orR: [.02, .034, .009], w2: .0225, bc: .0018, lash: .0013, pest: 0,
+  tris: 12500, me: [.05, .069, .043], meR: .033, baR: [.021, .018, .025], mand: [[.0, .046, .055], [.058, .012, .018], .021, .016, .03], au: .52, al: .36, inc: 0, pliegue: .001, bolsa: .0012, hu: .0028, hl: .0044, lx: .0042, ceja: {n: 44, r: .0009, y: .139}, orR: [.02, .034, .009], w2: .0225, bc: .0022, lash: .0013, pest: 0, E: [.0635, .1075, .0405], R: .0302, iris: .57,
   arrugas: [['naso', .0011, .0034], ['pata', .0007, .0016], ['frente', .00055, .0022], ['boca', .0004, .0012], ['bolsa', .0008, .0026]],
 });
 const HOMBRE = con(BASE, {
   tris: 10500, cr: [-.016, .136, 0], crR: [.108, .104, .1], ca: [.02, .082, 0], caR: [.08, .096, .08], k1: .045, me: [.05, .07, .044], meR: .031, meK: .03, ba: [.0725, .001, 0], baR: [.022, .022, .028], baK: .036, mand: [[-.005, .038, .056], [.06, .0, .022], .02, .017, .03], hoc: [.076, .036, 0, .02, .019, .027, .026],
-  E: [.0655, .1085, .0398], R: .027, yaw: .13, cuenca: .7, w: .94, au: .54, al: .38, inc: .05, pico: .12, bolsa: .0003, iris: .56, ceja: {y: .1385, h: .0058, z0: .0165, z1: .0625, r: .0016, l: .0125, n: 130, arco: .004, k: .0015}, arcoCeja: .0012,
+  E: [.0655, .1085, .0398], R: .027, yaw: .13, cuenca: .7, w: .94, au: .54, al: .38, inc: .05, pico: .12, bolsa: .0003, iris: .56, ceja: {y: .1375, h: .0056, z0: .0165, z1: .0625, g: .0038, r: .001, l: .0115, n: 56, arco: .001, k: .0014}, arcoCeja: .0012,
   nz: {a: [.093, .112, 0], b: [.1245, .0735, 0], r0: .0062, r: .0122, w: .0098, ala: .0074, k: .016}, my: .0375, w2: .0238, hu: .0028, hl: .0042, lx: .004, bc: .0018, or: [-.012, .09, .0985], orR: [.021, .033, .0105], cue: [[-.014, .05, 0], [-.022, -.1, 0], .052, .054], mejRubor: [.066, .073, .055, .03], lash: .0012,
 });
 const VIEJO = con(HOMBRE, {
-  tris: 12000, crR: [.108, .1, .1], me: [.054, .066, .045], meR: .036, nz: {b: [.129, .07, 0], r: .0158, r0: .0075, w: .0122, ala: .0098}, au: .5, al: .38, inc: -.03, pliegue: .0016, bolsa: .0016, orR: [.023, .039, .0115], ceja: {n: 110, r: .0016, l: .0165, y: .1385}, hu: .0026, hl: .0042,
+  tris: 12000, crR: [.108, .1, .1], me: [.054, .066, .045], meR: .036, nz: {b: [.129, .07, 0], r: .0158, r0: .0075, w: .0122, ala: .0098}, au: .5, al: .38, inc: -.03, pliegue: .0016, bolsa: .0016, orR: [.023, .039, .0115], ceja: {n: 90, r: .0014, l: .0165, g: .0042, y: .1385}, hu: .0026, hl: .0042,
   arrugas: [['naso', .0013, .004], ['pata', .0009, .0018], ['frente', .0009, .0026], ['bolsa', .0011, .003]],
 });
 
 function crea(P, nombre) {
   const {E, R, nz: NZ, w2: W} = P, cy = Math.cos(P.yaw), sy = Math.sin(P.yaw);
   const ojo = (x, y, s) => {const dx = x - E[0], dy = y - E[1], dz = s - E[2]; return [dx * cy + dz * sy, dy, -dx * sy + dz * cy]};
-  const up = u => {const q = clamp(u / P.w, -1, 1), t = clamp(1 - q * q, 0, 1); return P.au * Math.pow(t, .74) * (1 - P.pico * q) + P.inc * u}, lo = u => {const q = clamp(u / P.w, -1, 1), t = clamp(1 - q * q, 0, 1); return -P.al * Math.pow(t, .92) * (1 + P.pico * .8 * q) + P.inc * u};
+  const up = u => {const q = clamp(u / P.w, -1, 1), t = clamp(1 - q * q, 0, 1); return P.au * Math.pow(t, .7) * (1 - (P.pk ?? P.pico) * q) + P.inc * u}, lo = u => {const q = clamp(u / P.w, -1, 1), t = clamp(1 - q * q, 0, 1); return -P.al * Math.pow(t, .92) * (1 + P.pico * .8 * q) + P.inc * u};
   const base = (x, y, z) => {
     const s = sabs(z); let d = ell(x - P.cr[0], y - P.cr[1], z, ...P.crR); d = smin(d, ell(x - P.ca[0], y - P.ca[1], z, ...P.caR), P.k1);
     if (P.mand) d = smin(d, cap(x, y, s, P.mand[0], P.mand[1], P.mand[2], P.mand[3]), P.mand[4]);
@@ -72,12 +72,12 @@ function crea(P, nombre) {
     }
     if (x > .02 && y < P.my + .05) {
       const [a, b] = labios(x, y, s); d = smin(d, a, .0034); d = smin(d, b, .004); const X = xc(s), Y = y - yc(s); d += P.surco * gauss(z, .0028) * sstep(P.my + .004, P.my + .008, y) * sstep(NZ.b[1] - .006, NZ.b[1] - .012, y); d += .0007 * gauss(Y + P.hl * 2.5, .0032) * sstep(W * .8, .004, s);
-      if (s < W * 1.1) {const gr = Math.max(Math.abs(Y) - .00066 * Math.pow(clamp(1 - (s / (W * .97)) ** 2, 0, 1), .35), s - W * .97, X - .0062 - x, x - X - .02); d = smax(d, -gr, .0011); d = smax(d, -ell(x - X + .0142, y - P.my + .0012, z, .0118, .0092, W * .84), .0012)}
+      if (s < W * 1.1) {const gr = Math.max(Math.abs(Y) - .0005 * Math.pow(clamp(1 - (s / (W * .97)) ** 2, 0, 1), .35), s - W * .97, X - .0062 - x, x - X - .02); d = smax(d, -gr, .0011); d = smax(d, -ell(x - X + .0142, y - P.my + .0012, z, .0118, .0092, W * .84), .0012)}
       d += .0005 * gauss(Math.hypot(s - W - .0008, Y), .0024);
     }
     if (ARR.length) d += surcos(x, y, s);
     { // oreja
-      const ox = x - P.or[0], oy = y - P.or[1], oz = s - P.or[2]; if (Math.hypot(ox, oy, oz) < .06) {const a = .5, b = .16, x1 = ox * Math.cos(a) + oz * Math.sin(a), z1 = -ox * Math.sin(a) + oz * Math.cos(a), x2 = x1 * Math.cos(b) + oy * Math.sin(b), y2 = -x1 * Math.sin(b) + oy * Math.cos(b), [A, Bb, C] = P.orR; let e = ell(x2, y2 - .002, z1, A, Bb, C); e = smin(e, ell(x2 - A * .22, y2 + Bb * .86, z1 + .001, A * .46, Bb * .3, C * .8), .008);
+      const ox = x - P.or[0], oy = y - P.or[1], oz = s - P.or[2]; if (Math.hypot(ox, oy, oz) < .06) {const a = .5, b = .16, x1 = ox * Math.cos(a) + oz * Math.sin(a), z1 = -ox * Math.sin(a) + oz * Math.cos(a), x2 = x1 * Math.cos(b) + oy * Math.sin(b), y2 = -x1 * Math.sin(b) + oy * Math.cos(b), [A, Bb, C] = P.orR; let e = ell(x2, y2 - .002, z1, A, Bb, C); e = smin(e, ell(x2 - A * .2, y2 + Bb * .78, z1 + .001, A * .4, Bb * .24, C * .7), .008);
         e = smax(e, -ell(x2 - A * .12, y2 - Bb * .02, z1 - C * .95, A * .66, Bb * .7, C * .85), .004); e = smin(e, cap(x2, y2, z1, [A * .05, -Bb * .28, C * .35], [-A * .34, Bb * .42, C * .42], .0026, .0022), .0045); e = smax(e, -ell(x2 - A * .22, y2 + Bb * .16, z1 - C * .5, A * .32, Bb * .3, C * .9), .003); e = smin(e, ell(x2 - A * .62, y2 + Bb * .2, z1 - C * .3, A * .2, Bb * .22, C * .4), .004); d = smin(d, e, .006)}
     }
     return d;
@@ -93,18 +93,21 @@ function crea(P, nombre) {
   H.pinta = M => {
     const n = M.p.length / 3, c = new Float32Array(n * 4), m = P.mejRubor; for (let i = 0; i < n; i++) {
       const x = M.p[i * 3], y = M.p[i * 3 + 1], z = M.p[i * 3 + 2], s = sabs(z), ao = oclusion(fo, x, y, z, M.n[i * 3], M.n[i * 3 + 1], M.n[i * 3 + 2], .026), [a, b] = labios(x, y, s), lab = x > .05 ? sstep(.0026, .0004, Math.min(a, b)) * sstep(W * 1.06, W * .9, s) : 0;
-      const rub = clamp(gauss(Math.hypot(x - m[0], y - m[1], s - m[2]), m[3]) * .95 + .5 * gauss(Math.hypot(x - NZ.b[0], y - NZ.b[1], z), NZ.r * 1.7) + .55 * gauss(Math.hypot(x - P.or[0], y - P.or[1], s - P.or[2]), .03) + .22 * gauss(Math.hypot(x - P.ba[0] - .02, y - P.ba[1], z), .02) + .3 * gauss(Math.hypot(...ojo(x, y, s)) - R * 1.1, R * .12) * (x > E[0] ? 1 : 0), 0, 1); const mt = mate(x, y, z);
+      const rub = clamp(gauss(Math.hypot(x - m[0], y - m[1], s - m[2]), m[3]) * .95 + (P.narRubor || .5) * gauss(Math.hypot(x - NZ.b[0], y - NZ.b[1], z), NZ.r * 1.7) + .55 * gauss(Math.hypot(x - P.or[0], y - P.or[1], s - P.or[2]), .03) + .22 * gauss(Math.hypot(x - P.ba[0] - .02, y - P.ba[1], z), .02) + .15 * gauss(Math.hypot(...ojo(x, y, s)) - R * 1.1, R * .12) * (x > E[0] ? 1 : 0), 0, 1); const mt = mate(x, y, z);
       c.set([ao, rub, mt ? .4 : lab, mt * 64 / 255], i * 4);
     } return c;
   };
   /* ---------- cejas, dientes y lengua ---------- */
   H.extras = () => {
-    const L = [], rnd = azar(7), C = P.ceja, yB = t => C.y + C.h * Math.sin(Math.PI * clamp(t * .95 + .1, 0, 1)) - .005 * t * t + C.arco * .25;
-    for (const sd of [-1, 1]) for (let i = 0; i < C.n; i++) {
-      const t = (i + rnd() * .9) / C.n, z = lerp(C.z0, C.z1, t) + (rnd() - .5) * .002, y = yB(t) + (rnd() - .5) * C.k * 2 + (rnd() - .5) * .003 * (1 - t * .6), l = C.l * (.7 + rnd() * .5) * (1 - .25 * t), an = lerp(.62, -.4, Math.pow(t, .6)) + (rnd() - .5) * .16, P0 = []; for (let k = 0; k < 4; k++) {const r = k / 3, zz = z + Math.cos(an) * l * r, yy = y + Math.sin(an) * l * r - .0012 * r * r, x = xDe(f, yy, zz * sd) + .0006 + .0011 * Math.sin(r * 2.4); P0.push([x, yy, zz * sd])}
-      L.push(tubo(P0, u => {const k = Math.max(.12, 1 - u * u) * Math.min(1, .5 + u * 4); return [C.r * k, C.r * .7 * k]}, {lados: 4, seg: 3, arr: [1, 0, 0], color: u => [.72 + u * .28, rnd(), 0, 192 / 255]}));
+    const L = [], rnd = azar(7), C = P.ceja, yB = t => C.y + C.h * (t < .6 ? Math.pow(Math.sin(t / .6 * Math.PI / 2), 1.15) : 1 - .86 * Math.pow((t - .6) / .4, 1.7)) + C.arco, zB = t => lerp(C.z0, C.z1, t), gr = t => C.g * Math.min(1, .62 + t * 2.4) * Math.pow(Math.max(.02, 1 - Math.pow(t, 2.6)), .55);
+    for (const sd of [-1, 1]) {
+      const Q = []; for (let i = 0; i <= 12; i++) {const t = i / 12; Q.push([xDe(f, yB(t), zB(t) * sd) + .0002, yB(t), zB(t) * sd])} L.push(tubo(Q, u => [Math.max(.0004, gr(u) * Math.min(1, u * 14 + .25)), .0013], {lados: 8, seg: 22, arr: [1, 0, 0], color: (u, a) => [.8 + .2 * Math.sin(a), .45, 0, 192 / 255]}));
+      for (let i = 0; i < C.n; i++) {
+        const t = (i + rnd()) / C.n * .93, e = (rnd() - .5) * 1.5, g0 = gr(t), z = zB(t), y = yB(t) + e * g0, l = C.l * (.7 + rnd() * .5) * (1 - .3 * t), dt = .04, an0 = Math.atan2(yB(t + dt) - yB(t), zB(t + dt) - zB(t)), an = an0 + lerp(.75, .06, Math.min(1, t * 1.7)) * (1 - Math.max(0, e) * .5) - .18 * e * t, P0 = []; for (let k = 0; k < 4; k++) {const r = k / 3, zz = z + Math.cos(an) * l * r, yy = y + Math.sin(an) * l * r - .0016 * r * r; P0.push([xDe(f, yy, zz * sd) + .0011 + .0007 * Math.sin(r * 2.4), yy, zz * sd])}
+        L.push(tubo(P0, u => {const k = Math.max(.12, 1 - u * u) * Math.min(1, .5 + u * 4); return [C.r * k, C.r * .7 * k]}, {lados: 4, seg: 3, arr: [1, 0, 0], color: u => [.85 + u * .15, rnd(), 0, 192 / 255]}));
+      }
     }
-    if (P.dientes) {const D = []; for (let i = 0; i <= 8; i++) {const z = lerp(-1, 1, i / 8) * W * .78, s = Math.abs(z); D.push([xc(s) - .0074, P.my - .0006 + .0026 * (s / W) ** 2, z])} L.push(tubo(D, u => {const k = Math.sqrt(Math.max(.1, 1 - (u * 2 - 1) ** 4)); return [.0021 * k, .0049 * k]}, {lados: 8, seg: 16, arr: [0, 1, 0], color: u => [.8, 0, 0, 128 / 255]}))}
+    if (P.dientes) {const D = []; for (let i = 0; i <= 8; i++) {const z = lerp(-1, 1, i / 8) * W * .9, s = Math.abs(z); D.push([xc(s) - .0134, P.my + .0046 + .0026 * (s / W) ** 2, z])} L.push(tubo(D, u => {const k = Math.sqrt(Math.max(.1, 1 - (u * 2 - 1) ** 4)); return [.0021 * k, .0054 * k]}, {lados: 8, seg: 16, arr: [0, 1, 0], color: u => [.8, 0, 0, 128 / 255]}))}
     {const T = [[xc(0) - .03, P.my - .004, 0], [xc(0) - .02, P.my - .0038, 0], [xc(0) - .0095, P.my - .0055, 0]]; L.push(tubo(T, u => {const k = Math.sqrt(Math.max(.06, 1 - u ** 3)); return [W * .5 * k, .0028 * k]}, {lados: 10, seg: 8, arr: [0, 1, 0], color: () => [.7, 0, .75, 64 / 255]}))}
     return L;
   };
@@ -114,7 +117,7 @@ function crea(P, nombre) {
     const esBoca = (x, y, z) => {const s = Math.abs(z), X = xc(s); return s < W * 1.06 && x < X - .002 && x > X - .04 && Math.abs(y - P.my) < .013};
     const G = {
       /* abre la mandíbula */
-      abre: (x, y, z, a) => {const s = Math.abs(z), Y = y - yc(s), den = esBoca(x, y, z), k1 = den ? (a === 128 ? 0 : x < xc(s) - .016 ? sstep(.004, -.004, Y) : sstep(.0001, -.0004, Y)) : sstep(.0001, -.0009, Y), es = s < W ? Math.pow(clamp(1 - (s / W) ** 2, 0, 1), .42) : 0, prof = sstep(-.002, -.02, Y), k = k1 * lerp(den ? Math.max(.35, es) : es, 1, prof) * sstep(-.075, -.03, y) * fr(x) * sstep(.062, .026, s) * sstep(.016, .045, x), hx = 0, hy = P.my + .035, an = -.21 * k, dx = x - hx, dy = y - hy, c = Math.cos(an), q = Math.sin(an); const uy = !den && Y > 0 && s < W ? .0021 * es * gauss(Y, .006) : 0; return [dx * c - dy * q - dx, dx * q + dy * c - dy + uy, 0]},
+      abre: (x, y, z, a) => {if (a === 128) return [.006, -.0054, 0]; const s = Math.abs(z), Y = y - yc(s), den = esBoca(x, y, z), k1 = den ? (a === 128 ? 0 : x < xc(s) - .016 ? sstep(.004, -.004, Y) : sstep(.0001, -.0004, Y)) : sstep(.0001, -.0009, Y), es = s < W ? Math.pow(clamp(1 - (s / W) ** 2, 0, 1), .42) : 0, prof = sstep(-.002, -.02, Y), k = k1 * lerp(den ? Math.max(.35, es) : es, 1, prof) * sstep(-.075, -.03, y) * fr(x) * sstep(.062, .026, s) * sstep(.016, .045, x), hx = 0, hy = P.my + .035, an = -.21 * k, dx = x - hx, dy = y - hy, c = Math.cos(an), q = Math.sin(an); const uy = !den && Y > 0 && s < W ? .0021 * es * gauss(Y, .006) : 0; return [dx * c - dy * q - dx, dx * q + dy * c - dy + uy, 0]},
       son: (x, y, z) => {const s = Math.abs(z), Y = y - P.my, g = gauss(Math.hypot(s - W, Y * .9), .0135) * fr(x), b = gauss(Math.hypot(Math.max(0, s - W * .6) * .6, Y), .011) * fr(x), ch = gauss(Math.hypot(s - P.me[2] + .002, y - P.me[1] - .002), .022) * fr(x), lp = gauss(Math.hypot(s - E[2], (y - E[1] + R * .72) * 1.4), R * .62) * fr(x), sl = clamp(s / W, 0, 1.2); return [-.0045 * g + .0034 * ch - .0012 * b, .0066 * g + .0038 * ch - .0012 * b * (1 - sl) + .0026 * lp, sg(z) * (.0072 * g + .0016 * ch)]},
       o: (x, y, z) => {const s = Math.abs(z), Y = y - P.my, g = gauss(Math.hypot(Math.max(0, s - W * .5) * .9, Y), .0145) * fr(x); return [.0052 * g * (esBoca(x, y, z) ? .4 : 1), -.001 * g, -z * .46 * g]},
       triste: (x, y, z) => {const s = Math.abs(z), Y = y - P.my, g = gauss(Math.hypot(s - W, Y * .9), .012) * fr(x), c = gauss(Math.hypot(s * .7, y - P.ba[1] - .006), .016) * fr(x), ll = gauss(Math.hypot(s * .55, Y + P.hl), .006) * fr(x); return [-.0012 * g + .0014 * ll, -.0066 * g + .0022 * c + .0012 * ll, sg(z) * -.0008 * g]},
@@ -137,8 +140,9 @@ function crea(P, nombre) {
     const L = [], r = R * 1.026; for (const sd of [-1, 1]) {
       const M = {p: [], n: [], c: [], uv: [], ix: []}, NL = 18, NF = 8; for (let j = 0; j <= NF; j++) for (let i = 0; i <= NL; i++) {const la = lerp(-1.42, 1.42, i / NL), fi = j / NF * 1.75, x = Math.cos(la) * Math.cos(fi), y = Math.cos(la) * Math.sin(fi), z = Math.sin(la), g = j === 0 ? .992 : 1; M.p.push(E[0] + x * r * g, E[1] + y * r * g, sd * E[2] + z * r * g); M.n.push(x, y, z); M.c.push(.93, j < 2 ? .34 : .16, 0, 0); M.uv.push(i / NL, j / NF)}
       const w = NL + 1; for (let j = 0; j < NF; j++) for (let i = 0; i < NL; i++) {const a = j * w + i, b = a + 1, c = a + w, d = c + 1; M.ix.push(a, c, b, b, c, d)} L.push(M);
-      const arc = []; for (let i = 0; i <= 10; i++) {const la = lerp(-1.12, 1.12, i / 10); arc.push([E[0] + Math.cos(la) * r * 1.012, E[1] - .0004, sd * E[2] + Math.sin(la) * r * 1.012])} const gz = P.lash; L.push(tubo(arc, u => {const q = sd > 0 ? u : u, k = Math.sqrt(Math.max(.03, Math.sin(Math.PI * Math.pow(u, .82)))) * lerp(.62, 1.15, u); return [gz * k, gz * .85 * k]}, {lados: 5, seg: 14, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}));
-      if (P.pest) for (let i = 0; i < 7; i++) {const la = sd * lerp(.2, 1.14, i / 6), l = lerp(.0055, .0098, i / 6), c = [E[0] + Math.cos(la) * r * 1.006, E[1] - .0002, sd * E[2] + Math.sin(la) * r * 1.006], o = [Math.cos(la * 1.25), -.1, Math.sin(la * 1.25)], T = [0, 1, 2, 3].map(k => {const t = k / 3; return [c[0] + o[0] * l * t, c[1] + (o[1] * t + .62 * t * t) * l, c[2] + o[2] * l * t]}); L.push(tubo(T, u => {const k = Math.max(.08, Math.pow(1 - u, .8)); return [.00125 * k, .00095 * k]}, {lados: 5, seg: 5, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}))}
+      const arc = []; for (let i = 0; i <= 10; i++) {const la = lerp(-1.12, 1.12, i / 10); arc.push([E[0] + Math.cos(la) * r * 1.012, E[1] - .0004, sd * E[2] + Math.sin(la) * r * 1.012])} const gz = P.lash; L.push(tubo(arc, u => {const q = sd > 0 ? u : 1 - u, k = Math.sqrt(Math.max(.03, Math.sin(Math.PI * Math.pow(q, .8)))) * lerp(.45, 1.2, q); return [gz * k, gz * .8 * k]}, {lados: 6, seg: 18, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}));
+      // rabillo: dos pestañas gruesas que siguen la línea hacia fuera
+      if (P.pest) for (const [la0, l, g0, al] of [[1.0, .0105, .0024, .34], [.8, .0066, .0017, .42]]) {const la = sd * la0, c = [E[0] + Math.cos(la) * r * 1.008, E[1], sd * E[2] + Math.sin(la) * r * 1.008], o = [Math.cos(la * 1.12), 0, Math.sin(la * 1.12)], T = [0, 1, 2, 3].map(k => {const t = k / 3; return [c[0] + o[0] * l * t, c[1] + al * l * t * t, c[2] + o[2] * l * t]}); L.push(tubo(T, u => {const k = Math.max(.06, Math.pow(1 - u, .9)); return [g0 * k, g0 * .8 * k]}, {lados: 6, seg: 7, arr: [0, 1, 0], color: () => [.5, 0, 0, 1]}))}
     } return L;
   };
   H.P = P; H.xDe = xDe; H.base = base; H.nombre = nombre; H.pelos = () => {const o = PEINADOS[nombre](H, base); if (nombre === 'hombre') {o.bigote = bigote(H, .9); o.barba = barba(H)} return o}; return H;

@@ -34,7 +34,7 @@ export function tinta(g0, {piel: p, pelo, labio, rubor = 1, pecas = 0}) {
   for (let i = 0; i < n; i++) {
     const ao = k.getX(i), rb = k.getY(i), lb = k.getZ(i), m = k.getW(i), x = g.attributes.position.getX(i), y = g.attributes.position.getY(i), z = g.attributes.position.getZ(i); let r = 0;
     if (m < .12) {_c.copy(P).lerp(RUB, Math.min(.92, rb * .74 * rubor)).lerp(LAB, lb); if (pecas) {const h = Math.sin(x * 4127 + y * 2911) * Math.sin(z * 3733 + y * 1877), e = Math.exp(-(((y - .07) / .016) ** 2)) * Math.exp(-(((Math.abs(z) - .03) / .03) ** 2)); if (h > .55) _c.lerp(_a.set(0x9a5a34), pecas * e * .5)} const A = Math.pow(ao, .8); _c.r *= Math.pow(A, .34); _c.g *= Math.pow(A, .7); _c.b *= Math.pow(A, .78); r = lb > .35 ? .4 : 0}
-    else if (m < .4) {_c.set(0x5a1418).multiplyScalar(lb > .6 ? 1.5 : .55 * ao); if (m < .24) _c.lerp(LAB, clamp(1 - m / .25, 0, 1) * .8); r = .42} else if (m < .6) {_c.set(0xf6f1e8).multiplyScalar(.95 * ao); r = .5} else if (m < .9) {_c.copy(H).lerp(P, .12).multiplyScalar((.85 + rb * .5) * ao); r = .8} else {_c.set(0x140d0a); r = 1}
+    else if (m < .4) {_c.set(0x6e181d).multiplyScalar(lb > .6 ? 1.5 : .8 * ao); if (m < .24) _c.lerp(LAB, clamp(1 - m / .25, 0, 1) * .8); r = .42} else if (m < .6) {_c.set(0xf6f1e8).multiplyScalar(.95 * ao); r = .5} else if (m < .9) {_c.copy(H).lerp(P, .12).multiplyScalar((.85 + rb * .5) * ao); r = .8} else {_c.set(0x140d0a); r = 1}
     c.set([_c.r, _c.g, _c.b], i * 3); mt[i] = r;
   }
   g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.setAttribute('mt', new THREE.BufferAttribute(mt, 1)); g.deleteAttribute('mk'); return g;
@@ -42,7 +42,7 @@ export function tinta(g0, {piel: p, pelo, labio, rubor = 1, pecas = 0}) {
 /* ---------- ojos: el iris se pinta en el sombreador según hacia dónde mira ---------- */
 const FIB = (() => {const n = 256, d = new Uint8Array(n * 4); let s = 3; const r = () => (s = (s * 16807) % 2147483647) / 2147483647, a = Array.from({length: n}, r); for (let i = 0; i < n; i++) {const v = (a[i] * .5 + a[(i + 1) % n] * .3 + a[(i + 2) % n] * .2); d.set([v * 255, a[(i * 7) % n] * 255, a[(i * 3) % n] * 255, 255], i * 4)} const t = new THREE.DataTexture(d, n, 1); t.wrapS = THREE.RepeatWrapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t})();
 export function matOjos(color = 0x5a3216) {
-  const u = {gz: {value: new THREE.Vector3(1, 0, 0)}, iris: {value: new THREE.Color(color)}, fib: {value: FIB}, pup: {value: .46}, ri: {value: .6}, brillo: {value: 1}}, m = new THREE.MeshStandardMaterial({roughness: .07, color: 0xffffff, envMapIntensity: .9}); m.userData.u = u; m.customProgramCacheKey = () => 'ojos';
+  const u = {gz: {value: new THREE.Vector3(1, 0, 0)}, iris: {value: new THREE.Color(color)}, fib: {value: FIB}, pup: {value: .5}, ri: {value: .6}, brillo: {value: 1}}, m = new THREE.MeshStandardMaterial({roughness: .07, color: 0xffffff, envMapIntensity: .9}); m.userData.u = u; m.customProgramCacheKey = () => 'ojos';
   m.onBeforeCompile = s => {
     Object.assign(s.uniforms, u); s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 dir;varying vec3 vD;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvD=dir;');
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vD;uniform vec3 gz,iris;uniform sampler2D fib;uniform float pup,ri,brillo;uniform mat3 normalMatrix;').replace('#include <color_fragment>', `
@@ -51,8 +51,8 @@ float ins=step(0.,dg);vec3 ex=normalize(cross(vec3(0.,1.,0.),G)),ey=cross(G,ex);
 float f1=texture2D(fib,vec2(an*.6366,.5)).r,f2=texture2D(fib,vec2(an*1.2732+.3,.5)).g;float k=ra/ri;
 vec3 ic=iris*(.85+1.35*f1*smoothstep(.2,.9,k));ic=mix(ic,iris*vec3(1.9,1.5,1.05)+.02,.55*f2*smoothstep(.85,.45,k)*smoothstep(.3,.5,k));ic*=.8+.75*smoothstep(.5,-.6,q.y/ri)*smoothstep(1.,.4,k);ic*=1.-.82*smoothstep(.8,1.,k);
 float pu=smoothstep(pup+.035,pup-.035,k);ic=mix(ic,vec3(.006,.005,.005),pu);
-vec3 sc=vec3(.86,.83,.80);sc=mix(sc,vec3(.80,.55,.5),.35*smoothstep(.35,.95,abs(D.z)));
-float mi=smoothstep(ri+.018,ri-.018,rr)*ins;vec3 oc=mix(sc,ic,mi);float som=smoothstep(.95,.18,D.y)*smoothstep(-1.1,-.35,D.y);oc*=mix(.42,1.,som)*mix(.62,1.,smoothstep(.98,.5,abs(D.z)));diffuseColor.rgb=oc;`).replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{vec3 Gv=normalize(normalMatrix*G);float b=smoothstep(.66,.2,rr)*ins;normal=normalize(mix(normal,normalize(normal+(normal-Gv)*.75),b));}').replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+vec3 sc=vec3(.9,.875,.85);sc=mix(sc,vec3(.86,.66,.6),.22*smoothstep(.45,.98,abs(D.z)));
+float mi=smoothstep(ri+.018,ri-.018,rr)*ins;vec3 oc=mix(sc,ic,mi);float som=smoothstep(.95,.18,D.y)*smoothstep(-1.1,-.35,D.y);oc*=mix(.5,1.,som)*mix(.62,1.,smoothstep(.98,.5,abs(D.z)));diffuseColor.rgb=oc;`).replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{vec3 Gv=normalize(normalMatrix*G);float b=smoothstep(.66,.2,rr)*ins;normal=normalize(mix(normal,normalize(normal+(normal-Gv)*.75),b));}').replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 {vec3 V=normalize(vViewPosition),N=normalize(normal),Rf=reflect(-V,N);float h1=smoothstep(.955,.972,dot(Rf,normalize(vec3(-.36,.52,.78)))),h2=smoothstep(.978,.99,dot(Rf,normalize(vec3(.42,-.3,.86))));totalEmissiveRadiance+=vec3(1.,.98,.95)*(h1*1.5+h2*.32)*brillo;totalEmissiveRadiance+=ic*mi*.22*(1.-pu);}`);
   };
   return m;
@@ -62,7 +62,7 @@ function ojosGeo(id) {if (geoOjos[id]) return geoOjos[id]; const {E, R, yaw = 0}
 
 /* gesto → pesos de los morphs y apertura de los párpados */
 const GESTOS = {
-  son: {son: .55, parp: .97}, risa: {son: .85, abre: .92, cejaAlza: .4, parp: .91}, o: {o: .8, abre: .58, cejaAlza: .85, parp: 1.0}, seria: {cejaFrunce: .12, triste: .18, parp: .92}, triste: {triste: .95, cejaPena: 1, parp: .74}, duerme: {son: .22, parp: -.06}, pena: {triste: .55, cejaPena: .8, parp: .62},
+  son: {son: .66, parp: .96}, risa: {son: 1, abre: .86, cejaAlza: .45, parp: .86}, o: {o: .8, abre: .58, cejaAlza: .85, parp: 1.0}, seria: {cejaFrunce: .12, triste: .18, parp: .92}, triste: {triste: .95, cejaPena: 1, parp: .74}, duerme: {son: .22, parp: -.06}, pena: {triste: .55, cejaPena: .8, parp: .62},
 };
 export class Cara {
   constructor(id, col) {

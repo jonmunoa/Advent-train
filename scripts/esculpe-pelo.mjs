@@ -38,8 +38,20 @@ export const PEINADOS = {
     for (const [a, l] of [[20, .03], [-30, .026], [70, .022]]) {const p = K.en(cor, .014), d = dir(160 + a, 70); L.push(K.suelto([p, [p[0] + d[0] * .012, p[1] + .016, p[2] + d[2] * .012 + a * .0001], [p[0] - .006, p[1] + l, p[2] + a * .0004]], {w: .0052, fin: 1.2}))}
     return {pelo: L};
   },
-  /* recogido en un moño bajo, con raya al lado */
+  /* melena corta y ondulada, con raya al lado y un flequillo que cae hacia la sien */
   madre(H, base) {
+    const K = peluquero(H, base), {dir, slerp, rnd, C} = K, E = K.tabla([[0, 38], [26, 35], [46, 23], [62, 6], [78, -8], [96, -14], [140, -34], [180, -40]]), L = [K.casquete(E, .012)], RAYA = 20;
+    // radio de la cabeza en horizontal, a la altura de las mejillas: por ahí cae la melena
+    const radio = az => {const c = Math.cos(az * G), s = Math.sin(az * G); let r = 0; for (const y of [.075, .105, .135]) {let q = .2; for (let i = 0; i < 60; i++) {const e = base(C[0] + c * q, y, s * q); q -= e * .8; if (Math.abs(e) < 5e-5) break} r = Math.max(r, q)} return r};
+    const cae = (az, {w, sep, y1, fase, amp, al, k}) => {const c = Math.cos(az * G), s = Math.sin(az * G), R = radio(az), r = az * Math.sign(az) < 90 ? R : R, sd = Math.sign(az), P = [], N = 7; for (let i = 0; i <= N; i++) {const t = i / N, y = lerp(.118, y1, t), ond = Math.sin(t * 7.4 + fase), rr = r + sep * (1 - .25 * t) + .0075 * Math.sin(t * 2.7) + amp * .7 * ond - .02 * Math.pow(t, 3.2) * al, ta = amp * 1.2 * Math.cos(t * 5.2 + fase) + (Math.abs(az) < 100 ? .012 * t * t : 0) * -1; P.push([C[0] + c * rr - s * ta * 0 + (Math.abs(az) < 100 ? .010 * Math.sin(t * 3) : 0), y, s * rr + c * ta * 0])} return K.mechon([dir(sd * Math.abs(az) * .4 + RAYA * .4, 78), dir(az * .78, 56), dir(az * .95, 38), dir(az, 18)], {w, g: .5, h: t => sep * lerp(.75, 1, t) + .004 * Math.sin(t * 3), pts: P, seg: 20, lados: 6, ini: .3, fin: .75, ao: k ? 1 : .82})};
+    for (let k = 0; k < 2; k++) for (const sd of [-1, 1]) {const n = k ? 13 : 17; for (let i = 0; i < n; i++) {const q = (i + rnd() * .5) / n, az = sd * lerp(k ? 56 : 59, 179, q); L.push(cae(az, {w: (k ? .0135 : .0128) * (.85 + rnd() * .35), sep: .0115 + k * .007 + rnd() * .0015, y1: lerp(.020, -.004, Math.min(1, q * 2)) + (rnd() - .5) * .012 + k * .008, fase: .4 + rnd() * .5 + q * 1.2 + k * .3, amp: .0068, al: 1, k}))}}
+    // el flequillo, del lado ancho; y un mechón corto al otro lado de la raya
+    for (let i = 0; i < 12; i++) {const t0 = i / 11, p = [-58 - t0 * 4, 4 + t0 * 10], R = radio(p[0] - 6), a = (p[0] - 8) * G; L.push(K.mechon([dir(RAYA - 1, 58 + t0 * 12), dir(RAYA - 18 - t0 * 4, 38 + t0 * 18), dir(-26 - t0 * 8, 22 + t0 * 22), dir(-48 - t0 * 4, 12 + t0 * 20)], {w: .0088 * (.8 + rnd() * .4), g: .5, h: t => .011 + .0105 * Math.sin(t * 2.6) + t0 * .003, pts: [[C[0] + Math.cos(a) * (R + .016 + t0 * .004), .112 - t0 * .004, Math.sin(a) * (R + .016 + t0 * .004)], [C[0] + Math.cos(a - .12) * (R + .0175 + t0 * .004), .078, Math.sin(a - .12) * (R + .0175 + t0 * .004)], [C[0] + Math.cos(a - .1) * (R + .013 + t0 * .004), .046 + t0 * .01, Math.sin(a - .1) * (R + .013 + t0 * .004)], [C[0] + Math.cos(a) * (R + .004), .026 + t0 * .012, Math.sin(a) * (R + .004)]], seg: 22, lados: 6, ini: .35, fin: .7}))}
+    for (let i = 0; i < 8; i++) {const t0 = i / 7, R = radio(60), a = (61 + t0 * 5) * G; L.push(K.mechon([dir(RAYA + 1.5, 58 + t0 * 10), dir(RAYA + 16 + t0 * 8, 40 + t0 * 16), dir(52 + t0 * 6, 22 + t0 * 14)], {w: .0086 * (.8 + rnd() * .4), g: .5, h: t => .0105 + .0085 * Math.sin(t * 2.6) + t0 * .003, pts: [[C[0] + Math.cos(a) * (R + .0155), .112, Math.sin(a) * (R + .0155)], [C[0] + Math.cos(a + .1) * (R + .0175), .078, Math.sin(a + .1) * (R + .0175)], [C[0] + Math.cos(a + .06) * (R + .012), .044 + t0 * .012, Math.sin(a + .06) * (R + .012)], [C[0] + Math.cos(a) * (R + .003), .024 + t0 * .014, Math.sin(a) * (R + .003)]], seg: 20, lados: 6, ini: .35, fin: .7}))}
+    return {pelo: L};
+  },
+  /* recogido en un moño bajo, con raya al lado */
+  mayor(H, base) {
     const K = peluquero(H, base), {dir, slerp, rnd} = K, E = K.tabla([[0, 38], [26, 35], [46, 23], [62, 6], [78, -8], [96, -14], [140, -34], [180, -40]]), L = [K.casquete(E, .012)], mo = dir(180, -14), RAYA = 20;
     for (let i = 0; i < 58; i++) {const q = i / 57, az = -86 + q * 172, sd = az > RAYA ? 1 : -1, el = E(az) + 1 + rnd() * 5, a = dir(az, el), m = slerp(dir(az + sd * 14, el + 20 * (1 - Math.abs(az) / 90)), mo, .42), jj = (rnd() - .5) * .1; L.push(K.mechon([a, m, slerp(m, mo, .72 + jj), dir(180 + (rnd() - .5) * 26, -14 + (rnd() - .5) * 20)], {w: .0082 * (.7 + rnd() * .5), g: .5, h: t => .0105 + .0055 * Math.sin(t * 2.6) + rnd() * .0006, seg: 14, ini: .25, fin: .5}))}
     for (let i = 0; i < 26; i++) {const az = 100 + i * 160 / 25, el = E(az) + 1 + rnd() * 3, a = dir(az, el); L.push(K.mechon([a, slerp(a, mo, .5), slerp(a, mo, .9)], {w: .0078 * (.7 + rnd() * .5), g: .5, h: t => .009 + .005 * t, ini: .25, fin: .5}))}
@@ -53,7 +65,6 @@ export const PEINADOS = {
     for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) {const p = K.en(dir(sd * (72 + i * 1.6), 6 - i * 2), .008 + i * .001); L.push(K.suelto([p, [p[0] + .008, p[1] - .022, p[2] + sd * .005], [p[0] + .002 - i * .002, p[1] - .048, p[2] + sd * .004], [p[0] + .009, p[1] - .07 - i * .006, p[2] - sd * .003]], {w: .0046 - i * .0008, g: .7, seg: 14, lados: 6, fin: .8, arr: [1, 0, 0]}))}
     return {pelo: L};
   },
-  mayor(H, base) {return PEINADOS.madre(H, base)},
   /* corto con raya */
   hombre(H, base) {
     const K = peluquero(H, base), {dir, slerp, rnd} = K, E = K.tabla([[0, 47], [24, 46], [44, 34], [62, 14], [78, -4], [92, -10], [140, -30], [180, -36]]), L = [K.casquete(E, .0075)], R = 34;

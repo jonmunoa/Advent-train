@@ -64,7 +64,7 @@ const osc = (c, f) => {const k = new THREE.Color(c); return (x, y, z, o) => o.co
 export const ROPA = {
   nino: {abrigo: 0x27498c, abrigo2: 0x1d3870, bufanda: 0xc41e2e, bufanda2: 0xf3ecdd, pelo: 0x5f3c20, bota: 0x8a5a2b, pant: 0x2a2c36, mano: 0xc41e2e},
   senor: {abrigo: 0x3a3f4c, abrigo2: 0x2a2e38, bufanda: null, pelo: 0x3a2a1c, bota: 0x241812, pant: 0x2a2c36, mano: 0xf0c4a4},
-  madre: {abrigo: 0x8f2136, abrigo2: 0x74172a, bufanda: 0xe9dcc0, bufanda2: 0xe9dcc0, pelo: 0x40251a, bota: 0x3b2418, pant: 0x2b2530, mano: 0x33221a, boina: 0xe9dcc0},
+  madre: {abrigo: 0x8f2136, abrigo2: 0x74172a, bufanda: 0xe9dcc0, bufanda2: 0xe9dcc0, pelo: 0x5c3420, bota: 0x3b2418, pant: 0x2b2530, mano: 0x33221a, boina: 0xe9dcc0},
 };
 const PIEL = 0xf0c4a4, ORO = 0xd9a441, CUERO = 0x4a2c1c, BLANCO = 0xf1ebe0;
 
