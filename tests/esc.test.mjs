@@ -3,9 +3,10 @@
 import {strict as assert} from 'node:assert';
 import {MAPS, mapaOf, atM, BW, BD, KG, KT, KB, pondE, pisteD} from '../src/esc-vias.js';
 import {marcasEsc, pedirTexto, sitioDe, FACH, ESC, VAGONES} from '../src/esc-eco.js';
+import {TIENDA, enlaceTienda, MARCADOR, AVISO} from '../src/esc-tienda.js';
 import {N, DIAS, EXTRAS, ULTIMO, estado, previa, pedido, falta, tope} from '../src/esc-historia.js';
 import {readFileSync} from 'node:fs';
-import {MARCAS, PRECIO_ROTULO, PRECIO_VAGON} from '../src/esc-marcas.js';
+import {MARCAS, PRECIO_ROTULO, PRECIO_VAGON, VENDER} from '../src/esc-marcas.js';
 
 let fails = 0;
 const ok = (name, fn) => {try {fn(); console.log('  ok   ' + name)} catch (e) {fails++; console.log('  FALLO ' + name + '\n        ' + e.message)}};
@@ -48,5 +49,9 @@ ok('las marcas salen solo en sus fechas y en sitios que existen, y una línea ma
 ok('el fichero de marcas está bien escrito y la petición lleva los datos', () => {
   assert.ok(Array.isArray(MARCAS) && PRECIO_ROTULO > 0 && PRECIO_VAGON > 0); for (const m of MARCAS) assert.ok(Object.values(marcasEsc([m], m.desde)).some(e => Object.keys(e).length), 'línea que no sale nunca: ' + JSON.stringify(m));
   const t = pedirTexto({text: 'Ogi', sub: 'Roscón', url: 'https://ogi.es/', bg: '#1d3a78', img: 'x'}, 'rotulo', 2, 10); for (const q of ['rótulo', 'escaparate 2', '10 €', 'Ogi', 'Roscón', 'https://ogi.es/', 'adjunto']) assert.ok(t.includes(q), q);
+});
+ok('cada tienda vende algo menos el 24, y los enlaces son de Amazon con el código bien puesto', () => {
+  assert.equal(TIENDA.length, N); assert.equal(TIENDA[23], null); for (const q of TIENDA.slice(0, 23)) {assert.ok(q.titulo && q.titulo.length <= 34, q.titulo); assert.ok(q.texto.length <= 70, q.texto); assert.ok(q.busqueda); assert.ok(!/€|\d+,\d\d/.test(q.titulo + q.texto), 'sin precios'); assert.ok(q.asin === '' || /^[A-Z0-9]{10}$/.test(q.asin), q.titulo)}
+  const q = TIENDA[0]; assert.ok(!enlaceTienda(q, MARCADOR).includes('tag=')); assert.ok(!enlaceTienda(q, 'x"><script>').includes('tag=')); assert.ok(enlaceTienda(q, 'jon-21').startsWith('https://www.amazon.es/s?k=') && enlaceTienda(q, 'jon-21').endsWith('&tag=jon-21')); assert.equal(enlaceTienda({...q, asin: 'B0ABCDEFGH'}, 'jon-21'), 'https://www.amazon.es/dp/B0ABCDEFGH?tag=jon-21'); assert.equal(enlaceTienda(null, 'jon-21'), ''); assert.ok(AVISO.includes('Afiliado de Amazon')); assert.equal(VENDER, false);
 });
 console.log(fails ? `\n${fails} fallos` : '\nTodo OK'); process.exit(fails ? 1 : 0);

@@ -60,6 +60,7 @@ src/esc-gente.js, esc-cara.js, esc-medidas.js   las figuras y su ropa / las cara
 src/esc-vista.js           cámara de mapa de dentro del escaparate (sale de tren.js)
 src/esc-post.js, esc-geo.js  posprocesado ligero / juntar geometría quieta en pocas mallas
 src/esc-follaje.js, m/gente/*.glb, scripts/esculpe*.mjs   abeto con ramitas / piezas esculpidas / escultor sin conexión (SDF → glb)
+src/esc-tienda.js          qué vende cada tienda (un producto por día) y su enlace de afiliado, sin DOM ni red
 src/esc-eco.js, esc-marcas.js    reparto de marcas sin DOM ni red / lo que Jon edita a mano (contacto, precios y marcas)
 src/kit.js, musica.js      juguetes y materiales, y caja de música (sacados de tren.js)
 src/escaparates.css        estilos de los escaparates
@@ -164,14 +165,15 @@ Enfoque actual (23–24 de noviembre de 2026, a petición de Jon). **Los usuario
 - Luz: `vent` es el foco del escaparate más cercano (la única sombra de la calle), `relleno` ilumina las caras en las escenas y `enfoca(dt)` lleva el foco de la cámara (`post.foco`); las escenas pueden llamar a `this.enfoca(dist, cantidad)`. Desenfoque de cámara en `esc-post.js`. El abeto (`esc-follaje.js`) son ramitas con recorte alfa.
 - Materiales: `separa(root, sitio)` (`esc-geo.js`) da una copia del material por escena y tipo de malla; compartirlos hace que three recalcule el programa en cada fotograma. Los programas se compilan en paralelo al arrancar (`compila`).
 - Vías: `buildVia` clasifica cada muestra (túnel si el monte queda `TUN` por encima, puente si queda `BR` por debajo); `mapaOf(q).h` es el suelo con la vía y `T.cap` evita que el terraplén tape los puentes. Radio mínimo > 9 y pendiente < 11 %. En las bocas, `terreno()` parte las caras que estorban y quita solo los trocitos del hueco; la galería lleva la luz pintada en los vértices. `contacto()` oscurece la nieve bajo casas y árboles.
-- Marcas: `MARCAS` de `esc-marcas.js` por escaparate y sitio (`rotulo` o vagón 1–4) y fechas, validadas con `marcasEsc`; con la lista vacía salen ejemplos. Al tocar un vagón o un rótulo sale su ficha (enlace `sponsored`); el editor enseña cómo queda y copia los datos (o abre el correo si hay `CONTACTO`).
+- Dinero (decidido con Jon el 24 de noviembre de 2026): **solo afiliados**; las marcas, si la web gana visitas. Afiliados (`esc-tienda.js`): al mirar un escaparate o estar dentro, `#bTi` («Llévate uno a casa») o tocar el rótulo abren la ficha (`showTienda`) con el producto, el botón a Amazon (`rel` con `sponsored`) y el aviso obligatorio; «Ver todas las tiendas» (`#tiSheet`) enseña solo los días encendidos. El 24 y los días especiales no venden nada. Sin precios ni fotos de Amazon. El código sale de `config.js` (`TAG`); con el marcador, el enlace va sin código y la ficha lo dice. Sin `asin`, el enlace es una búsqueda.
+- Marcas (guardadas): `VENDER` en `esc-marcas.js` (o `?marcas` para probarlas, `VENTA` en `esc-tren.js`) enciende «Tu marca aquí», el editor y los ejemplos. Apagado, los vagones libres llevan un adorno («Juguetes», «Caramelos»…). `MARCAS` por escaparate y sitio (`rotulo` o vagón 1–4) y fechas, validadas con `marcasEsc`, salen siempre. Al tocar un vagón o un rótulo con marca sale su ficha; el editor enseña cómo queda y copia los datos (o abre el correo si hay `CONTACTO`).
 - Hook: `window.__esc` (`empezar`, `ir(n)`, `entrar(n)`, `salir()`, `ponDia(d)`, `escena(id)`, `verEscena`, `cal`, `ESCN`, `mundo(n)`, `MU`, `locs`, `tapado(n)`, `step(s, dt, suave)`, `vista`, `step(s)`, `mirar(u)`, `hold(v)`, `setCam`, `pos`, `manos`, `vagon(k, i)`, `ventana(n)`, `rotulo(k)`, `figura('nino')`, `queHay(x, y)`, `sitios()`, `eng`, `perf(n, pr)`…). `localStorage`: `advx-sonido` y `advx-esc-nav` (pista de manejo vista). `window.ADVX_ESC_URL` cambia el enlace de compartir.
 - Rendimiento (con los 24 escaparates y las caras esculpidas). Escritorio (GPU integrada): a 1200×760, andando 8,5 ms, mirando 8 y dentro 6; a 1600×900, 11–12 ms a 1× y 14–15 a 1,5×. Arranque 2,5 s. Perfil móvil (412×915, CPU ×4 más lenta): andando 10–11 ms, mirando 9, dentro 3 y las escenas 8–15. No medido en un Android real.
 - Antes de publicar: quitar la vista previa (`#pv`, `?dia=`, `#dia-`), que deja ver todos los días. El cerrojo usa la hora del dispositivo: se puede hacer trampa y se acepta.
 
 ## Pendientes conocidos
 
-- Faltan los valores reales en Vercel: `ADVX_TAG` (en local, `config.js` usa el marcador `TU-TAG-21` y se ve el aviso de enlace de ejemplo) y `ADVX_SITE_URL`.
+- Los escaparates leen el mismo `ADVX_TAG`. Faltan los valores reales en Vercel: `ADVX_TAG` (en local, `config.js` usa el marcador `TU-TAG-21` y se ve el aviso de enlace de ejemplo) y `ADVX_SITE_URL`.
 - Faltan los ASIN de `src/products.js`: sin ellos los enlaces son búsquedas de Amazon.
 - Despliegue preparado (Vercel), pero aún no hecho.
 - La clasificación global está preparada (Supabase: `supabase/`), pero falta crear el proyecto y poner `SUPABASE_URL`/`SUPABASE_KEY` (README → «Clasificación global»). Sin ellos, `Board` guarda en `localStorage`.

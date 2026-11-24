@@ -37,7 +37,8 @@
   <button class="cap" id="cap" type="button" title="Ver el escaparate por dentro"><b id="capN"></b><span id="capS" aria-live="polite"></span></button>
   <button class="ar" id="bNext" aria-label="Seguir paseando" title="Seguir paseando (→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
 </nav>
-<button class="marca hud" id="bAd" type="button">Tu marca aquí</button>
+<button class="marca hud" id="bAd" type="button" hidden>Tu marca aquí</button>
+<button class="marca hud" id="bTi" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12.500 12.500 20a1.800 1.800 0 0 1-2.500 0L4 14V4h10l6 6a1.800 1.800 0 0 1 0 2.500z"/><circle cx="8.500" cy="8.500" r="1.500"/></svg><span>Llévate uno a casa</span></button>
 
 <button class="volver" id="bVolver" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span id="bVolverT">Volver a la calle</span></button>
 <div class="nav hud" id="nav" role="group" aria-label="Vista de la maqueta">
@@ -53,10 +54,11 @@
 <div class="pv hud" id="pv" role="group" aria-label="Vista previa del calendario"><button id="pvA" aria-label="Día anterior">‹</button><button id="pvS" title="Volver a empezar este día"><small>Vista previa</small><b id="pvT"></b></button><button id="pvB" aria-label="Día siguiente">›</button></div>
 <section id="fin" class="fin" aria-label="Fin"><button class="mano" id="finGo" type="button">Mándaselo a tu madre</button><button class="lnk" id="finX" type="button">Seguir paseando</button></section>
 
-<div id="card" class="adcard" hidden role="region" aria-label="Marca">
+<div id="card" class="adcard" hidden role="region" aria-label="Ficha">
   <div class="ac-tx"><span class="ac-tag" id="caTag"></span><b id="caName"></b><span id="caSub"></span></div>
-  <a id="caGo" class="btn" target="_blank" rel="noopener noreferrer nofollow sponsored">Visitar <span id="caHost"></span></a>
+  <a id="caGo" class="btn" target="_blank" rel="noopener noreferrer nofollow sponsored"><span id="caVer">Visitar</span> <span id="caHost"></span></a>
   <button id="caFree" class="btn" type="button">Pon tu marca</button>
+  <p class="ac-fine" id="caFine" hidden></p>
   <button class="x" id="caX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
 </div>
 <button id="prevBack" class="pill" hidden>Vista previa · Volver</button>
@@ -82,6 +84,16 @@
     <button class="btn" id="adAsk" type="button">Pedir este sitio</button>
     <button class="lnk" id="adSee" type="button">Ver cómo queda</button>
     <p class="fine">Te contestamos con los días libres y cómo pagar. Cada imagen se revisa antes de salir.</p>
+  </div>
+</div>
+
+<div id="tiSheet" class="modal" role="dialog" aria-modal="true" aria-labelledby="tiTtl">
+  <div class="card">
+    <button class="x" id="tiX" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="tiTtl">De tienda en tienda</h2>
+    <p class="lead">Una idea de cada escaparate encendido.</p>
+    <ul class="tienda" id="tiList"></ul>
+    <p class="fine" id="tiFine"></p>
   </div>
 </div>
 

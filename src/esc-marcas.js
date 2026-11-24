@@ -1,5 +1,8 @@
 // Marcas de los escaparates. Se edita a mano: no hay servidor ni base de datos.
 // Cuando alguien paga un sitio, se añade aquí una línea y se vuelve a subir la web.
+// VENDER: false = no se ofrecen sitios («Tu marca aquí») y los vagones libres llevan un adorno. Cuando la web tenga visitas,
+// ponlo en true. Para probarlo sin publicarlo: ?marcas en la dirección. Las MARCAS de la lista salen siempre, se ofrezcan o no.
+export const VENDER = false;
 export const CONTACTO = '';                     // correo al que llegan las peticiones; vacío = se copian los datos al portapapeles
 export const PRECIO_ROTULO = 10, PRECIO_VAGON = 3;  // € por día: el rótulo de una tienda o un vagón de su tren
 

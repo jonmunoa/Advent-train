@@ -24,7 +24,7 @@ def check(name, cond, info=''):
     print(('  ok   ' if cond else '  FALLO ') + name + (f'  {info}' if info else ''))
 
 
-async def abrir(pg, errors, quien='', q='?dia=9'):
+async def abrir(pg, errors, quien='', q='?dia=9&marcas'):
     pg.on('pageerror', lambda e: errors.append(f'pageerror {quien}: {e}'))
     pg.on('response', lambda r: errors.append(f'HTTP {r.status} {r.url}') if r.status >= 400 and 'favicon' not in r.url else None)
     await route_local_three(pg)
@@ -325,7 +325,7 @@ async def main():
         # 8) móvil
         mob = await b.new_context(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
         mp = await mob.new_page()
-        await abrir(mp, errors, '(móvil)', '')
+        await abrir(mp, errors, '(móvil)', '?marcas')
         if SHOTS:
             await mp.wait_for_timeout(900)
             await mp.screenshot(path=str(OUT / 'esc-9-movil-portada.png'), timeout=120000)
@@ -375,6 +375,49 @@ async def main():
             await mp.evaluate('__esc.hold(false);__esc.mirar(.75);__esc.step(8)')
             await mp.wait_for_timeout(900)
             await mp.screenshot(path=str(OUT / 'esc-9-movil.png'), timeout=120000)
+        await mob.close()
+
+        # 9) sin venta de marcas (como se publica): afiliados
+        for quien, kw in (('', {'viewport': {'width': 1200, 'height': 720}}), (' (móvil)', {'viewport': {'width': 375, 'height': 812}, 'is_mobile': True, 'has_touch': True})):
+            ctx = await b.new_context(**kw)
+            tp = await ctx.new_page()
+            fuera = []
+            tp.on('request', lambda r: fuera.append(r.url) if 'amazon' in r.url else None)
+            await abrir(tp, errors, '(tienda)' + quien, '?dia=14')
+            mira = "(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.step(3)})()"
+            await tp.evaluate("__esc.empezar();__esc.hold(true)")
+            await tp.evaluate(mira)
+            await tp.wait_for_timeout(600)
+            await tp.evaluate('__esc.step(2)')
+            r = await tp.evaluate("({ad:getComputedStyle(bAd).display,ti:getComputedStyle(bTi).display,v:__esc.mundo(13).tren.ads.filter(a=>a&&!a.ad).length,s:Object.values(__esc.sitios()).some(x=>Object.keys(x).length)})")
+            check('no se ofrecen sitios para marcas y los vagones llevan un adorno' + quien, r['ad'] == 'none' and r['ti'] != 'none' and r['v'] == 4 and not r['s'], str(r))
+            await tp.click('#bTi')
+            await tp.wait_for_timeout(350)
+            r = await tp.evaluate("(()=>{const q=document.getElementById('card').getBoundingClientRect();return {n:caName.textContent,t:caTag.textContent,a:caGo.href,rel:caGo.rel,tg:caGo.target,f:caFine.textContent,free:caFree.hidden,l:q.left,r:q.right,b:q.bottom,foot:document.getElementById('foot').getBoundingClientRect().top,w:innerWidth}})()")
+            check('la ficha de la tienda lleva su producto, se identifica como enlace de afiliado y abre Amazon en otra pestaña' + quien, r['n'] == 'Silbato de tren' and 'afiliado' in r['t'] and r['a'].startswith('https://www.amazon.es/') and 'tag=' not in r['a'] and 'sponsored' in r['rel'] and 'noopener' in r['rel'] and r['tg'] == '_blank' and 'Afiliado de Amazon' in r['f'] and 'comisión' in r['f'] and r['free'], str(r))
+            check('la ficha cabe y no tapa los botones del paseo' + quien, r['l'] >= 0 and r['r'] <= r['w'] and r['b'] <= r['foot'] + 1, str(r))
+            if SHOTS:
+                await tp.screenshot(path=str(OUT / f"esc-10-tienda{'-movil' if quien else ''}.png"), timeout=120000)
+            await tp.click('#caFine button')
+            await tp.wait_for_timeout(350)
+            r = await tp.evaluate("({n:[...document.querySelectorAll('#tiList a')].length,ok:[...document.querySelectorAll('#tiList a')].every(a=>a.href.startsWith('https://www.amazon.es/')&&a.rel.includes('sponsored')&&a.target==='_blank'),f:tiFine.textContent,foco:document.activeElement.id,b:document.querySelector('#tiSheet .card').getBoundingClientRect().bottom<=innerHeight})")
+            check('«todas las tiendas» solo enseña los días encendidos' + quien, r['n'] == 14 and r['ok'] and 'Afiliado de Amazon' in r['f'] and r['foco'] == 'tiX' and r['b'], str(r))
+            await tp.keyboard.press('Escape')
+            check('Escape cierra la lista' + quien, not await tp.evaluate("tiSheet.classList.contains('on')"))
+            if not quien:
+                v = await tp.evaluate('(()=>{__esc.mirar(0);__esc.step(6);return __esc.rotulo(13)})()')
+                await tp.mouse.click(v['x'], v['y'])
+                check('tocar el rótulo enseña lo que vende la tienda', await tp.evaluate("!document.getElementById('card').hidden&&caName.textContent==='Silbato de tren'"))
+                await tp.evaluate("__esc.entrar(__esc.n,{car:2});__esc.step(3)")
+                check('tocar un vagón lo sigue sin ofrecer nada', await tp.evaluate("__esc.vista.cam.focus&&__esc.vista.cam.focus.car===2&&document.getElementById('card').hidden"))
+                await tp.evaluate('__esc.ponDia(24)')
+                await tp.wait_for_timeout(600)
+                await tp.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30);bSaltar.click()})()")
+                await tp.wait_for_timeout(700)
+                await tp.evaluate(mira)
+                check('el 24 no se vende nada', await tp.evaluate("__esc.n===23&&getComputedStyle(bTi).display==='none'"))
+            check('a Amazon no se llama hasta que se pulsa el enlace' + quien, not fuera, str(fuera[:2]))
+            await ctx.close()
         await b.close()
     srv.shutdown()
     check('sin errores de JavaScript ni recursos que fallen', not errors, '\n        '.join(errors[:8]))

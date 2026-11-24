@@ -3,7 +3,14 @@
 import {THREE, RT, WB, WS, GAUGE, WLEN, WTOP, WHALF, TM, M, wagonGeos, bigWheelGeos, smallWheelGeos, buildLoco, buildTender, buildCaboose, SPH, coneTex, dotTex,
   PANEL, PANEL_Y, AD_W, AD_H, drawAd, loadImg, adTex, hostOf, ZAX, ONE, QFLIP, lerp} from './kit.js';
 import {atM, kindAt, KT} from './esc-vias.js';
+import {QS} from './kit.js';
+import {VENDER} from './esc-marcas.js';
 
+/* si se ofrecen sitios para marcas (con ?marcas se puede probar) */
+export const VENTA = VENDER || QS.has('marcas');
+
+const ADORNO = [['Juguetes', '#7a1020'], ['Caramelos', '#1c5a41'], ['Cartas', '#1d3a78'], ['Regalos', '#8a5a1c']], adornos = [];
+const adorno = i => {if (!adornos[i]) {const cv = document.createElement('canvas'); cv.width = AD_W / 2; cv.height = AD_H / 2; const g = cv.getContext('2d'); g.scale(.5, .5); const t = document.createElement('canvas'); t.width = AD_W; t.height = AD_H; drawAd(t, {text: ADORNO[i][0], bg: ADORNO[i][1]}); g.drawImage(t, 0, 0); adornos[i] = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.8, .8, .8)})} return adornos[i]};
 export const V = 6.2;   // unidades por segundo: despacio, para verlo pasar
 let GEO = null;
 const geos = () => GEO || (GEO = {w: wagonGeos(), b: bigWheelGeos(), s: smallWheelGeos()});
@@ -55,7 +62,7 @@ export class Tren {
   async setAd(i, ad) {
     const W = this.wag[i]; if (!W) return; const tok = W.userData.tok = (W.userData.tok || 0) + 1, im = ad ? await loadImg(ad.img) : null; if (W.userData.tok !== tok) return;
     const old = this.ads[i]; if (old) {W.remove(old.mesh); if (old.ad) {old.mesh.material.map.dispose(); old.mesh.material.dispose()}}
-    let mat = freeMat(); if (ad) {const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {...ad, im, host: ad.url ? hostOf(ad.url) : ''}); mat = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.86, .86, .86)})}
+    let mat = VENTA ? freeMat() : adorno(i % 4); if (ad) {const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {...ad, im, host: ad.url ? hostOf(ad.url) : ''}); mat = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.86, .86, .86)})}
     const mesh = new THREE.Mesh(PANEL, mat); mesh.position.y = PANEL_Y; W.add(mesh); this.ads[i] = {ad: ad || null, mesh};
   }
 }
