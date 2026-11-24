@@ -6,7 +6,7 @@ import {S} from './esc-calle.js';
 import {Cara, pieza3, sss, VIDRIO} from './esc-cara.js';
 import {separa} from './esc-geo.js';
 import {MEDIDAS} from './esc-medidas.js';
-import {persona, monta} from './esc-persona.js';
+import {persona, monta, trozo} from './esc-persona.js';
 
 const PI = Math.PI, V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 /* ---------- telas ---------- */
@@ -93,7 +93,7 @@ const refleja = g0 => {const g = g0.clone(), p = g.attributes.position, n = g.at
 export class Figura {
   constructor(tipo, ropa, det = 1) {
     const n = this.n = tipo === 'nino', sr = this.sr = tipo === 'senor', R = this.R = {...ROPA[n ? 'nino' : sr ? 'senor' : 'madre'], ...ropa}; this.det = det; this.simple = det < .6; DET = this.simple ? .45 : LOWQ ? .8 : 1; this.cro = 0; this.lean = 0; this.tip = 0; this.g = new THREE.Group(); this.g.scale.setScalar(S); this.ph = 0; this.alt = n ? 1.05 : 1.7;
-    const idP = this.idP = !(R.gorro === false) && !sr && !R.mayor && !R.gafas && !(det < .6) && persona(n ? 'nino' : 'madre') ? (n ? 'nino' : 'madre') : null, XP = idP && persona(idP).x; if (idP) {this.alt = XP.alto; this.ojosP = XP.ojos}
+    const idQ = n ? (R.gorro === false ? null : 'nino') : sr ? (R.barba || R.gafas || R.calvo ? 'viejo' : 'hombre') : R.mayor || R.gafas ? 'mayor' : 'madre', idP = this.idP = R.mandil ? null : det < .6 ? (persona(idQ + '_l') ? idQ + '_l' : null) : persona(idQ) ? idQ : null, XP = idP && persona(idP).x; if (idP) {this.alt = XP.alto; this.ojosP = XP.ojos}
     const D = this.D = idP ? {...XP.D} : n ? {hip: .3, sho: .64, sw: .122, arm: .315, lw: .066, tob: .05, cad: .34, cuello: .775} : sr ? {hip: .8, sho: 1.305, sw: .176, arm: .57, lw: .09, tob: .075, cad: .9, cuello: 1.452} : {hip: .78, sho: 1.295, sw: .148, arm: .555, lw: .082, tob: .075, cad: .88, cuello: 1.442}; D.l1 = (D.hip - D.tob) * .5; if (!idP) {D.mun = D.arm * .815; D.a1 = D.mun * .5; D.a2 = D.arm - D.a1}
     // huesos: cadera → tronco → cabeza y brazos; cadera → piernas
     const H = this.huesos = [], hu = (par, x, y, z) => {const b = new THREE.Bone(); b.position.set(x, y, z); par.add(b); H.push(b); return b}; this.b = hu(this.g, 0, 0, 0); this.cad = hu(this.b, 0, D.cad, 0); this.tro = hu(this.cad, 0, (D.sho - D.cad) * .25, 0); const ty = D.cad + (D.sho - D.cad) * .25; this.head = hu(this.tro, 0, D.cuello - ty, 0);
@@ -105,9 +105,9 @@ export class Figura {
   }
   /* persona de MakeHuman: cabeza, pelo y ropa hechas; aquí solo manos y botas */
   vistePersona(C, id, R, D) {
-    const n = this.n; this.hem = 0; [0, 1].forEach(i => this.mano(C, i, n ? 'manopla' : 'mano', n ? 1.06 : 1.0, R.mano, n ? 'punto' : 'cuero'));
-    this.piernas2(C, n ? {r: [[0, .05], [.5, .046], [1, .04]], color: R.pant, bota: 'botaNino', kb: 1.12, colB: R.bota, colS: 0x241610} : {r: [[0, .08], [.35, .07], [.6, .056], [1, .044]], color: R.pant, t: 'lana', bota: 'botaMadre', kb: 1, colB: R.bota, colS: 0x15100c, caña: .18});
-    if (!n) this.hazBolsa(); monta(this, id, R);
+    const n = this.n, sr = this.sr; this.hem = 0; [0, 1].forEach(i => this.mano(C, i, n ? 'manopla' : 'mano', n ? 1.06 : sr ? 1.14 : 1.0, R.mano, n ? 'punto' : R.mano === 0xf0c4a4 ? 'piel' : 'cuero')); for (const [k, c] of [['barba', R.barba], ['bigote', R.barba || (R.bigote && R.pelo)]]) {const g = c && trozo(id, k); if (g) C.pelo(g.clone(), c, this.head, k === 'barba' ? {l: .05, cae: .55} : {l: .016, cae: .5})}
+    this.piernas2(C, n ? {r: [[0, .05], [.5, .046], [1, .04]], color: R.pant, bota: 'botaNino', kb: 1.12, colB: R.bota, colS: 0x241610} : sr ? {r: [[0, .06], [.5, .05], [1, .04]], color: R.pant, bota: 'zapato', kb: 1.02, colB: R.bota, colS: 0x0e0a07, caña: -.005} : {r: [[0, .02], [.45, .03], [.62, .05], [1, .044]], color: R.pant, t: 'lana', bota: 'botaMadre', kb: 1, colB: R.bota, colS: 0x15100c, caña: .18});
+    if (sr) {this.bag = new THREE.Group(); this.tro.add(this.bag)} else if (!n) this.hazBolsa(); monta(this, id, R);
   }
   colaHuesos() {const D = this.D, n = this.n; if (D.cola) {const [tx, ty, tz, cl] = D.cola, ty0 = D.cad + (D.sho - D.cad) * .25; this.cl = cl; this.tail.position.set(tx, ty - ty0, tz); this.caeT = n ? [-.1, .1, .02] : [-.12, .1, .02]; this.tr.forEach((t, i) => t.position.set(0, i ? -cl : 0, 0)); if (D.borla) this.pomH.position.set(D.borla[0], D.borla[1] - D.cuello, 0); return} const l = this.cl = n ? .1 : .13; this.tail.position.set(n ? -.16 : this.sr ? -.176 : this.R.cuello === false ? -.158 : -.16, D.cuello - (D.cad + (D.sho - D.cad) * .25) - (n ? .06 : .05), n ? .07 : .058); this.caeT = n ? [-.2, .16, .04] : this.sr ? [-.42, .36, .04] : [-.38, .34, .03]; this.tr.forEach((t, i) => t.position.set(0, i ? -l : 0, 0)); this.pomH.position.set(-.08, .3, 0)}
 

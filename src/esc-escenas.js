@@ -70,7 +70,7 @@ export class Escenas {
   /* deja hechas las figuras de una escena, una por llamada; devuelve si falta alguna */
   calienta(id) {for (const [t, d] of REPARTO[id] || []) if (!this.arm.has(t + JSON.stringify(DISFRAZ[d]))) {this.viste(t, DISFRAZ[d]); return true} return false}
   extra(tipo, ropa, x, z, yaw = 0) {const f = this.viste(tipo, ropa); f.cro = f.lean = f.inc = 0; f.look = {y: 0, p: 0}; f.reach = [null, null]; f.palma = [0, 0]; f.g.visible = true; f.g.position.y = 0; f.cara('son'); if (f.bag) f.bag.visible = false; this.c.calle.add(f.g); this.ext.push(f); this.pon(f, x, z, yaw); return f}
-  plano(px, py, pz, lx, ly, lz, fov = 42, k = 1.6, corte = false) {this.plan = {p: V(this.wx(px), py, pz), l: V(this.wx(lx), ly, lz), fov, k, corte}}
+  plano(px, py, pz, lx, ly, lz, fov = 42, k = 1.6, corte = false) {if (this.N && this.N.idP) {const w = 7 * Math.exp(-(((ly - 41) / 9) ** 2)) * clamp((170 - Math.hypot(px - lx, pz - lz)) / 90, 0, 1); py += w; ly += w} this.plan = {p: V(this.wx(px), py, pz), l: V(this.wx(lx), ly, lz), fov, k, corte}}
   /* enfoca a una distancia fija (a: cuánto desenfoca) */
   enfoca(d, a = 1) {if (this.plan) {this.plan.foco = d; this.plan.fa = a}}
   /* en vertical, la cámara se aleja hasta que cabe este ancho */
