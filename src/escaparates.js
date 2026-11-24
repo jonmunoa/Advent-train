@@ -174,7 +174,7 @@ function enfoca(dt) {
 /* las tiendas y las maquetas se recolocan delante de quien pasea; solo se mueve y se dibuja lo que se ve */
 const kpx = () => renderer.getPixelRatio() * innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
 function colocar(dt, t) {
-  const cx = cam.p.x, px = kpx(), bi = cx + E.dir * 250, din = E.st === 'dentro', esc = E.st === 'escena', vis = new Set();
+  const cx = cam.p.x, px = kpx(), din = E.st === 'dentro', esc = E.st === 'escena', bi = cx + E.dir * (esc ? 0 : 250), vis = new Set();
   for (let k = 0; k < 3; k++) {
     const n = din && k === mod(E.n, 3) ? E.n : sitioDe(k, bi, PASO), x = WX(n), L = locs[k], F = lejos[k], cer = tapado(n); viste(L, n); L.g.position.x = x; L.g.visible = true; viste(F, n + 3 * E.dir); F.g.position.x = x + E.dir * PER; F.g.visible = !din; const c = cristal[k]; c.position.x = x;
     const cerca = din ? n === E.n : esc ? Math.abs(x - cx) < 300 : E.st === 'mira' ? Math.abs(x - cx) < 120 : Math.abs(E.az) > .7 ? Math.abs(x - cx) < 285 : ((x - cx) * E.dir > -95 && (x - cx) * E.dir < (LOWQ ? 240 : 285)) || (n === E.n && E.st !== 'paseo' && Math.abs(x - cx) < 400), abre = n >= 0 && n < N && (n < AB() || n === AB() || CAL.extra); let m = null;
