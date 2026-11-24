@@ -20,7 +20,7 @@ function horneado({tipo, d, n, k = 1 / 90, nor = 1, color = [1, 1, 1], rug = 1, 
     Object.assign(s.uniforms, u, U); m.userData.s = s;
     s.vertexShader = s.vertexShader.replace('#include <common>', `#include <common>
 uniform vec3 uB0,uBS;uniform float k;attribute vec4 tinte;attribute vec2 lmuv;${pr ? 'attribute vec2 puv;' : ''}varying vec2 vL,vB;varying vec4 vT;varying vec3 vPo,vNo;`).replace('#include <begin_vertex>', `vec3 transformed=uB0+position*uBS;vPo=(modelMatrix*vec4(transformed,1.)).xyz;vNo=objectNormal;vL=lmuv;vT=tinte;
-{vec3 a=abs(objectNormal);vB=${pr ? 'puv' : '(a.y>a.x&&a.y>a.z?transformed.xz:a.x>a.z?transformed.zy:transformed.xy)*k'};}`);
+{vec3 a=abs(objectNormal);vB=${pr ? 'puv' : tipo === 'suelo' ? 'transformed.xz*k' : '(a.y>a.x&&a.y>a.z?transformed.xz:a.x>a.z?transformed.zy:transformed.xy)*k'};}`);
     s.fragmentShader = s.fragmentShader.replace('#include <common>', `#include <common>
 uniform sampler2D tL,tDir,tE,tA,tN,tS,tSd;uniform float MX,MW,on,esc,envK,k;uniform vec3 col;varying vec2 vL,vB;varying vec4 vT;varying vec3 vPo,vNo;float rugB,metB,snB;vec3 lmE,lmM,lmD;
 ${LZ}${RUIDO}
@@ -49,7 +49,7 @@ if(receiveShadow){SpotLightShadow sl=spotLightShadows[0];somB=getShadow(spotShad
 WB*=mix(.22,1.,somB);vec3 irradiance=LmB*mix(.8,1.,somB)+vec3(1.,.8,.58)*1.25*WB;
 vec3 dwB=texture2D(tDir,vL).xyz*2.-1.;float kdB=lmM.b;vec3 dvB=normalize((viewMatrix*vec4(dwB,0.)).xyz+vec3(0.,0.,1e-4));
 {float f=dot(nLis,dvB),g=dot(normal,dvB);irradiance*=mix(1.,clamp((max(g,0.)+.32)/(max(f,0.)+.32),.3,1.8),kdB*(1.-.6*snB));}
-{vec3 hB2=normalize(dvB+geometryViewDir);float nl=clamp(dot(normal,dvB),0.,1.);vec3 sp=BRDF_GGX(dvB,geometryViewDir,normal,material);reflectedLight.directSpecular+=irradiance*sp*smoothstep(0.,.2,nl)*kdB*.9;}`)
+{vec3 hB2=normalize(dvB+geometryViewDir);float nl=clamp(dot(normal,dvB),0.,1.);vec3 sp=BRDF_GGX(dvB,geometryViewDir,normal,material);reflectedLight.directSpecular+=min(irradiance*sp*smoothstep(0.,.2,nl)*kdB*${tipo === 'liso' ? '.42' : '.9'},vec3(${tipo === 'liso' ? '1.1' : '3.'}));}`)
       .replace('#include <lights_fragment_maps>', `#ifdef USE_ENVMAP
 {vec3 rf=getIBLRadiance(geometryViewDir,geometryNormal,material.roughness);float oc=clamp(dot(irradiance,vec3(.4))*1.6+lmM.g*.35,0.,1.);radiance+=rf*oc*envK;}
 #endif${tipo === 'suelo' && !LOWQ ? `
