@@ -356,7 +356,7 @@ document.addEventListener('fullscreenchange', () => {if (FON && FON.full && !doc
 /* lo que se oye del tren desde donde está la cámara */
 const oI = new THREE.Matrix4(), oV = new THREE.Vector3(), oO = {T: null, s: 0, w: 0, off: null, c: [0, 14, 58], d: [1, 0], nivel: 0};
 function escucha() {
-  const m = MU.get(E.k), st = E.st, nv = st === 'dentro' ? 1 : st === 'mira' ? .3 + .35 * E.u : st === 'escena' ? .34 : st === 'llega' || st === 'sale' ? .16 : 0; if (!m || !nv || casaOn || tapado(E.n)) {callaTren(); return}
+  const m = MU.get(E.k), st = E.st, nv = st === 'dentro' ? 1 : st === 'mira' ? .5 + .4 * E.u : st === 'escena' ? .45 : st === 'llega' || st === 'sale' ? .16 : 0; if (!m || !nv || casaOn || tapado(E.n)) {callaTren(); return}
   oO.T = m.T; oO.s = m.tren.s; oO.w = m.tren.w; oO.off = m.tren.off; oO.nivel = nv; if (st === 'dentro') {oI.copy(m.g.matrixWorld).invert(); oV.copy(camera.position).applyMatrix4(oI); oO.c[0] = oV.x; oO.c[1] = oV.y; oO.c[2] = oV.z; const e = camera.matrixWorld.elements; oO.d[0] = e[0]; oO.d[1] = e[2]} else {oO.c[0] = 0; oO.c[1] = 14; oO.c[2] = 56; oO.d[0] = 1; oO.d[1] = 0} oyeTren(oO);
 }
 const url = () => window.ADVX_ESC_URL || location.origin + location.pathname;

@@ -18,10 +18,10 @@ const inicio = () => {const g = parseInt(store.get('advx-lofi'), 10); if (g >= 0
 let prim = null; const primera = () => (prim ??= inicio());
 function monta() {
   if (N || !ac) return N; const g = v => {const x = ac.createGain(); x.gain.value = v; return x}, lp = f => {const x = ac.createBiquadFilter(); x.type = 'lowpass'; x.frequency.value = f; x.Q.value = .3; return x};
-  const master = g(1), comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 14; comp.ratio.value = 3; comp.attack.value = .012; comp.release.value = .28; master.connect(comp); comp.connect(ac.destination);
+  const master = g(.8), comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 14; comp.ratio.value = 3; comp.attack.value = .012; comp.release.value = .28; const lim = ac.createDynamicsCompressor(); lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .002; lim.release.value = .12; master.connect(comp); comp.connect(lim); lim.connect(ac.destination);
   const fx = g(.9); fx.connect(master); const mus = g(0), musF = lp(1600); mus.connect(musF); musF.connect(master); const tren = g(0), trF = lp(900); tren.connect(trF); trF.connect(master); const amb = g(0), ambF = lp(6000); amb.connect(ambF); ambF.connect(master);
   const ir = sala(ac, LOWQ ? 1.3 : 2.1), rev = ac.createConvolver(); rev.buffer = ir; rev.connect(tren);
-  N = {master, comp, fx, mus, musF, tren, trF, amb, ambF, rev, apaga: 0}; N.lofi = new Lofi(ac, mus, {i: primera(), ligera: LOWQ, sala: ir, cambia: (p, a) => {store.set('advx-lofi', String(p.i)); if (a) {N.ton = a.ton; N.menor = a.menor; if (N.st) {N.st.ton = a.ton; N.st.menor = a.menor}} if (alCambiar) alCambiar(p)}}); N.lofi.out.gain.value = 1;
+  N = {master, comp: lim, fx, mus, musF, tren, trF, amb, ambF, rev, apaga: 0}; N.lofi = new Lofi(ac, mus, {i: primera(), ligera: LOWQ, sala: ir, cambia: (p, a) => {store.set('advx-lofi', String(p.i)); if (a) {N.ton = a.ton; N.menor = a.menor; if (N.st) {N.st.ton = a.ton; N.st.menor = a.menor}} if (alCambiar) alCambiar(p)}}); N.lofi.out.gain.value = 1;
   N.st = new SonidoTren(ac, tren, rev); N.it = N.st.hace(); return N;
 }
 /* bucles de ambiente: se hacen la primera vez que hacen falta, a trozos */
@@ -29,7 +29,7 @@ function ambiente() {if (N.fl === 0 || VOL.amb <= 0 || N.it) return; N.fl ??= [[
 function tic() {
   if (!ac || ac.state !== 'running') return; if (!N) {if (!sfx) return; monta()}
   const t = ac.currentTime, H = document.hidden ? 2.2 : .35, pon = (p, v, k) => p.setTargetAtTime(v, t, k);
-  pon(N.mus.gain, sfx && !callado ? VOL.musica * .74 * (.5 + .5 * cerca) : 0, .6); pon(N.musF.frequency, 1300 + 17500 * Math.pow(cerca, 1.4), .5); pon(N.tren.gain, sfx && !callado ? VOL.tren * 2.1 : 0, .3); pon(N.trF.frequency, 650 + 13000 * Math.pow(cerca, 2.2), .4); pon(N.amb.gain, sfx ? VOL.amb * (callado ? .6 : 1) : 0, .8);
+  pon(N.mus.gain, sfx && !callado ? VOL.musica * .64 * (.5 + .5 * cerca) : 0, .6); pon(N.musF.frequency, 1300 + 17500 * Math.pow(cerca, 1.4), .5); pon(N.tren.gain, sfx && !callado ? VOL.tren * 2.3 : 0, .3); pon(N.trF.frequency, 650 + 13000 * Math.pow(cerca, 2.2), .4); pon(N.amb.gain, sfx ? VOL.amb * (callado ? .6 : 1) : 0, .8);
   if (!sfx) {if (N.lofi.on && t > N.apaga) N.lofi.para(); return} N.apaga = t + 1.2;
   if (!N.lofi.on && VOL.musica > 0) N.lofi.empieza(); if (N.it && N.lofi.cola.length < 6 && N.it.next().done) N.it = null; ambiente();
   N.lofi.hor = H; N.lofi.tic(); N.st.tic(x => N.lofi.rejilla(x), H);
