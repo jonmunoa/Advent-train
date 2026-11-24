@@ -29,13 +29,13 @@ class Casa extends Tienda {
     for (const sd of [-1, 1]) for (let y = 4; y < alto; y += 17) A(BX(sd > 0 ? 8 : 6 + (Math.round(y / 17) % 2) * 4, 15, 12), E.stone, sd * (H - 4), y + 4, -5);
     // comercio
     const x = -38, vt = new THREE.MeshBasicMaterial({map: interior(k), color: new THREE.Color(1.5, 1.35, 1.1)}); A(BX(196, 150, 8), W, x, 75, -3); A(PLN(126, 78), vt, x - 22, 72, 1.6); A(BX(136, 5, 5), WL, x - 22, 112, 2); A(BX(140, 4, 14), WL, x - 22, 30, 4); A(BX(138, 3.4, 10), E.snow, x - 22, 33, 5); for (const q of [-63, -21, 21, 63]) A(BX(3, 80, 3), WL, x - 22 + q, 72, 2.6); for (const q of [-48, -8, 32]) A(BX(36, 17, 1.4), WL, x - 22 + q + 4, 15, 1.8);
-    A(BX(42, 108, 4), E.door[k], x + 68, 54, .6); A(PLN(26, 56), E.glass, x + 68, 72, 3.2); A(BX(26, 1.6, 1.4), E.door[k], x + 68, 72, 3.6); A(SPH(1.6), E.gold, x + 52, 52, 4); A(TOR(9, 2.8, 22), E.pine, x + 68, 86, 5); A(BX(52, 4, 12), E.stone, x + 68, 2, 4);
+    A(BX(42, 108, 4), E.door[k], x + 68, 54, .6); A(PLN(26, 56), E.glass, x + 68, 72, 3.2); A(BX(26, 1.6, 1.4), E.door[k], x + 68, 72, 3.6); A(SPH(1.6), E.gold, x + 52, 52, 4); this.corona(x + 68, 86, 4.6, 8.6, 2.7, 0); A(BX(52, 4, 12), E.stone, x + 68, 2, 4);
     A(PLN(176, 24), new THREE.MeshBasicMaterial({map: cartel(['Panadería', 'Librería', 'Café'][k], ['#5a1620', '#17372c', '#1b2c52'][k]), color: new THREE.Color(1, .96, .88)}), x, 133, 1.6);
     {const t = new THREE.PlaneGeometry(150, 34, 1, 1); A(t, new THREE.MeshStandardMaterial({map: toldoT(['#b3162a', '#1b5a40', '#274173'][k]), roughness: .9, side: THREE.DoubleSide}), x - 20, 118, 17, -.95); A(BX(150, 2.6, 30), E.snow, x - 20, 121.4, 15, .62)}
     this.guirnalda([[-H + 14, 168, 6], [-90, 152, 8], [-20, 166, 7], [50, 152, 8], [H - 14, 168, 6]], 3.2, 40);
     for (const q of [x - 96, x + 98]) {A(BX(5, 11, 5), E.iron, q, 96, 5); A(BX(3.4, 7, 3.4), E.lamp, q, 96, 6.4)}
     // portal de las casas
-    {const px = 118; A(BX(56, 124, 4), E.frame, px, 62, -1.6); A(BX(42, 106, 3), E.door[(k + 1) % 3], px, 53, .4); A(PLN(26, 22), E.glass2, px, 88, 2.4); A(BX(30, 22, 1.2), E.shutter[k], px, 24, 2.2); A(BX(30, 22, 1.2), E.shutter[k], px, 54, 2.2); A(TOR(8, 2.6, 20), E.pine, px, 88, 4); A(BX(62, 4, 13), E.stone, px, 126, 2); A(BX(64, 3.4, 13), E.snow, px, 129.6, 2.4); this.abeto(px - 42, 18, .95)}
+    {const px = 118; A(BX(56, 124, 4), E.frame, px, 62, -1.6); A(BX(42, 106, 3), E.door[(k + 1) % 3], px, 53, .4); A(PLN(26, 22), E.glass2, px, 88, 2.4); A(BX(30, 22, 1.2), E.shutter[k], px, 24, 2.2); A(BX(30, 22, 1.2), E.shutter[k], px, 54, 2.2); this.corona(px, 88, 3.6, 7.8, 2.5, 0); A(BX(62, 4, 13), E.stone, px, 126, 2); A(BX(64, 3.4, 13), E.snow, px, 129.6, 2.4); this.abeto(px - 42, 18, .95)}
     for (let q = 0; q < 14; q++) A(new THREE.SphereGeometry(1, 10, 6, 0, 6.28, 0, 1.57).scale(10 + r() * 14, 4 + r() * 5, 7 + r() * 6), E.snow, -H + 8 + r() * (PASO - 16), -.4, 5 + r() * 5);
     this.cierra();
   }
