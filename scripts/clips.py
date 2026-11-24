@@ -1,10 +1,10 @@
-"""Graba las escenas de la historia como vídeos verticales (1080×1920, 30 fps) para TikTok, Reels o Shorts.
+"""Graba las escenas de cada día como vídeos verticales (1080×1920, 30 fps) para TikTok, Reels o Shorts.
 
 Fotograma a fotograma, sin depender de la velocidad del ordenador. Necesita Playwright (como las pruebas), numpy y ffmpeg.
 La música es una caja de música con «Noche de paz» (dominio público); el 18 solo suena el viento.
 
 Uso:
-  python scripts/clips.py 1,6,18        # días 1–24; 25 campanadas, 26 cabalgata, 27 Reyes y final
+  python scripts/clips.py 1,6,18        # días 1–24; 25 campanadas, 26 cabalgata, 27 Reyes
 Deja los vídeos en clips/ (no se sube al repositorio).
 """
 import asyncio, math, pathlib, subprocess, sys, tempfile, wave
