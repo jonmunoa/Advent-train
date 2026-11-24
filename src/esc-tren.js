@@ -1,7 +1,7 @@
 /* Un tren completo que da vueltas por una vía. Qué máquina y qué vagones lleva sale del catálogo (TIPOS, esc-trenes.js).
    Los vagones iguales y las ruedas son mallas instanciadas; cada maqueta tiene su tren. */
-import {THREE, RT, WB, TM, M, SPH, dotTex, PANEL, PANEL_Y, AD_W, AD_H, drawAd, loadImg, adTex, hostOf, ZAX, ONE, QFLIP, GAUGE, WLEN} from './kit.js';
-import {TIPOS, vagon, ruedas, laca, LISA} from './esc-trenes.js';
+import {THREE, RT, WB, TM, M, SPH, dotTex, PANEL, PANEL_Y, AD_W, AD_H, drawAd, loadImg, adTex, hostOf, ZAX, QFLIP, LOWQ} from './kit.js';
+import {TIPOS, vagon, ruedas, laca, LISA, ligera, ligeraG} from './esc-trenes.js';
 import {atM, kindAt, KT} from './esc-vias.js';
 import {QS} from './kit.js';
 import {VENDER} from './esc-marcas.js';
@@ -23,15 +23,15 @@ export class Tren {
   constructor(par, T, {tipo = 'americana', body = 0x0e4a31, trim = 0xb3121f, cols = ['#8f1d24', '#16492f', '#1f3a6b', '#e6d8b8'], vagones = null, wagons = 0} = {}) {
     this.T = T; this.s = 0; this.w = 0; this.g = new THREE.Group(); par.add(this.g); this.ads = []; this.wag = []; this.tipo = tipo; const D = this.def = TIPOS[tipo] || TIPOS.americana; this.clase = D.clase; this.nombre = D.nombre;
     const cb = laca(body), cr = laca(trim), mat = {cue: cb, tri: cr, cre: laca(0xf0e6d2), lac: TM.lac, lisa: LISA};
-    this.cars = D.loco({cb, cr, ...mat}); this.maq = this.cars.length; let L = vagones || D.v; if (wagons && !vagones) L = Array.from({length: wagons}, (_, k) => D.v[k % D.v.length]);
+    this.cars = D.loco({cb, cr, ...mat}); if (LOWQ) this.cars.forEach(ligeraG); this.maq = this.cars.length; let L = vagones || D.v; if (wagons && !vagones) L = Array.from({length: wagons}, (_, k) => D.v[k % D.v.length]);
     // vagones: los iguales comparten mallas instanciadas
-    const grupos = new Map(), pon = (nom, k) => {const V = vagon(nom); if (V.grupo) {const g = V.grupo({cb, cr, ...mat}); this.cars.push(g); return g} const W = new THREE.Group(); W.userData = {len: V.len, top: V.top, wheels: V.wheels, sesgo: V.sesgo || 0, ci: this.cars.length, panel: !!V.panel}; this.cars.push(W); if (!grupos.has(nom)) grupos.set(nom, {V, W: [], c: []}); const G = grupos.get(nom); G.W.push(W); G.c.push(new THREE.Color(cols[k % cols.length])); return W};
+    const grupos = new Map(), pon = (nom, k) => {const V = vagon(nom); if (V.grupo) {const g = V.grupo({cb, cr, ...mat}); if (LOWQ) ligeraG(g); this.cars.push(g); return g} const W = new THREE.Group(); W.userData = {len: V.len, top: V.top, wheels: V.wheels, sesgo: V.sesgo || 0, ci: this.cars.length, panel: !!V.panel}; this.cars.push(W); if (!grupos.has(nom)) grupos.set(nom, {V, W: [], c: []}); const G = grupos.get(nom); G.W.push(W); G.c.push(new THREE.Color(cols[k % cols.length])); return W};
     L.forEach((n, k) => this.wag.push(pon(n, k))); this.wag.forEach((W, k) => {W.userData.ci = this.maq + k}); if (D.cola) pon(D.cola, L.length);
     const ud = c => c.userData, ses = c => ud(c).sesgo || 0; this.off = [0]; for (let i = 1; i < this.cars.length; i++) {const a = this.cars[i - 1], b = this.cars[i]; this.off.push(this.off[i - 1] - (ud(a).len / 2 - ses(a) + ud(b).len / 2 + ses(b) + .5))}
     this.len = -this.off[this.off.length - 1] + 6; this.cars.forEach(c => this.g.add(c));
     const mk = (geo, m, n) => {const q = new THREE.InstancedMesh(geo, m, n); q.castShadow = !m.isMeshBasicMaterial; q.receiveShadow = true; q.frustumCulled = false; this.g.add(q); return q};
-    this.iv = [...grupos.values()].map(({V, W, c}) => ({W, im: V.m.map(([g, m]) => {const q = mk(g, typeof m === 'string' ? mat[m] : m, W.length); if (m === 'lac' || m === 'lisa') {c.forEach((k, i) => q.setColorAt(i, k)); q.instanceColor.needsUpdate = true} return q})}));
-    const R = ruedas(), por = {}; this.cars.forEach((c, ci) => ud(c).wheels.forEach(w => {const k = w.set || (w.big ? 'big' : 'small'); (por[k] = por[k] || []).push({c: ci, ...w, r: w.r || R[k].r})})); this.wl = Object.entries(por).map(([k, l]) => ({l, r: R[k].r, im: R[k].m.map(([g, m]) => mk(g, m === 'tri' ? cr : m, l.length))}));
+    this.iv = [...grupos.values()].map(({V, W, c}) => ({W, im: (LOWQ ? ligera(V.m, mat) : V.m).map(([g, m]) => {const q = mk(g, typeof m === 'string' ? mat[m] : m, W.length); if (m === 'lac' || m === 'lisa') {c.forEach((k, i) => q.setColorAt(i, k)); q.instanceColor.needsUpdate = true} return q})}));
+    const R = ruedas(), por = {}; this.cars.forEach((c, ci) => ud(c).wheels.forEach(w => {const k = w.set || (w.big ? 'big' : 'small'); (por[k] = por[k] || []).push({c: ci, ...w, r: w.r || R[k].r})})); this.wl = Object.entries(por).map(([k, l]) => ({l, r: R[k].r, im: (LOWQ ? ligera(R[k].m, {tri: cr}) : R[k].m).map(([g, m]) => mk(g, m === 'tri' ? cr : m, l.length))}));
     // faro con su haz y luces de cola
     const L0 = this.cars[0], lp = L0.userData.lamp, lens = new THREE.Mesh(SPH(.21, 14, 10), M.lamp); lens.position.copy(lp); L0.add(lens);
     if (lp.x < 3.5) lens.scale.setScalar(.8); const cg = new THREE.ConeGeometry(3.6, 20, 24, 1, true); cg.translate(0, -10, 0); cg.rotateZ(Math.PI / 2);

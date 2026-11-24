@@ -201,6 +201,14 @@ export function vagon(nombre) {
   if (cacheV.has(nombre)) return cacheV.get(nombre); const [t, a] = nombre.split(':'), v = VAG[t](a === undefined ? undefined : isNaN(+a) ? a : +a); if (!v.grupo) {const by = new Map(); for (const [g, m] of v.L) {const q = m.vertexColors ? g : geoOnly(g); if (!by.has(m)) by.set(m, []); by.get(m).push(q)} v.m = [...by].map(([m, gs]) => [gs.length > 1 ? mergeGeometries(gs, false) : gs[0], m]); delete v.L} cacheV.set(nombre, v); return v;
 }
 
+/* móvil: los materiales lisos de un coche van en una sola malla con el color por vértice */
+const VCOL = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .42, metalness: .12});
+export function ligera(lista, mat) {
+  const L = [], o = [], c = new THREE.Color(); for (const [g0, m] of lista) {const M = typeof m === 'string' ? mat[m] : m; if (m === 'lac' || m === 'lisa' || M.isMeshBasicMaterial || M.vertexColors || M.map) {o.push([g0, m]); continue} const g = new THREE.BufferGeometry(), q = g0.index ? g0.toNonIndexed() : g0, n = q.attributes.position.count, a = new Float32Array(n * 3); c.copy(M.color); if (M.metalness > .7) c.multiplyScalar(1.25); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('position', q.attributes.position); g.setAttribute('normal', q.attributes.normal); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); L.push(g)}
+  if (L.length) o.push([mergeGeometries(L, false), VCOL]); return o;
+}
+export function ligeraG(g) {const fijo = new Set(g.userData.rods || []), ms = g.children.filter(m => m.isMesh && !fijo.has(m)), o = ligera(ms.map(m => [m.geometry, m.material]), {}); ms.forEach(m => g.remove(m)); for (const [a, m] of o) g.add(new THREE.Mesh(a, m)); return g}
+
 /* ---------- el catálogo ---------- */
 const exp = o => [maquina({...o, rm: .92, rc: 1.0, x0: -1.9, x1: 2.9, humo: 1.1, chim: 'corta', cx: -3.1, cw: 2.3, ch: 2.2, motrices: [-1.95, 0, 1.95], libres: [3.0, 3.95, -3.5], domos: [.9], bandas: [-1.2, .1, 1.5, 2.7], deflectores: true, faros: 2, cil: 1.35}), tender({cb: o.cb, cr: o.cr, l: 5.6})];
 const tan = (x = {}) => o => [maquina({...o, rm: .74, rc: .9, x0: -1.2, x1: 2.2, humo: .8, chim: 'recta', cx: -1.9, cw: 1.7, ch: 2.2, motrices: [-1.6, 0, 1.6], domos: [.8], bandas: [], tanques: [-1.0, 2.0, 1.3], carbonera: 1.0, faros: 2, cil: 1.2, ...x})];

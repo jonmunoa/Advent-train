@@ -32,6 +32,8 @@
 
 Los recursos de Poly Haven se descargan con `scripts/fetch-polyhaven.mjs` (lista en `scripts/polyhaven.json`) y se aligeran con gltf-transform (meshopt, webp, simplificación) y sharp.
 
+Los juguetes, figuras y trenes de los escaparates (`src/esc-juguetes.js`, `src/esc-trenes.js`, `m/gente/juguetes.glb`) son propios: ya no usan los modelos de Kenney, que siguen en los demás prototipos.
+
 ## Música de los escaparates
 
 No hay ficheros de audio: todo se sintetiza en el navegador (`src/lofi.js`, `src/sonido-tren.js`). Las melodías son villancicos tradicionales o de autores en dominio público (el más reciente, *Away in a Manger*, de 1887); los arreglos son propios.
