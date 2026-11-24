@@ -24,8 +24,8 @@ function monta() {
   N = {master, comp, fx, mus, musF, tren, trF, amb, ambF, rev, apaga: 0}; N.lofi = new Lofi(ac, mus, {i: primera(), ligera: LOWQ, sala: ir, cambia: (p, a) => {store.set('advx-lofi', String(p.i)); if (a) {N.ton = a.ton; N.menor = a.menor; if (N.st) {N.st.ton = a.ton; N.st.menor = a.menor}} if (alCambiar) alCambiar(p)}}); N.lofi.out.gain.value = 1;
   N.st = new SonidoTren(ac, tren, rev); N.it = N.st.hace(); return N;
 }
-/* bucles de ambiente: se hacen la primera vez que hacen falta, uno a uno */
-function ambiente() {if (N.f0 || VOL.amb <= 0) return; N.f0 = 1; const lz = (b, v) => {const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = b; s.loop = true; s.loopEnd = b.fin; g.gain.value = v; s.connect(g); g.connect(N.amb); s.start()}; setTimeout(() => lz(fuego(ac), .8), 1200); setTimeout(() => lz(vientoB(ac), .5), 2000)}
+/* bucles de ambiente: se hacen la primera vez que hacen falta, a trozos */
+function ambiente() {if (N.fl === 0 || VOL.amb <= 0 || N.it) return; N.fl ??= [[fuego(ac), .8], [vientoB(ac), .5]]; const [g, v] = N.fl[0], q = g.next(); if (!q.done) return; const s = ac.createBufferSource(), k = ac.createGain(); s.buffer = q.value; s.loop = true; s.loopEnd = q.value.fin; k.gain.value = v; s.connect(k); k.connect(N.amb); s.start(); N.fl.shift(); if (!N.fl.length) N.fl = 0}
 function tic() {
   if (!ac || ac.state !== 'running') return; if (!N) {if (!sfx) return; monta()}
   const t = ac.currentTime, H = document.hidden ? 2.2 : .35, pon = (p, v, k) => p.setTargetAtTime(v, t, k);
