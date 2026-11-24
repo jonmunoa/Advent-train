@@ -7,8 +7,9 @@ import {matOjos, sss, VIDRIO} from './esc-cara.js';
 
 const PM = {}, T = new THREE.TextureLoader(), TX = {}; let cargador = null;
 const tx = (f, srgb) => TX[f] ||= (() => {const t = T.load('m/gente2/' + f); t.flipY = false; t.anisotropy = LOWQ ? 2 : 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t})();
-export async function cargaPersonas(ids) {
-  cargador ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder); await Promise.all(ids.map(async id => {if (PM[id]) return; const g = await cargador.loadAsync(`m/gente2/${id}.glb`), o = {m: {}, x: g.scene.userData.D ? g.scene.userData : g.userData}; g.scene.updateMatrixWorld(true); g.scene.traverse(m => {if (m.isMesh) o.m[m.name] = plana(m)}); PM[id] = o}));
+/* aRatos: convierte una pieza cada vez, para no parar la imagen */
+export async function cargaPersonas(ids, aRatos = false) {
+  cargador ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder); await Promise.all(ids.map(async id => {if (PM[id]) return; const g = await cargador.loadAsync(`m/gente2/${id}.glb`), o = {m: {}, x: g.scene.userData.D ? g.scene.userData : g.userData}; g.scene.updateMatrixWorld(true); const L = []; g.scene.traverse(m => {if (m.isMesh) L.push(m)}); for (const m of L) {o.m[m.name] = plana(m); if (aRatos) await new Promise(r => setTimeout(r, 12))} PM[id] = o}));
 }
 export const persona = id => PM[id];
 export const trozo = (id, n) => PM[id] && PM[id].m[n];

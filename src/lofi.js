@@ -84,9 +84,11 @@ export class Lofi {
   pide(p) {const L = [], S = new Set(); for (const e of p.ev) {if (INST[e.k]) {const q = this.clave(e.k, e.n), c = e.k + q; if (!this.M.has(c) && !S.has(c)) {S.add(c); L.push([e.k, q, c, e.t])}} else if (!this.G.has(e.k) && !S.has(e.k)) {S.add(e.k); L.push([e.k, 0, e.k, e.t])}} return L.sort((a, b) => a[3] - b[3])}
   hazUna() {const q = this.cola.shift(); if (!q) return false; if (INST[q[0]]) {if (!this.M.has(q[2])) this.M.set(q[2], muestra(this.ac, q[0], q[1]))} else if (!this.G.has(q[2])) this.G.set(q[2], golpe(this.ac, q[0])); return true}
   prepara(i) {const p = partitura(LISTA[i]); this.cola.push(...this.pide(p)); return p}
+  /* antes de que suene nada: deja hechas las muestras del principio (una por llamada); true cuando ya está todo */
+  adelanta() {if (!this.pre) {this.pre = true; this.prepara(this.i); return false} if (this.cola.length) {this.hazUna(); return false} if (!this.vb0) {this.vb0 = vinilo(this.ac); return false} return true}
   /* empieza a tocar desde la pista i */
   empieza(t0) {
-    if (this.on) return; this.on = true; this.act = this.prepara(this.i); this.ini = t0 ?? this.ac.currentTime + .5; this.k = 0; this.sig = null; if (!this.vb) {this.vb = this.ac.createBufferSource(); this.vb.buffer = vinilo(this.ac); this.vb.loop = true; this.vb.connect(this.vn); this.vb.start()} this.vn.gain.setTargetAtTime(.5, this.ac.currentTime, 1.5); if (this.cambia) this.cambia(LISTA[this.i], this.act)
+    if (this.on) return; this.on = true; this.act = this.prepara(this.i); this.ini = t0 ?? this.ac.currentTime + .5; this.k = 0; this.sig = null; if (!this.vb) {this.vb = this.ac.createBufferSource(); this.vb.buffer = this.vb0 || vinilo(this.ac); this.vb.loop = true; this.vb.connect(this.vn); this.vb.start()} this.vn.gain.setTargetAtTime(.5, this.ac.currentTime, 1.5); if (this.cambia) this.cambia(LISTA[this.i], this.act)
   }
   para() {if (!this.on) return; this.on = false; this.calla(.25); this.vn.gain.setTargetAtTime(0, this.ac.currentTime, .3)}
   calla(s = .3) {const t = this.ac.currentTime; for (const v of this.vivas) {try {v.g.gain.cancelScheduledValues(t); v.g.gain.setTargetAtTime(0, t, s / 3); v.s.stop(t + s + .05)} catch (e) {}} this.vivas.clear()}

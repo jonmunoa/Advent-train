@@ -26,7 +26,11 @@ function monta() {
 }
 /* bucles de ambiente: se hacen la primera vez que hacen falta, a trozos */
 function ambiente() {if (N.fl === 0 || VOL.amb <= 0 || N.it) return; N.fl ??= [[fuego(ac), .8], [vientoB(ac), .5]]; const [g, v] = N.fl[0], q = g.next(); if (!q.done) return; const s = ac.createBufferSource(), k = ac.createGain(); s.buffer = q.value; s.loop = true; s.loopEnd = q.value.fin; k.gain.value = v; s.connect(k); k.connect(N.amb); s.start(); N.fl.shift(); if (!N.fl.length) N.fl = 0}
+/* en la portada, con el contexto aún parado, se van haciendo las primeras muestras para que al empezar no haya nada que calcular */
+let prev = false; export const calientaSonido = () => {prev = true};
+function previa() {if (!sfx || document.hidden || !acP) return; if (!ac) {ac = acP; return} if (!N) {monta(); return} if (!N.lofi.adelanta()) return; if (N.it && N.it.next().done) N.it = null}
 function tic() {
+  if (prev && (!ac || ac.state === 'suspended') && !(N && N.lofi.on)) {previa(); return}
   if (!ac || ac.state !== 'running') return; if (!N) {if (!sfx) return; monta()}
   const t = ac.currentTime, H = document.hidden ? 2.2 : .35, pon = (p, v, k) => p.setTargetAtTime(v, t, k);
   pon(N.mus.gain, sfx && !callado ? VOL.musica * .64 * (.5 + .5 * cerca) : 0, .6); pon(N.musF.frequency, 1300 + 17500 * Math.pow(cerca, 1.4), .5); pon(N.tren.gain, sfx && !callado ? VOL.tren * 2.3 : 0, .3); pon(N.trF.frequency, 650 + 13000 * Math.pow(cerca, 2.2), .4); pon(N.amb.gain, sfx ? VOL.amb * (callado ? .6 : 1) : 0, .8);

@@ -11,9 +11,9 @@ export const ULZ = {lzT: {value: tex}, lzI: {value: new THREE.Matrix4()}, lzF: {
 const MAX = 5;   // luz más fuerte que cabe en el mapa
 
 /* mu: Mundo. Usa mu.focosL ([x, y, z, radio, r, g, b, fuerza]) y mu.bloq ([x, z, giro, medio ancho, medio fondo]: casas que dan sombra) */
-export function horneaLuz(mu) {
-  const capa = mu.i % CAPAS, off = capa * W * H * 4, gy = new Float32Array(W * H), R = new Float32Array(W * H * 3); for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) gy[j * W + i] = mu.gy(-BW + (i + .5) * TX, -BD + (j + .5) * TZ);
-  for (const [x, y, z, r, cr, cg, cb, k] of mu.focosL) {
+export function* horneaLuz(mu) {
+  const capa = mu.i % CAPAS, off = capa * W * H * 4, gy = new Float32Array(W * H), R = new Float32Array(W * H * 3); for (let j = 0; j < H; j++) {if (j % 60 === 59) yield; for (let i = 0; i < W; i++) gy[j * W + i] = mu.gy(-BW + (i + .5) * TX, -BD + (j + .5) * TZ)} let nq = 0;
+  for (const [x, y, z, r, cr, cg, cb, k] of mu.focosL) {if (++nq % 10 === 0) yield;
     const i0 = Math.max(1, Math.floor((x - r + BW) / TX)), i1 = Math.min(W - 2, Math.ceil((x + r + BW) / TX)), j0 = Math.max(1, Math.floor((z - r + BD) / TZ)), j1 = Math.min(H - 2, Math.ceil((z + r + BD) / TZ)), B = r > 4 ? mu.bloq.filter(b => Math.hypot(b[0] - x, b[1] - z) < r + 5) : [];
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const n = j * W + i, px = -BW + (i + .5) * TX, pz = -BD + (j + .5) * TZ, dx = x - px, dz = z - pz, d2h = dx * dx + dz * dz; if (d2h > r * r) continue; const dy = y - gy[n]; if (dy < .05) continue;
@@ -24,7 +24,7 @@ export function horneaLuz(mu) {
       R[n * 3] += e * cr; R[n * 3 + 1] += e * cg; R[n * 3 + 2] += e * cb;
     }
   }
-  for (let n = 0; n < W * H; n++) {for (let c = 0; c < 3; c++) DATA[off + n * 4 + c] = Math.round(255 * Math.sqrt(clamp(R[n * 3 + c] / MAX, 0, 1))); DATA[off + n * 4 + 3] = Math.round(clamp((gy[n] + 12) / 72, 0, 1) * 255)}
+  yield; for (let n = 0; n < W * H; n++) {for (let c = 0; c < 3; c++) DATA[off + n * 4 + c] = Math.round(255 * Math.sqrt(clamp(R[n * 3 + c] / MAX, 0, 1))); DATA[off + n * 4 + 3] = Math.round(clamp((gy[n] + 12) / 72, 0, 1) * 255)}
   tex.addLayerUpdate(capa); tex.needsUpdate = true;
 }
 const f1 = x => x.toFixed(1), VERT = `#include <fog_vertex>

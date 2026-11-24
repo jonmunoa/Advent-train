@@ -16,14 +16,16 @@ export function cubo(m) {
   return m.metalness > .4 ? 'metal' : m.roughness < .62 ? 'satin' : 'mate';
 }
 /* lista de [geometría, material] → mallas en «par» */
-export function juntar(list, par, {sombra = true} = {}) {
-  const by = new Map();
+export function juntar(list, par, o) {const it = juntarG(list, par, o); for (;;) {const r = it.next(); if (r.done) return r.value}}
+/* lo mismo repartido: cede cada pocas piezas */
+export function* juntarG(list, par, {sombra = true} = {}) {
+  const by = new Map(); let n = 0;
   for (let [g0, m] of list) {
-    if (m.userData.fotoJ) g0 = uvFoto(g0, m.userData.fotoJ, m.userData.giro);
+    if (++n % 40 === 0) yield; if (m.userData.fotoJ) g0 = uvFoto(g0, m.userData.fotoJ, m.userData.giro);
     const k = cubo(m), vc = m.vertexColors && g0.attributes.color && (g0.index ? g0.toNonIndexed().attributes.color : g0.attributes.color), g = geoOnly(g0); if (vc) g.setAttribute('color', vc); if (k) {const n = g.attributes.position.count, a = new Float32Array(n * 3), {r, g: gg, b} = m.color; for (let i = 0; i < n; i++) {a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b} g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv')}
     const key = k ? CUBO[k] : m; if (!by.has(key)) by.set(key, []); by.get(key).push(g);
   }
-  const out = []; by.forEach((gs, m) => {const me = new THREE.Mesh(mergeGeometries(gs, false), m); me.castShadow = sombra && m !== CUBO.luz && !m.isMeshBasicMaterial; me.receiveShadow = sombra && me.castShadow; me.matrixAutoUpdate = false; me.updateMatrix(); par.add(me); out.push(me)});
+  const out = []; for (const [m, gs] of by) {yield; const me = new THREE.Mesh(mergeGeometries(gs, false), m); me.castShadow = sombra && m !== CUBO.luz && !m.isMeshBasicMaterial; me.receiveShadow = sombra && me.castShadow; me.matrixAutoUpdate = false; me.updateMatrix(); par.add(me); out.push(me)}
   return out;
 }
 /* Un material no puede ir a la vez en dos escenas (otras luces) ni en mallas normales, instanciadas o con huesos: three
