@@ -6,7 +6,7 @@ import {mapaOf, atM, KG, KT, KB, BW, BD, ICE_Y, pondE, pisteD, riverD} from './e
 import {Tren} from './esc-tren.js';
 import {juntar} from './esc-geo.js';
 import {nevada} from './esc-calle.js';
-import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, HIELO, casa as casaReal, farol, losa} from './esc-real.js';
+import {R, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, sierra, sierraTela, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, cerca} from './esc-real.js';
 
 const C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .6, ...o}), glow = (r, g, b) => new THREE.MeshBasicMaterial({color: new THREE.Color(r, g, b)});
 export const X = {
@@ -159,8 +159,19 @@ export class Mundo {
   /* Papá Noel en el trineo, dando vueltas por el cielo del escaparate */
   trineo(cx, cy, cz, rx, rz, w = .16) {const G = new THREE.Group(), P = []; const sl = obj('sled', 1.9); sl.rotation.y = Math.PI / 2; P.push(sl); const sa = santaFig(); sa.g.scale.setScalar(.72); sa.g.position.set(-.3, .55, 0); P.push(sa.g); for (const [x, z] of [[4.4, -.8], [4.4, .8], [7.2, -.8], [7.2, .8]]) {const d = obj('deer', 2.5); d.position.set(x, 0, z); d.rotation.y = Math.PI / 2; P.push(d)} P.forEach(o => G.add(o)); G.updateMatrixWorld(true); const ms = []; G.traverse(o => {if (o.isMesh) ms.push(o)}); const mm = mergeMeshes(ms); G.clear(); mm.forEach(m => {m.castShadow = false; G.add(m)}); this.g.add(G);
     this.anim.push(t => {const a = t * w; G.position.set(cx + Math.cos(a) * rx, cy + Math.sin(a * 2) * 2.4, cz + Math.sin(a) * rz); G.rotation.set(0, -Math.atan2(Math.cos(a) * rz, -Math.sin(a) * rx), Math.cos(a * 2) * .12, 'YZX')})}
+  /* lo que hay junto a la vía: postes con sus cables, cercas, piedras y hierba seca */
+  orilla() {
+    const T = this.T, R = rng(500 + this.i * 13), m = this.m, campo = this.q !== 2 && (!this.tema || this.tema.bosque > 0), suelo = (x, z, r, d) => Math.abs(x) < BW - 2 && z > -BD + 2 && z < BD - 2 && m.near(x, z, 12).d > d && pondE(m, x, z) > 1.08 + r / 20 && riverD(m, x, z) > r + 2.4 && pisteD(m, x, z) > r + 4 && this.gy(x, z) > ICE_Y + .5 && this.taken.every(([a, b, q]) => Math.hypot(a - x, b - z) > q + r);
+    if (campo) {
+      const L = []; let sd = -1, quita = 0; for (let s = 0; s < T.L - 6; s += 12.5) {const p = atM(T, s), k = T.k[Math.floor(s / T.ds) % T.N]; if (Math.abs(Math.cos(p.a)) > .3) sd = Math.cos(p.a) > 0 ? -1 : 1; const x = p.x - Math.sin(p.a) * sd * 3.7, z = p.z + Math.cos(p.a) * sd * 3.7; if (k !== KG || !suelo(x, z, .3, 3) || this.slope(x, z) > .9) {L.push(null); continue} L.push([x, this.gy(x, z), z, p.a]); quita++} const L2 = L.map((q, i) => q && (L[i - 1] || L[i + 1]) ? q : null); telegrafo(L2, (x, y, z, r) => this.at(x, y, z, r), this.g); for (const q of L2) if (q) this.take(q[0], q[2], .5, 5.4);
+      let nc = 0; for (let t = 0; t < 160 && nc < 7; t++) {const s0 = R() * T.L, l = 8 + R() * 8, lado = R() < .5 ? -1 : 1, d = 3.5 + R() * 1.6, P = []; let ok = true; for (let q = 0; q <= l && ok; q += 1.9) {const p = atM(T, s0 + q), x = p.x - Math.sin(p.a) * lado * d, z = p.z + Math.cos(p.a) * lado * d; ok = T.k[Math.floor(((s0 + q) % T.L) / T.ds) % T.N] === KG && suelo(x, z, .4, 3) && this.slope(x, z) < .5; P.push([x, this.gy(x, z), z])} if (!ok) continue; cerca(P, (x, y, z, r) => this.at(x, y, z, r)); P.forEach(([x, , z]) => this.take(x, z, .7)); nc++}
+    }
+    const pi = [], hi = [], br = []; for (let t = 0; t < 900 && pi.length < (LOWQ ? 40 : 80); t++) {const s = R() * T.L, p = atM(T, s); if (T.k[Math.floor(s / T.ds) % T.N] !== KG) continue; const d = (2.3 + Math.pow(R(), 2) * 5) * (R() < .5 ? -1 : 1), x = p.x - Math.sin(p.a) * d, z = p.z + Math.cos(p.a) * d; if (!suelo(x, z, .2, 2.1)) continue; pi.push({x, z, y: this.gy(x, z) - .04, h: .12 + Math.pow(R(), 3) * .42, r: R() * 6})} rocas(pi, this.g, true);
+    for (let t = 0; t < 900 && hi.length < (LOWQ ? 70 : 150); t++) {const x = lerp(-BW, BW, R()), z = lerp(-BD, BD, R()); if (!suelo(x, z, .2, 2.3) || this.slope(x, z) > .9) continue; for (let q = 0; q < 3; q++) {const a = x + (R() - .5) * 1.6, b = z + (R() - .5) * 1.6; if (suelo(a, b, .1, 2.2)) hi.push({x: a, z: b, y: this.gy(a, b), h: .5 + R() * .6, r: R() * 6})}} if (campo) hierbas(hi, this.g);
+    if (campo) {for (let t = 0; t < 500 && br.length < (LOWQ ? 12 : 26); t++) {const x = lerp(-BW, BW, R()), z = lerp(-10, BD, R()); if (!suelo(x, z, .5, 3.2) || this.slope(x, z) > .8) continue; br.push({x, z, y: this.gy(x, z) - .1, h: .9 + R() * 1.1, r: R() * 6, k: 2}); this.take(x, z, .6)} abetos(br, this.g, {lod: true, sombra: true})}
+  }
   bosque() {
-    const R = this.r, l = {treeA: [], treeB: [], treeC: [], treeD: []}, N = Math.round((LOWQ ? [46, 60, 40][this.q] : [80, 110, 64][this.q]) * (this.tema ? this.tema.bosque : 1)); let n = 0;
+    this.orilla(); const R = this.r, l = {treeA: [], treeB: [], treeC: [], treeD: []}, N = Math.round((LOWQ ? [46, 60, 40][this.q] : [80, 110, 64][this.q]) * (this.tema ? this.tema.bosque : 1)); let n = 0;
     for (let t = 0; t < N * 40 && n < N; t++) {const x = lerp(-BW, BW, R()), z = lerp(-BD, BD, R()), y = this.gy(x, z); if (y > 26 || this.slope(x, z) > 1.2 || !this.libre(x, z, 1.5)) continue; const front = z > 8, k = ['treeA', 'treeB', 'treeC', 'treeA', 'treeB', 'treeD'][Math.floor(R() * 6)]; const h = (front ? 3.6 : 4.6) + R() * (front ? 2.4 : 4.5); l[k].push({x, z, y: y - .25, h, r: R() * 6}); this.take(x, z, 1.5, h * .95); n++}
     abetos(Object.entries(l).flatMap(([k, L]) => L.map(t => ({...t, ad: k === 'treeD'}))), this.g);
     const rocks = []; for (let t = 0; t < 500 && rocks.length < 16; t++) {const x = lerp(-BW, BW, R()), z = lerp(-BD, BD, R()), s = this.slope(x, z); if (s < .5 || s > 2.2 || !this.libre(x, z, 1.4)) continue; rocks.push({x, z, y: this.gy(x, z) - .5, h: 1.6 + R() * 1.8, r: R() * 6})} if (this.q !== 2) rocas(rocks, this.g);

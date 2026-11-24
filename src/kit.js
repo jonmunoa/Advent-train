@@ -227,26 +227,26 @@ function buildTree(par,x,y,z,sc){
   const stand=cyl(R*0.24,R*0.3,7,M.red,24);stand.position.y=3.5;g.add(stand);
   const skirt=new THREE.Mesh(new THREE.RingGeometry(R*0.3,R*0.95,48,1).rotateX(-Math.PI/2),M.felt);skirt.position.y=0.25;skirt.receiveShadow=true;g.add(skirt);
   const trim=new THREE.Mesh(new THREE.TorusGeometry(R*0.95,0.9,8,64),M.fur);trim.rotation.x=Math.PI/2;trim.position.y=0.4;g.add(trim);
-  const core=new THREE.Mesh(new THREE.ConeGeometry(R*0.4,H*0.86,24),M.core);core.position.y=H*0.43+12;g.add(core);
-  const wh=24,per=14,n=wh*per,br=new THREE.InstancedMesh(branchGeo,M.branch,n),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),p=new THREE.Vector3(),s=new THREE.Vector3(),col=new THREE.Color();let k=0;const tips=[];
+  const core=new THREE.Mesh(new THREE.ConeGeometry(R*0.36,H*0.79,24),M.core);core.position.y=H*0.395+11;g.add(core);
+  const wh=27,per=14,n=wh*per,br=new THREE.InstancedMesh(branchGeo,M.branch,n),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),p=new THREE.Vector3(),s=new THREE.Vector3(),col=new THREE.Color();let k=0;const tips=[];
   const y0=12.5;
-  for(let i=0;i<wh;i++){const u=i/wh,yy=y0+(H-y0)*0.94*u,L=R*Math.pow(1-u,0.95)+1.2;const pitch0=-Math.min(0.45,Math.asin(Math.min(1,Math.max(0,yy-10)/L)));
+  for(let i=0;i<wh;i++){const u=i/wh,yy=y0+(H+5-y0)*0.94*u,L=R*Math.pow(1-u,0.95)+1.2;const pitch0=-Math.min(0.45,Math.asin(Math.min(1,Math.max(0,yy-10)/L)));
     for(let j=0;j<per;j++){const phi=j/per*Math.PI*2+i*0.7,pitch=pitch0+(hash2(i,j)-.5)*0.12;q.setFromEuler(e.set(0,phi,pitch,'YZX'));p.set(0,yy,0);s.set(L,1,L);m4.compose(p,q,s);br.setMatrixAt(k,m4);col.setHSL(0.36,0.14,0.8+hash2(i,j*3)*0.2).multiplyScalar(1.25);br.setColorAt(k,col);k++;
-      if(j%2===0)tips.push([Math.cos(phi)*L*0.82,yy+Math.sin(pitch)*L*0.82-1.2,-Math.sin(phi)*L*0.82])}}
+      if((j+i)%3===0)tips.push([Math.cos(phi)*L*0.82,yy+Math.sin(pitch)*L*0.82-1.2,-Math.sin(phi)*L*0.82])}}
   br.instanceColor.needsUpdate=true;br.castShadow=br.receiveShadow=true;g.add(br);
-  const radAt=yy=>{const u=Math.min(1,Math.max(0,(yy-y0)/((H-y0)*0.94)));return (R*Math.pow(1-u,0.95)+1.2)*0.8};
+  const radAt=yy=>{const u=Math.min(1,Math.max(0,(yy-y0)/((H+5-y0)*0.94)));return (R*Math.pow(1-u,0.95)+1.2)*0.8};
   const NB=coarse?150:220,lights=new THREE.InstancedMesh(new THREE.SphereGeometry(0.385,6,5),new THREE.MeshBasicMaterial({color:0xffffff}),NB),base=[];
   const pal=[[3,.4,.5],[3,2.3,.5],[.5,1.4,3],[.7,3,.9],[3,.9,2.4]],o=new THREE.Object3D();
-  for(let i=0;i<NB;i++){const t=i/NB,yy=y0+2+t*(H-y0-4),ang=t*Math.PI*2*10,rr=radAt(yy);o.position.set(Math.cos(ang)*rr,yy-1,Math.sin(ang)*rr);o.scale.set(0.8,1.3,0.8);o.updateMatrix();lights.setMatrixAt(i,o.matrix);const c=new THREE.Color(...pal[i%5]);base.push(c);lights.setColorAt(i,c)}
+  for(let i=0;i<NB;i++){const t=i/NB,yy=y0+2+t*(H+3-y0-4),ang=t*Math.PI*2*10,rr=radAt(yy);o.position.set(Math.cos(ang)*rr,yy-1,Math.sin(ang)*rr);o.scale.set(0.8,1.3,0.8);o.updateMatrix();lights.setMatrixAt(i,o.matrix);const c=new THREE.Color(...pal[i%5]);base.push(c);lights.setColorAt(i,c)}
   g.add(lights);
   const orn=new THREE.InstancedMesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshPhysicalMaterial({roughness:.14,metalness:.45,clearcoat:1,clearcoatRoughness:.05}),tips.length),oc=[0xd0202f,0xf0b93c,0xdfe6f2,0x2a6fd6,0x1f8a52];o.scale.set(1,1,1);
-  tips.forEach((tp,i)=>{if(tp[1]<10)tp[1]=10;const sc2=(1.6+hash2(i,7)*1.4)*0.57;o.position.set(...tp);o.scale.setScalar(sc2);o.updateMatrix();orn.setMatrixAt(i,o.matrix);orn.setColorAt(i,new THREE.Color(oc[i%5]))});orn.instanceColor.needsUpdate=true;orn.castShadow=true;g.add(orn);
+  tips.forEach((tp,i)=>{if(tp[1]<10)tp[1]=10;const sc2=(1.6+hash2(i,7)*1.4)*0.57*(.42+.62*Math.sqrt(Math.max(0,1-(tp[1]-10)/38)));o.position.set(...tp);o.scale.setScalar(sc2);o.updateMatrix();orn.setMatrixAt(i,o.matrix);orn.setColorAt(i,new THREE.Color(oc[i%5]))});orn.instanceColor.needsUpdate=true;orn.castShadow=true;g.add(orn);
   const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2?2.2:5.2,a=Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}
-  const stg=new THREE.ExtrudeGeometry(sh,{depth:1.4,bevelEnabled:true,bevelSize:.3,bevelThickness:.3,bevelSegments:2});stg.translate(0,0,-0.7);
-  const star=new THREE.Mesh(stg,new THREE.MeshBasicMaterial({color:new THREE.Color(4,3,1)}));star.position.y=H+16;g.add(star);
+  const stg=new THREE.ExtrudeGeometry(sh,{depth:1.0,bevelEnabled:true,bevelSize:.5,bevelThickness:.9,bevelSegments:1});stg.translate(0,0,-0.5);
+  const star=new THREE.Mesh(stg,new THREE.MeshBasicMaterial({color:new THREE.Color(3,2.1,.75)}));star.position.y=H+7;g.add(star);
   const glow=new THREE.Mesh(new THREE.PlaneGeometry(R*5,R*5).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:dotTex,color:new THREE.Color(1.1,.62,.28),transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending}));glow.position.y=0.6;g.add(glow);
   g.position.set(x,y,z);g.scale.setScalar(sc);par.add(g);g.updateMatrixWorld(true);
-  return {lights,base,star,glow,top:g.localToWorld(new THREE.Vector3(0,H+16,0))}}
+  return {lights,base,star,glow,top:g.localToWorld(new THREE.Vector3(0,H+7,0))}}
 
 /* Papá Noel: abrigo de terciopelo, cinturón, barba, gorro y un brazo para saludar */
 function santaFig(){const L=[],g=new THREE.Group(),W=M.fur;
