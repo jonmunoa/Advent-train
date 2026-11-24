@@ -40,8 +40,8 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 
 `http://localhost:5173/escaparates.html` es el enfoque actual: un **calendario de Adviento** sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada de **24 escaparates, uno por día**, con un circuito de tren distinto en cada uno.
 
-- **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta Reyes.
-- **Un momento cada día**: en cada escaparate, una escena sin palabras de 6–15 segundos que se entiende sola (la nariz en el cristal, una bola de nieve, la foto que sale mal…). El 24 se cierra con el niño ya mayor. El 31 hay campanadas, el 5 de enero cabalgata y el 6 Reyes. Están en `src/esc-escenas.js`.
+- **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta el 10 de enero: puedes volver a cualquiera, entrar en su circuito y repetir su escena.
+- **Un momento cada día**: en cada escaparate, una escena sin palabras de 6–15 segundos que se entiende sola (la nariz en el cristal, una bola de nieve, la foto que sale mal…). El 24 se cierra con el niño ya mayor. Están en `src/esc-escenas.js`.
 - **Lo que vende cada tienda**: «Llévate uno a casa» enlaza a un producto de Amazon con enlace de afiliado. Se edita en `src/esc-tienda.js` (pon el `asin` para ir a una ficha en concreto) y el código va en `config.js` o en `ADVX_TAG`. Las marcas están guardadas tras `VENDER` en `src/esc-marcas.js`.
 - **Un tren distinto cada día**: 23 trenes (vapor, eléctrica, diésel, tranvía, quitanieves, de madera, de galleta, de cuerda…) con su sonido. El catálogo está en `src/esc-trenes.js`.
 - **Maquetas con materiales de verdad**: roca, piedra, madera, tejas, adoquines y ramas de abeto son fotos de Poly Haven (CC0) sobre geometría propia. Para cambiarlas o añadir más: `scripts/polyhaven.json`, `node scripts/fetch-polyhaven.mjs` y `python scripts/rama.py` (ramas).
@@ -50,7 +50,7 @@ La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src
 - **Pincha un escaparate (o «Ver el tren de cerca») y entras en él**: una cámara de cine graba el tren desde fuera y va cambiando de plano sola (botón de la cámara o tecla V). En cuanto mueves la vista, mandas tú: se maneja como un mapa (arrastrar o un dedo mueve, la rueda o el pellizco acercan adonde apuntas, el botón derecho o girar dos dedos gira, subir o bajar dos dedos inclina). Tocar un vagón lo sigue, el ojo va con el tren y, mirando hacia el cristal, se ve al niño asomado. «Volver a la calle» o Escape salen. Teclado: flechas o WASD, +, −, Q, E, 0 y C.
 - **Marcas** en el rótulo de cada tienda y en los cuatro vagones de su tren, salvo el 24 (apagadas por ahora). Se escriben a mano en `src/esc-marcas.js`; no se cobra ni se guarda nada desde la web.
 
-Fuera de temporada es una **vista previa**: un botón cambia de día. `?dia=7` enseña un día (25 son las campanadas, 26 la cabalgata y 27 Reyes), `?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
+Fuera de temporada es una **vista previa**: un botón cambia de día. `?dia=7` enseña un día, `?todos` los 24 a la vez, `?movil` fuerza la versión ligera y `?debug` muestra fps y draw calls.
 
 **Vídeos para TikTok y Reels**: `python scripts/clips.py 1,6,18` graba las escenas en vertical (1080×1920, con música de caja) en `clips/`. Necesita Playwright, numpy y ffmpeg.
 

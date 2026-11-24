@@ -4,7 +4,7 @@ Fotograma a fotograma, sin depender de la velocidad del ordenador. Necesita Play
 La música es una caja de música con «Noche de paz» (dominio público).
 
 Uso:
-  python scripts/clips.py 1,6,18        # días 1–24; 25 campanadas, 26 cabalgata, 27 Reyes
+  python scripts/clips.py 1,6,18        # días 1–24
 Deja los vídeos en clips/ (no se sube al repositorio).
 """
 import asyncio, math, pathlib, subprocess, sys, tempfile, wave
@@ -18,9 +18,8 @@ from harness import serve, chromium_args  # noqa: E402
 sys.stdout.reconfigure(encoding='utf-8')
 FPS, SR, OUT = 30, 44100, ROOT / 'clips'
 DIAS = [int(x) for x in (sys.argv[1] if len(sys.argv) > 1 else '1').split(',')]
-NOMBRE = {25: '31 de diciembre', 26: '5 de enero', 27: '6 de enero'}
 CSS = """.hud,.saltar,.pv,#navHint,#toast,#card,.fin,.intro{display:none!important}#cine i{transition:none!important}
-#negro{transition-duration:3.2s!important}#texto{transition-duration:5s!important;font-size:150px!important}#flash.on{animation-duration:2.2s!important}#dip{transition-duration:.9s!important}
+#texto{transition-duration:5s!important;font-size:150px!important}#flash.on{animation-duration:2.2s!important}#dip{transition-duration:.9s!important}
 #rot{position:fixed;left:0;right:0;top:11.5vh;text-align:center;z-index:20;font:400 46px/1.1 Yesteryear,cursive;color:#fff6e0;text-shadow:0 3px 22px rgba(0,0,0,.8);opacity:0}
 #cie{position:fixed;inset:0;z-index:21;display:grid;place-content:center;text-align:center;background:rgba(4,6,14,.78);opacity:0;color:#fff6e0}
 #cie b{font:400 54px/1.05 'Alfa Slab One',Georgia,serif;color:#fbf3df}#cie i{display:block;font:400 58px/1 Yesteryear,cursive;color:#e0ad45}#cie span{display:block;margin-top:26px;font:600 22px/1.3 Rubik,sans-serif;color:#dfe5f5}"""
@@ -65,16 +64,16 @@ async def main():
         for k, d in enumerate(DIAS):
             await pg.evaluate(f'__esc.ponDia({d})'); await pg.wait_for_timeout(1400)
             await pg.evaluate("(()=>{for(let i=0;i<600&&__esc.st==='paseo'&&Math.abs(__esc.E.x-__esc.n*340)>80;i++)__esc.step(1/30)})()")
-            await pg.evaluate(f"document.getElementById('rot').textContent={NOMBRE.get(d, f'{d} de diciembre')!r};document.querySelector('#cie span').textContent={'' if d in (24, 27) else 'Mañana se enciende otro, a las 18:00'!r}")
+            await pg.evaluate(f"document.getElementById('rot').textContent={f'{d} de diciembre'!r};document.querySelector('#cie span').textContent={'' if d == 24 else 'Mañana se enciende otro, a las 18:00'!r}")
             out = OUT / f'dia-{d:02d}.mp4'; tmp = pathlib.Path(tempfile.mkdtemp()); wav = tmp / 'a.wav'; vid = tmp / 'v.mp4'
             ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', str(FPS), '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'medium', str(vid)], stdin=subprocess.PIPE)
             n, fin, cola = 0, 0, int(2.6 * FPS)
             while n < FPS * 110:
                 t = n / FPS; v = min(1, t / .6) * min(1, max(0, (3.4 - t) / .8)); u = 0 if not fin else min(1, (n - fin) / (FPS * .8))
-                st = await pg.evaluate(f"(async()=>{{const e=__esc;{'' if fin and n - fin > FPS * .5 else 'e.step(1/30,1/30,true);'}document.getElementById('rot').style.opacity={v:.3f};document.getElementById('cie').style.opacity={u if d not in (24, 27) else 0:.3f};await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return e.st}})()")
+                st = await pg.evaluate(f"(async()=>{{const e=__esc;{'' if fin and n - fin > FPS * .5 else 'e.step(1/30,1/30,true);'}document.getElementById('rot').style.opacity={v:.3f};document.getElementById('cie').style.opacity={u if d != 24 else 0:.3f};await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return e.st}})()")
                 ff.stdin.write(await pg.screenshot(type='jpeg', quality=93)); n += 1
                 if not fin and st not in ('paseo', 'escena', 'llega'): fin = n
-                if fin and n - fin > (cola if d not in (24, 27) else 4): break
+                if fin and n - fin > (cola if d != 24 else 4): break
             ff.stdin.close(); ff.wait(); dur = n / FPS
             with wave.open(str(wav), 'wb') as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes(caja(dur).tobytes())
             subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(vid), '-i', str(wav), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest', str(out)], check=True)

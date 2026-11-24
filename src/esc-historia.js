@@ -1,4 +1,4 @@
-/* El calendario: qué escaparate toca cada día, a qué hora se enciende y qué escenas especiales hay. Sin DOM ni red.
+/* El calendario: qué escaparate toca cada día y a qué hora se enciende. Sin DOM ni red.
    Todo sale del reloj del dispositivo: no hay servidor. */
 export const N = 24, HORA = 18;
 /* un escaparate por día: rótulo de la tienda, nombre de su momento y si va sin marca (el 24) */
@@ -7,23 +7,18 @@ export const DIAS = [
   ['Correos', 'La carta'], ['La Ciudad', '¿Qué miran?'], ['Panadería', '¡Quema!'], ['Fotografía', 'La foto'], ['El Refugio', 'La gran nevada'], ['Juguetería', 'El silbato'], ['Zapatería', 'Las huellas'], ['Bombillas', 'Se hizo la luz'],
   ['Planetario', 'Pide un deseo'], ['Modelismo', 'La carrera'], ['Música', 'El baile'], ['Sastrería', 'El señor de rojo'], ['Sombrerería', 'La chistera'], ['Viajes', '¡Pasajeros al tren!'], ['Bellas Artes', 'Todos los trenes'], ['Feliz Navidad', 'Como entonces', 1],
 ].map(([rotulo, momento, sinMarca], i) => ({d: i + 1, rotulo, momento, sinMarca: !!sinMarca}));
-/* después del 24: campanadas, cabalgata y mañana de Reyes (días 25, 26 y 27 de la vista previa) */
-export const EXTRAS = {25: 'campanadas', 26: 'cabalgata', 27: 'reyes'}, ULTIMO = 27;
 const at = (y, m, d, h = HORA) => new Date(y, m, d, h, 0, 0, 0);
-/* {abiertos: 0–24, proximo: cuándo se enciende el siguiente (o null), extra, temporada} */
+/* {abiertos: 0–24, proximo: cuándo se enciende el siguiente (o null), temporada}. Los encendidos no se apagan hasta el 10 de enero */
 export function estado(now = new Date()) {
   const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-  if (m === 11) {
-    const ab = Math.min(N, d - (now < at(y, 11, d) ? 1 : 0)), extra = d === 31 && now >= at(y, 11, 31, 18) ? 'campanadas' : null;
-    return {abiertos: Math.max(0, ab), proximo: ab < N ? at(y, 11, Math.max(1, ab + 1)) : null, extra, temporada: true};
-  }
-  if (m === 0 && d <= 10) return {abiertos: N, proximo: null, extra: d === 1 ? 'campanadas' : d === 5 && now >= at(y, 0, 5) ? 'cabalgata' : d >= 6 ? 'reyes' : null, temporada: true};
-  return {abiertos: 0, proximo: at(m === 0 ? y : y, 11, 1), extra: null, temporada: false};
+  if (m === 11) {const ab = Math.max(0, Math.min(N, d - (now < at(y, 11, d) ? 1 : 0))); return {abiertos: ab, proximo: ab < N ? at(y, 11, ab + 1) : null, temporada: true}}
+  if (m === 0 && d <= 10) return {abiertos: N, proximo: null, temporada: true};
+  return {abiertos: 0, proximo: at(y, 11, 1), temporada: false};
 }
-/* vista previa de un día (1–24) o de una escena especial (25–27) */
-export function previa(d) {d = Math.max(1, Math.min(ULTIMO, Math.round(d) || 1)); return d > N ? {abiertos: N, proximo: null, extra: EXTRAS[d], temporada: true, previa: d} : {abiertos: d, proximo: null, extra: null, temporada: true, previa: d}}
+/* vista previa de un día (1–24) */
+export function previa(d) {d = Math.max(1, Math.min(N, Math.round(d) || 1)); return {abiertos: d, proximo: null, temporada: true, previa: d}}
 /* día pedido en la dirección: ?dia=7 o #dia-7 */
-export function pedido(search, hash) {const a = /[?&]dia=(\d{1,2})\b/.exec(search || '') || /^#dia-(\d{1,2})$/.exec(hash || ''); return a && +a[1] >= 1 && +a[1] <= ULTIMO ? +a[1] : 0}
+export function pedido(search, hash) {const a = /[?&]dia=(\d{1,2})\b/.exec(search || '') || /^#dia-(\d{1,2})$/.exec(hash || ''); return a && +a[1] >= 1 && +a[1] <= N ? +a[1] : 0}
 /* «en 3 h 12 min», «mañana a las 18:00», «el 7 de diciembre» */
 export function falta(hasta, now = new Date()) {
   const ms = hasta - now; if (!(ms > 0)) return 'ahora'; const min = Math.ceil(ms / 6e4), hoy = hasta.toDateString() === now.toDateString(), man = new Date(now.getTime() + 864e5).toDateString() === hasta.toDateString();
