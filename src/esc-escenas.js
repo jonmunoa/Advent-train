@@ -6,6 +6,7 @@ import {S} from './esc-calle.js';
 import {Figura, abrigoVacio} from './esc-gente.js';
 import {Tren} from './esc-tren.js';
 import {pieza3} from './esc-cara.js';
+import {separa} from './esc-geo.js';
 
 const PI = Math.PI, V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), wrap = a => {while (a > PI) a -= 2 * PI; while (a < -PI) a += 2 * PI; return a}, damp = (a, b, l, dt) => lerp(a, b, 1 - Math.exp(-l * dt)), io = u => u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
 const C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .8, ...o}), B = (map, o = {}) => new THREE.MeshBasicMaterial({map, ...o});
@@ -57,7 +58,7 @@ export class Escenas {
   agacha(f, k) {this.act(f).cro = k} inclina(f, k) {this.act(f).lean = k}
   mano(f, i, p, k) {const h = this.act(f).h[i]; h.p = p; h.k = k}
   /* mano «de fuera» (derecha) y «de dentro» según hacia dónde mira: 0 izquierda, 1 derecha */
-  prop(list, x = 0, y = 0, z = 0) {const G = new THREE.Group(); for (const [g, m] of list) {const q = new THREE.Mesh(g, m); q.castShadow = !LOWQ && !m.transparent; G.add(q)} G.position.set(this.wx(x), y, z); this.c.calle.add(G); this.props.push(G); return G}
+  prop(list, x = 0, y = 0, z = 0) {const G = new THREE.Group(); for (const [g, m] of list) {const q = new THREE.Mesh(g, m); q.castShadow = !LOWQ && !m.transparent; G.add(q)} G.position.set(this.wx(x), y, z); separa(G, 'calle'); this.c.calle.add(G); this.props.push(G); return G}
   coge(o, f, i, x = 0, y = 0, z = 0) {o.scale.setScalar(1 / S); o.position.set(x / S, -(f.D.arm - f.D.mun) + y / S, z / S); o.rotation.set(0, 0, 0); f.hand[i].add(o)}
   deja(o, x, y, z) {this.c.calle.add(o); o.scale.setScalar(1); o.position.set(this.wx(x), y, z); o.rotation.set(0, 0, 0)}
   extra(tipo, ropa, x, z, yaw = 0) {const f = new Figura(tipo, ropa, 1); f.bag.visible = false; this.c.calle.add(f.g); this.ext.push(f); this.pon(f, x, z, yaw); return f}

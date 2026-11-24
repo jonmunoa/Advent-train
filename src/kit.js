@@ -286,7 +286,7 @@ function drawAd(cv,ad){const g=cv.getContext('2d'),w=cv.width,h=cv.height,bg=ad.
   if(im&&im.width){const boxW=hasTxt?w*0.36:w-120,boxH=h-96,sc=Math.min(boxW/im.width,boxH/im.height),dw=im.width*sc,dh=im.height*sc,cx=hasTxt?48+boxW/2:w/2;
     g.imageSmoothingQuality='high';g.drawImage(im,cx-dw/2,h/2-dh/2,dw,dh);tx0=48+boxW+28}
   if(hasTxt){const ink=light?'#2b1a12':'#fbf3df',mw=tx1-tx0,cx=(tx0+tx1)/2;g.fillStyle=ink;g.textAlign='center';g.textBaseline='middle';
-    const fit=(txt,font,max,min)=>{let s=max;for(;s>min;s-=2){g.font=font.replace('#',s);if(g.measureText(txt).width<=mw)break}return s};
+    const fit=(txt,font,max,min)=>{g.font=font.replace('#',max);const w=g.measureText(txt).width;return w<=mw?max:Math.max(min,Math.floor(max*mw/w))};
     if(ad.text){const s=fit(ad.text,'400 #px "Alfa Slab One", Georgia, serif',ad.sub?88:100,30);g.font=`400 ${s}px "Alfa Slab One", Georgia, serif`;g.fillText(ad.text,cx,ad.sub?h*0.41:h/2+4,mw)}
     if(ad.sub){g.globalAlpha=.85;const s=fit(ad.sub,'500 #px Rubik, system-ui, sans-serif',42,20);g.font=`500 ${s}px Rubik, system-ui, sans-serif`;g.fillText(ad.sub,cx,ad.text?h*0.68:h/2,mw);g.globalAlpha=1}}
   if(ad.host){g.font='600 25px Rubik, system-ui, sans-serif';g.textAlign='right';g.textBaseline='alphabetic';g.fillStyle=light?'rgba(43,26,18,.72)':'rgba(251,243,223,.78)';g.fillText(ad.host,w-44,h-34)}

@@ -1,8 +1,10 @@
 /* Sonido: villancicos de caja de música (dominio público, sintetizados), pasos en la nieve, campanillas y silbato. Sale de tren.js.
    De lejos la música se oye apagada, como al otro lado del cristal; al acercarse al escaparate se aclara (setCerca). */
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-let ac=null,sfx=store.get('advx-sonido')!=='0',music=sfx,cerca=0;
-function au(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume().catch(()=>{});return ac}
+let ac=null,acP=null,sfx=store.get('advx-sonido')!=='0',music=sfx,cerca=0;
+/* el contexto tarda ~80 ms en crearse: se hace antes de tocar nada, parado */
+export function prepAu(){setTimeout(()=>{if(!ac&&!acP)try{acP=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}},60)}
+function au(){if(!ac){try{ac=acP||new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume().catch(()=>{});return ac}
 function tone(f,d,type,g,when){if(!sfx||!ac)return;const t=ac.currentTime+(when||0),o=ac.createOscillator(),v=ac.createGain();o.type=type||'sine';o.frequency.value=f;v.gain.setValueAtTime(0,t);v.gain.linearRampToValueAtTime(g,t+0.012);v.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(v);v.connect(ac.destination);o.start(t);o.stop(t+d+0.05)}
 let nbuf=null;function nb(){if(!nbuf){const n=ac.sampleRate;nbuf=ac.createBuffer(1,n,n);const a=nbuf.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1}return nbuf}
 function noise(d,g,fc,type){if(!sfx||!ac)return;nb();const t=ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),v=ac.createGain();s.buffer=nbuf;f.type=type||'lowpass';f.frequency.value=fc;v.gain.setValueAtTime(g,t);v.gain.exponentialRampToValueAtTime(0.0001,t+d);s.connect(f);f.connect(v);v.connect(ac.destination);s.start(t,Math.random()*0.5,d+0.05)}

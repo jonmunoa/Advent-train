@@ -15,10 +15,10 @@ import {Casa} from './esc-casa.js';
 import {Figura} from './esc-gente.js';
 import {cargaGente} from './esc-cara.js';
 import {Barrio, PER} from './esc-barrio.js';
-import {juntar} from './esc-geo.js';
+import {juntar, separa} from './esc-geo.js';
 import {marcasEsc, pedirTexto, cleanText, cleanUrl, isoDay, sitioDe, ESC as NESC} from './esc-eco.js';
 import {CONTACTO, PRECIO_ROTULO, PRECIO_VAGON, MARCAS} from './esc-marcas.js';
-import {au, pasos, traqueteo, setCerca, setSonido, sonidoOn, bells, whistle, chime, silencio, campana, suave, viento, clac, chuf, trenSuena} from './musica.js';
+import {au, prepAu, pasos, traqueteo, setCerca, setSonido, sonidoOn, bells, whistle, chime, silencio, campana, suave, viento, clac, chuf, trenSuena} from './musica.js';
 clearTimeout(window.__boot);
 
 const $ = id => document.getElementById(id), canvas = $('c'), DEBUG = QS.has('debug');
@@ -185,15 +185,17 @@ function colocar(dt, t) {
 }
 
 /* ================= las maquetas, a medida que hacen falta ================= */
-const MU = new Map(), FO = new Map(), RO = new Map(); let obra = null, version = 0;
+const MU = new Map(), FO = new Map(), RO = new Map(); let obra = null, version = 0, SINFOTO = false;
+/* prepara los programas de una escena sin parar el hilo (los compila la GPU mientras se monta lo demás) */
+const compila = (s, rt = post ? post.rt : null) => {const t = renderer.getRenderTarget(); let p = null; try {renderer.setRenderTarget(rt); p = renderer.compileAsync(s, camera).catch(() => {})} catch (e) {} renderer.setRenderTarget(t); return Promise.race([p, new Promise(r => setTimeout(r, 4000))])};
 const nueva = n => {const m = new Mundo(n, TEMAS[MAPS[n].id]); return {n, m, q: m.pasos()}};
 /* empieza a montar la maqueta n, un paso por fotograma */
 function prepara(n) {if (n < 0 || n >= N || MU.has(n) || obra) return; obra = nueva(n)}
-function obraPaso() {const o = obra; if (!o) return; o.q.shift()(); if (!o.q.length) {obra = null; termina(o)}}
+function obraPaso() {const o = obra; if (!o) return; o.q.shift()(); if (!o.q.length) {obra = null; termina(o, true)}}
 /* la maqueta n, montada ya */
 function mundo(n) {n = clamp(n, 0, N - 1); if (MU.has(n)) return MU.get(n); const o = obra && obra.n === n ? obra : nueva(n); if (obra === o) obra = null; o.q.forEach(f => f()); termina(o); return o.m}
-function termina({n, m}) {
-  m.g.scale.setScalar(K); m.g.position.set(WX(n), VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = false; if (LOWQ) ligero(m.g); reflejos(m.g, .5); dentro.add(m.g); m.tren.s = m.T.L * .04; MU.set(n, m); const A = SITIOS[n + 1] || {}; if (!DIAS[n].sinMarca) for (let v = 1; v <= 4; v++) m.tren.setAd(v - 1, A[v] || null); if (!FO.has(n)) {fotografia(n); version++}
+function termina({n, m}, luego) {
+  m.g.scale.setScalar(K); m.g.position.set(WX(n), VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = false; if (LOWQ) ligero(m.g); separa(m.g, 'dentro'); reflejos(m.g, .5); dentro.add(m.g); m.tren.s = m.T.L * .04; MU.set(n, m); const A = SITIOS[n + 1] || {}; if (!DIAS[n].sinMarca) for (let v = 1; v <= 4; v++) m.tren.setAd(v - 1, A[v] || null); if (!FO.has(n) && !SINFOTO) {const f = () => {if (MU.get(n) === m && !FO.has(n)) {fotografia(n); version++}}; if (luego && !FAST) compila(dentro, FOTORT).then(f); else f()}
   for (const q of [...MU.keys()].sort((a, b) => Math.abs(b - E.n) - Math.abs(a - E.n))) {if (MU.size <= (LOWQ ? 3 : 5) || Math.abs(q - E.n) <= 1 || q === n || q === E.k) continue; const w = MU.get(q); dentro.remove(w.g); w.g.traverse(o => {if (o.geometry) o.geometry.dispose()}); MU.delete(q)}
 }
 /* foto de un escaparate: la de verdad si ya se ha montado alguna vez; si no, un boceto con sus colores */
@@ -235,7 +237,7 @@ let dipT = 0; function dip(fn, ms = 210) {if (FAST) {fn(); return} const el = $(
 function entrar(n, {car} = {}) {
   if (E.st === 'inicio' || E.st === 'escena' || !listo) return; if (n < 0 || n >= N) return; if (tapado(n)) {if (n === E.n && E.st === 'mira') {E.manual = true; E.uT = E.uT > .5 ? .1 : 1; toca()} else if (n <= TOPE()) {ir(n); if (E.st === 'dentro') return} toast(n === AB() - 1 ? 'Ya está a punto de encenderse' : `Se enciende ${n === AB() ? cuando() : `el ${n + 1} de diciembre`}`); return}
   if (E.st === 'dentro') {if (n !== E.n) cambia(n); else if (car !== undefined) vista.setFocus({car}); return} au(); hideCard();
-  const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = n; E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundo(n); m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.envolver(); reflejos(m.domo, .5); vista.entra(m, directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.6}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
+  const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = n; E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundo(n); m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.envolver(); separa(m.domo, 'dentro'); reflejos(m.domo, .5); vista.entra(m, directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.6}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
   if (cerca) fn(false); else dip(() => fn(true));
 }
 function cambia(n) {dip(() => {const v = MU.get(E.k); if (v) {v.modo(0); v.g.visible = false} E.md = 0; vista.sale(); E.dir = n > E.n ? 1 : -1; E.n = E.k = n; E.x = WX(n); aLaVentana(); const m = mundo(n); m.g.position.set(E.x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.envolver(); E.md = 1; vista.entra(m, {desde: {p: V3().set(0, 74, 150), l: V3().set(0, 6, 0)}, dur: 1.5}); caption(); hideCard(); if (!FAST) bells()})}
@@ -326,17 +328,19 @@ let tqA = 0, calT = 0; function loop(now) {requestAnimationFrame(loop); const ra
 function adapta(raw, now) {if (window.__noAdapt || document.hidden || raw > .2) return; fA += raw; if (++fN < 40 || now - lastAdj < 1300) return; const a = fA / fN, g = coarse ? 1 / 30 : 1 / 60; fA = fN = 0; lastAdj = now; if (a < g * 1.25) {lento = 0; return} if (++lento < 2) return; if (dynPR > 1) {dynPR = Math.max(1, dynPR - .2); resize()} else if (post && post.samples > 2) {MSFIJO = true; post.msaa(2)} else if (renderer.shadowMap.enabled && a > g * 1.6) {foco.castShadow = false; vent.castShadow = false; renderer.shadowMap.enabled = false} else if (post && !post.sinFoco && a > g * 1.4) post.sinFoco = true; else if (post && post.bloom > 0 && a > g * 2.2) post.bloom = 0}
 const prog = (p, t) => {$('lBar').style.transform = `scaleX(${p})`; if (t) $('go').textContent = t};
 /* móvil: materiales con barniz pasados a estándar */
-function ligero(root) {const c = new Map(); root.traverse(o => {if (!o.isMesh || !o.material.isMeshPhysicalMaterial) return; let m = c.get(o.material); if (!m) {const p = o.material; m = new THREE.MeshStandardMaterial({color: p.color, map: p.map, roughness: Math.max(.35, p.roughness), metalness: Math.min(.6, p.metalness), emissive: p.emissive, emissiveIntensity: p.emissiveIntensity, transparent: p.transparent, opacity: p.opacity, side: p.side}); c.set(p, m)} o.material = m})}
+const LIGERO = new WeakMap();
+function ligero(root) {const c = LIGERO; root.traverse(o => {if (!o.isMesh || !o.material.isMeshPhysicalMaterial) return; let m = c.get(o.material); if (!m) {const p = o.material; m = new THREE.MeshStandardMaterial({color: p.color, map: p.map, roughness: Math.max(.35, p.roughness), metalness: Math.min(.6, p.metalness), emissive: p.emissive, emissiveIntensity: p.emissiveIntensity, transparent: p.transparent, opacity: p.opacity, side: p.side}); c.set(p, m)} o.material = m})}
 /* foto de cada escaparate, para verlo de lejos sin dibujar la maqueta entera */
+const FOTORT = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType});
 function fotografia(n) {const w = LOWQ ? 512 : 1024, h = Math.round(w * (VY1 - VY0) / (VX * 2)), rt = new THREE.WebGLRenderTarget(w, h, {type: THREE.HalfFloatType, samples: LOWQ ? 0 : 4, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter}), c = new THREE.PerspectiveCamera(2 * Math.atan((VY1 - VY0) / 2 / 170) * 180 / Math.PI, w / h, 2, 900); rt.texture.anisotropy = 8; const m = MU.get(n), oc = new Map(); dentro.children.forEach(o => {if (!o.isLight && o !== m.g && o !== foco.target) {oc.set(o, o.visible); o.visible = false}}); const p0 = m.g.position.clone(), v0 = m.g.visible; m.g.visible = true; m.g.position.set(0, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; const f0 = foco.position.clone(), f1 = foco.target.position.clone(); foco.position.set(-46, 130, 78); foco.target.position.set(0, 40, -40); foco.target.updateMatrixWorld(); c.position.set(0, (VY0 + VY1) / 2, 170); c.lookAt(0, (VY0 + VY1) / 2, 0); m.update(0, 0); const tm = renderer.toneMapping, fn = dentro.fog.near, ff = dentro.fog.far; dentro.fog.near = 5000; dentro.fog.far = 6000; renderer.toneMapping = THREE.NoToneMapping; foco.shadow.needsUpdate = true; renderer.setRenderTarget(rt); renderer.clear(); renderer.render(dentro, c); renderer.setRenderTarget(null); renderer.toneMapping = tm; dentro.fog.near = fn; dentro.fog.far = ff; oc.forEach((v, o) => {o.visible = v}); m.g.position.copy(p0); m.g.visible = v0; foco.position.copy(f0); foco.target.position.copy(f1); foco.target.updateMatrixWorld(); foco.shadow.needsUpdate = true; FO.set(n, rt.texture)}
 async function boot() {
   resize(); $('intro').classList.add('carga'); prog(.05); const fonts = document.fonts ? Promise.all(['400 80px "Alfa Slab One"', '500 40px Rubik', '400 40px Yesteryear'].map(f => document.fonts.load(f))).catch(() => {}) : null;
   await Promise.all([loadModels(p => prog(.05 + p * .4)), cargaGente(['nino', 'madre', 'manos'])]); await fonts; const resto = cargaGente(['mayor', 'hombre', 'viejo']); if ([12, 14, 21, 22, 26, 27].includes(CAL.previa)) await resto;
   for (let k = 0; k < 3; k++) {prog(.5 + k * .08, 'Abriendo las tiendas…'); await tick(); const t = new Tienda(k, ''); calle.add(t.g); tiendas.push(t); const cp = t.copia(); locs.push(new Local(t.g, k)); lejos.push(new Local(cp, k)); calle.add(cp)}
   prog(.76, 'Colgando las luces…'); await tick(); barrio = new Barrio(calle); huellas = new Huellas(calle); nieve = nevada(dentro, LOWQ ? 420 : 900); cristales(); await ponMarcas();
-  prog(.86, 'Poniendo la bufanda…'); await tick(); vestir(ropaHoy()); cambios = null; if (LOWQ) {ligero(dentro); ligero(calle)} else {barrio.planos[0].receiveShadow = barrio.planos[1].receiveShadow = true} reflejos(calle, .22);
-  prog(.93, 'Encendiendo el escaparate…'); await tick(); coloca0(); mundo(E.n); if (E.n > 0) {await tick(); mundo(E.n - 1)}
-  FAST = true; paso(1 / 60); E.st = 'inicio'; for (let i = 0; i < 30; i++) paso(1 / 30); FAST = false; listo = true; draw(); $('intro').classList.remove('carga'); $('go').disabled = false; prog(1, 'Dame la mano'); caption();
+  prog(.86, 'Poniendo la bufanda…'); await tick(); vestir(ropaHoy()); cambios = null; if (LOWQ) {ligero(dentro); ligero(calle)} else {barrio.planos[0].receiveShadow = barrio.planos[1].receiveShadow = true} separa(calle, 'calle'); separa(dentro, 'dentro'); reflejos(calle, .22);
+  prog(.93, 'Encendiendo el escaparate…'); await tick(); const T0 = performance.now(), mar = n => {if (DEBUG) console.log(n, Math.round(performance.now() - T0))}; SINFOTO = true; coloca0(); mar('coloca'); const pc = compila(calle); mar('compila calle'); await tick(); const m0 = mundo(E.n); mar('mundo'); m0.g.visible = true; const cd = () => {const ps = [compila(dentro, FOTORT)]; if (LOWQ) ps.push(compila(dentro, null)); return Promise.all(ps)}; const pd = cd(); mar('compila dentro'); if (E.n > 0) {await tick(); mundo(E.n - 1).g.visible = true; await cd()} mar('mundo 2'); await pd; mar('esperar dentro'); SINFOTO = false; for (const q of [E.n, E.n - 1]) if (q >= 0) {fotografia(q); version++} mar('fotos'); await pc; mar('esperar calle');
+  FAST = true; paso(1 / 60); E.st = 'inicio'; for (let i = 0; i < 30; i++) paso(1 / 30); mar('pasos'); await compila(calle); mar('programas'); FAST = false; listo = true; draw(); mar('primer dibujo'); prepAu(); $('intro').classList.remove('carga'); $('go').disabled = false; prog(1, 'Dame la mano'); caption();
 }
 boot().catch(e => {console.error(e); const f = $('fatal'); f.textContent = 'No se ha podido montar la calle. Recarga la página.'; f.hidden = false});
 requestAnimationFrame(loop);
