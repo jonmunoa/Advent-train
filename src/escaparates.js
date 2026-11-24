@@ -196,7 +196,7 @@ function colocar(dt, t) {
   for (const [n, m] of MU) if (!vis.has(n)) {m.g.visible = false; if (!m.tren.parado) m.tren.s = (m.tren.s + 6.2 * dt) % m.T.L}
   const ord = [0, 1, 2].sort((a, b) => Math.abs(locs[a].g.position.x - cx) - Math.abs(locs[b].g.position.x - cx)); calor.forEach((l, i) => {const q = locs[ord[i]], x = q.g.position.x; l.position.set(x, 82, -26); l.intensity = (LOWQ ? 430 : 1250) * (din ? .34 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .24 : 1) * sstep(360, 220, Math.abs(x - cx))}); {const q = locs[ord[0]], x = q.g.position.x, k = sstep(172, 96, Math.abs(x - (esc ? WX(E.n) : cx))); if (vent.castShadow) {vent.position.set(x, 112, -92); vent.target.position.set(x, 6, 110); vent.target.updateMatrixWorld(); vent.intensity = 1100 * k * (din ? .3 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .16 : 1); calor[0].intensity *= 1 - .6 * k}} {const k = esc ? (cam.p.z < 2 ? (LOWQ ? .7 : .5) : LOWQ ? .95 : .95) : E.st === 'dentro' ? 0 : .16; relleno.intensity = damp(relleno.intensity, k * (E.oscuro ?? 1), 4, dt); {const dx = cam.l.x - cam.p.x, dz = cam.l.z - cam.p.z; relleno.position.set(cam.p.x + dz * .5, cam.p.y + Math.hypot(dx, dz) * .42 + 12, cam.p.z - dx * .5)} relleno.target.position.copy(cam.l); relleno.target.updateMatrixWorld()} const fx = din || esc ? WX(E.n) : E.st === 'paseo' || E.st === 'inicio' ? locs[ord[0]].g.position.x : WX(E.st === 'sale' ? Math.round(E.x / PASO) : E.n); foco.position.set(fx - 46, 130, 78); foco.target.position.set(fx, 40, -40); foco.target.updateMatrixWorld(); farol.position.set(Math.round((cx + E.dir * 90 + PASO / 2) / PASO) * PASO - PASO / 2 + 8, 124, 112); farol.intensity = LOWQ ? 420 : 800; farol.distance = 280; if (E.tren24) {farol.position.set(WX(E.n) + 10, 150, 170); farol.intensity = 5200; farol.distance = 900}
   const frente = E.st === 'mira' && (E.u > .12 || E.t > 1.6) && Math.abs(E.az) < .5; barrio.ver(!frente); if (frente) lejos.forEach(l => {l.g.visible = false});
-  if (!din || verPortal) barrio.mover(din ? WX(E.n) : cx, E.dir, dt, t, px); const tm = E.tormenta || 0; nieve.t.value += dt * (1 + tm * 2.6); nieve.c.value.set(cam.p.x + E.dir * (E.st === 'paseo' ? 90 : 0), 120, Math.max(90, cam.p.z - 60)); nieve.k.value = px * (1 + tm * .8); calle.fog.near = lerp(260, 20, tm); calle.fog.far = lerp(1500, 520, tm); chispas.paso(dt, px); if (obra && !FAST) obraPaso();
+  if (!din || verPortal) barrio.mover(din ? WX(E.n) : cx, E.dir, dt, t, px); const tm = E.tormenta || 0; nieve.t.value += dt * (1 + tm * 2.6); nieve.c.value.set(cam.p.x + E.dir * (E.st === 'paseo' ? 90 : 0), 120, Math.max(90, cam.p.z - 60)); nieve.k.value = px * (1 + tm * .8); calle.fog.near = lerp(260, 20, tm); calle.fog.far = lerp(1500, 520, tm); chispas.paso(dt, px); if (obra && !FAST && (prisa || fr % (E.st === 'mira' || E.st === 'dentro' || E.st === 'inicio' ? 2 : 4) === 0)) obraPaso(); if (!obra && !FAST && E.st === 'mira' && E.t > 2.2) {for (const d of [E.dir, -E.dir]) {const q = E.n + d; if (q >= 0 && q < N && q <= AB() && !MU.has(q)) {prepara(q); break}}}
 }
 
 /* ================= las maquetas, a medida que hacen falta ================= */
@@ -210,10 +210,10 @@ function obraPaso() {const o = obra; if (!o) return; o.q.shift()(); if (!o.q.len
 /* la maqueta n, montada ya */
 function mundo(n) {n = clamp(n, 0, N - 1); if (MU.has(n)) return MU.get(n); const o = obra && obra.n === n ? obra : nueva(n); if (obra === o) obra = null; o.q.forEach(f => f()); termina(o); return o.m}
 /* monta la maqueta n sin congelar la imagen y sigue cuando está lista (si entretanto se pide otra, gana la última) */
-let cita = 0;
+let cita = 0, prisa = false;
 async function conMundo(n, fn) {
   const c = ++cita; if (MU.has(n) || FAST || HOLD) {fn(); return} if (obra && obra.n !== n) obra = null;
-  for (const t0 = performance.now(); !MU.has(n) && performance.now() - t0 < 8000;) {prepara(n); await new Promise(r => requestAnimationFrame(r)); if (c !== cita) return}
+  for (const t0 = performance.now(); !MU.has(n) && performance.now() - t0 < 8000;) {prisa = true; prepara(n); await new Promise(r => requestAnimationFrame(r)); if (c !== cita) {prisa = false; return}} prisa = false;
   await Promise.race([compila(dentro), new Promise(r => setTimeout(r, 1500))]); if (c === cita) fn();
 }
 function termina({n, m}, luego) {
