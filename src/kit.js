@@ -241,7 +241,7 @@ function buildTree(par,x,y,z,sc){
   tips.forEach((tp,i)=>{if(tp[1]<10)tp[1]=10;const sc2=(1.6+hash2(i,7)*1.4)*0.57*(.42+.62*Math.sqrt(Math.max(0,1-(tp[1]-10)/38)));o.position.set(...tp);o.scale.setScalar(sc2);o.updateMatrix();orn.setMatrixAt(i,o.matrix);orn.setColorAt(i,new THREE.Color(oc[i%5]))});orn.instanceColor.needsUpdate=true;orn.castShadow=true;g.add(orn);
   const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2?2.2:5.2,a=Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}
   const stg=new THREE.ExtrudeGeometry(sh,{depth:1.0,bevelEnabled:true,bevelSize:.5,bevelThickness:.9,bevelSegments:1});stg.translate(0,0,-0.5);
-  const star=new THREE.Mesh(stg,new THREE.MeshBasicMaterial({color:new THREE.Color(3,2.1,.75)}));star.position.y=H+7;g.add(star);
+  const star=new THREE.Mesh(stg,new THREE.MeshStandardMaterial({color:0xf0b83e,metalness:.55,roughness:.34,emissive:new THREE.Color(1.25,.72,.2),emissiveIntensity:1,flatShading:true}));star.position.y=H+7;g.add(star);
   const glow=new THREE.Mesh(new THREE.PlaneGeometry(R*5,R*5).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:dotTex,color:new THREE.Color(1.1,.62,.28),transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending}));glow.position.y=0.6;g.add(glow);
   g.position.set(x,y,z);g.scale.setScalar(sc);par.add(g);g.updateMatrixWorld(true);
   return {lights,base,star,glow,top:g.localToWorld(new THREE.Vector3(0,H+7,0))}}

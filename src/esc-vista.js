@@ -15,13 +15,13 @@ const mod = (x, L) => ((x % L) + L) % L;
 export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}) {
   const cine = new Cine(), cp2 = new THREE.Vector3(); let cineOn = false;
   let on = false, M = null, W = null; const Wi = new THREE.Matrix4(), up = V3();
-  const CTR = new THREE.Vector3(0, 8, -3), cam = {az: Math.PI / 2, el: .5, d: 100, tgt: CTR.clone(), azT: null, vx: 0, vz: 0, vaz: 0, vel: 0, focus: null, faz: Math.PI / 2, fel: .3, fd: 17, fdT: 17, back: null};
+  const CTR = new THREE.Vector3(0, 13, -8), cam = {az: Math.PI / 2, el: .5, d: 100, tgt: CTR.clone(), azT: null, vx: 0, vz: 0, vaz: 0, vel: 0, focus: null, faz: Math.PI / 2, fel: .3, fd: 17, fdT: 17, back: null};
   const cp = V3(), cl = V3(), dir = V3(), t1 = V3(), t2 = V3();                    // cp, cl: cámara que se ve (posición y punto al que mira, en la maqueta)
   const pp = V3(), ll = V3(), bl = {t: 1, dur: .8, p: V3(), az: 0, el: 0, hop: 0, su: false, fov: FOVD};      // vuelo entre dos vistas: sale siempre de lo que se ve
   const zm = {on: false, l: 0, A: V3(), x: -1e4, y: 0}, ptrs = new Map(), gs = {moved: false, drag: false, far: false, G: V3(), hist: [], lastMove: 0}, pn = {A: V3()};
   let lastIn = 0, tap = null, lastTap = {t: -1e9, x: 0, y: 0}, touched = false, hov = null, cutK = 0, cutOp = 0;
   const now = () => performance.now(), portrait = () => camera.aspect < .8, gy = (x, z) => M.gy(x, z);
-  const fitD = () => Math.max((BW - 3) / (tanH * camera.aspect) + 41, (BD * .9 + 16) / tanH) * 1.12, maxD = () => clamp(fitD() * 1.06, 150, 360), defD = () => clamp(fitD() * (portrait() ? .4 : .45), 62, portrait() ? 104 : 130), homeEl = () => portrait() ? .5 : .33;
+  const fitD = () => Math.max((BW - 3) / (tanH * camera.aspect) + 41, (BD * .9 + 16) / tanH) * 1.12, maxD = () => clamp(fitD() * 1.06, 150, 360), defD = () => clamp(fitD() * (portrait() ? .4 : .42), 60, portrait() ? 104 : 130), homeEl = () => portrait() ? .42 : .21;
   const elMin = () => lerp(.05, .3, sstep(12, 90, cp.y)), effD = () => cp.y / Math.max(.3, Math.sin(cam.el));
   const RC = new THREE.Raycaster(), ND = new THREE.Vector2(), R = new THREE.Ray();
   /* al soltar la cámara de cine se vuela a una vista de mapa; mientras dura, los gestos se aplican a la vista de destino (vc) */

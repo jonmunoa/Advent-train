@@ -153,6 +153,37 @@ export function farol(put) {
 }
 const FARO = new THREE.MeshStandardMaterial({color: 0x1b1e24, metalness: .6, roughness: .42}), CRIST = new THREE.MeshBasicMaterial({color: new THREE.Color(2.1, 1.35, .62)});
 
+/* ---------- edificios de ciudad: ladrillo con ventanas, bajo con escaparates, cornisa y azotea nevada ---------- */
+const FW = 1.5, FH = 2.1, FB = 2.7;   // ancho y alto de cada ventana y alto del bajo
+export const FACHADA = (() => {
+  const m = foto('red_brick_03', {esc: 2.6, rug: .9, tinte: true}); m.userData = {solo: true}; m.onBeforeCompile = s => {PN(s); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPo,vNo;float vLit,vVid;vec3 vEm;float h2F(vec2 p){p=fract(p*vec2(.1031,.11369));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}' + RUIDO).replace('#include <map_fragment>', `
+vec2 U=vMapUv;vec4 tex0=texture2D(map,U*.385);diffuseColor.rgb*=mix(vec3(dot(tex0.rgb,vec3(.33))),tex0.rgb,.35)*1.9;vLit=0.;vVid=0.;vEm=vec3(0.);
+if(abs(vNo.y)<.5){float bajo=step(U.y,${FB.toFixed(2)});vec2 ce=bajo>.5?vec2(${(FW * 2).toFixed(2)},${FB.toFixed(2)}):vec2(${FW.toFixed(2)},${FH.toFixed(2)}),c=vec2(U.x,bajo>.5?U.y:U.y-${FB.toFixed(2)})/ce,id=floor(c)+vec2(0.,bajo*50.),f=fract(c);float h=h2F(id+.5),hb=h2F(id*1.7+9.2);vec2 hw=bajo>.5?vec2(.42,.36):vec2(.27,.31),q=abs(f-vec2(.5,bajo>.5?.46:.52))-hw,aa=fwidth(c)+1e-4;float d=max(q.x*ce.x,q.y*ce.y),w=fwidth(d)+1e-4,in0=smoothstep(w,-w,d),marco=smoothstep(w,-w,d-.11)-in0;
+/* alféizar con nieve y dintel */
+float al=smoothstep(.02,0.,abs(f.x-.5)-hw.x-.07)*step(abs((f.y-(.52-hw.y))*ce.y+.13),.08)*(1.-bajo);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.8,.85,.94),al);
+diffuseColor.rgb=mix(diffuseColor.rgb,mix(vec3(.56,.52,.46),vec3(.1,.09,.085),step(.5,hb)),marco);
+float on=step(bajo>.5?.12:.52,h);vec2 g=(f-vec2(.5,bajo>.5?.46:.52))/hw;float cr=bajo>.5?smoothstep(.02,.0,abs(abs(g.x)-.34)-.012):max(smoothstep(.06,.03,abs(g.x)),smoothstep(.05,.02,abs(g.y+.1)));
+vec3 cal=mix(mix(vec3(1.,.55,.2),vec3(1.,.74,.42),hb),vec3(.62,.75,1.),step(.86,hb));float lz=(.35+.75*exp(-dot(g-vec2(.1,.35),g-vec2(.1,.35))*1.1))*mix(.7,1.,nR(vec3(g*3.,id.x+id.y*7.)));float cor=bajo>.5?0.:smoothstep(.45,.95,abs(g.x)+.15*sin(g.y*4.+hb*6.))*step(.3,hb);vec3 ha=cal*lz;ha=mix(ha,vec3(.5,.12,.07)*cal,cor*.75);if(bajo>.5){float es=step(.0,sin(g.y*9.))*.3;ha*=.75+.5*nR(vec3(g.x*7.,g.y*4.,id.x*5.));ha*=1.-smoothstep(-.35,-.6,g.y)*.5;}else ha*=1.-.55*smoothstep(.2,-1.,g.y)*step(.4,hb);
+vEm=ha*on*in0*(1.-cr)*(bajo>.5?1.5:1.25);vVid=in0*(1.-cr);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.025,.03,.045),vVid);diffuseColor.rgb*=1.-.5*in0*cr;
+/* rótulo corrido del bajo y zócalo */
+if(bajo>.5){float ba=smoothstep(.0,.02,f.y-.84);vec3 bc=mix(mix(vec3(.28,.04,.05),vec3(.05,.16,.1),step(.33,h)),vec3(.05,.08,.2),step(.66,h));diffuseColor.rgb=mix(diffuseColor.rgb,bc,ba);}
+diffuseColor.rgb*=mix(1.,.62,smoothstep(-.02,-.14,d)*0.)*(1.-.35*smoothstep(.16,0.,d)*(1.-in0)*(1.-marco)*step(0.,g.y));diffuseColor.rgb*=.82+.3*nR(vPo*vec3(.35,.12,.35));}
+#ifdef USE_COLOR
+#endif
+`).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.12,vVid);').replace('#include <normal_fragment_maps>', 'vec3 nF0=normal;\n#include <normal_fragment_maps>\nnormal=normalize(mix(normal,nF0,vVid));').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vEm;')}; m.customProgramCacheKey = () => 'fachada'; return m;
+})();
+const LADR = [0x9a5a48, 0x7a4a44, 0xa8835e, 0x6a5a58, 0x8a7a6c, 0xb0a48e];
+/* put(geo, mat, x, y, z…) en el sistema del edificio; nx, nz ventanas por fachada y n pisos. Devuelve [ancho, alto, fondo] */
+export function edificio(put, r, nx, nz, n, k) {
+  const w = nx * FW, d = nz * FW, h = FB + n * FH, sem = Math.floor(r() * 400) * FW * 2, caras = [[w, 0, 0, d / 2, 0], [d, 1, w / 2, 0, Math.PI / 2], [w, 2, 0, -d / 2, Math.PI], [d, 3, -w / 2, 0, -Math.PI / 2]]; for (const [a, i, x, z, ry] of caras) {const g = new THREE.PlaneGeometry(a, h), u = g.attributes.uv; for (let q = 0; q < 4; q++) u.setXY(q, u.getX(q) * a + sem + i * FW * 30, u.getY(q) * h); put(pinta(g, LADR[k % LADR.length]), FACHADA, x, h / 2, z, 0, ry, 0)}
+  const pi = R.piedra2; for (const [y, e, a] of [[FB, .22, .24], [h - .1, .5, .34], [h + .22, .3, .5]]) {put(BX(w + e * 2, a, d + e * 2), pi, 0, y, 0)} if (n > 3) put(BX(w + .24, .16, d + .24), pi, 0, FB + Math.floor(n * .5) * FH, 0);
+  for (let x = -w / 2 + .5; x < w / 2; x += 1) for (const s of [-1, 1]) put(BX(.18, .3, .3), pi, x, h - .36, s * (d / 2 + .24)); put(losa(w + .5, .46, d + .5), M.snow, 0, h + .62, 0);
+  // azotea: caseta, chimeneas y, en los altos, el depósito de agua
+  const cx = (r() - .5) * w * .4, cz = (r() - .5) * d * .3; if (r() < .6) {put(BX(1.5, 1.3, 1.4), R.ladrillo, cx, h + 1.2, cz); put(losa(1.8, .3, 1.7), M.snow, cx, h + 1.95, cz)} for (let q = 0; q < 2; q++) {const a = (r() - .5) * w * .7, b = -d * .34; put(BX(.55, 1.1, .55), R.ladrillo, a, h + 1.1, b); put(BX(.7, .14, .7), pi, a, h + 1.7, b)}
+  if (n > 4 && r() < .7) {const a = -cx * 1.3, b = d * .12; for (const [p, q] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) put(CY(.06, .06, 1.6, 5), FARO, a + p, h + 1.4, b + q); put(CY(.85, .8, 1.5, 14), R.tronco, a, h + 2.9, b); put(new THREE.ConeGeometry(1, .7, 14), R.teja, a, h + 4, b); put(new THREE.ConeGeometry(.8, .5, 14), M.snow, a, h + 4.16, b)}
+  return [w, h, d];
+}
+
 /* nieve con los cantos redondos y algo hundida, en vez de una losa */
 export function losa(w, h, d) {
   const r = Math.min(h * .62, d * .3, w * .3), nx = Math.max(4, Math.min(LOWQ ? 8 : 16, Math.round(w / (h * 1.6)))), nz = Math.max(4, Math.min(LOWQ ? 4 : 6, Math.round(d / (h * 1.3)))), g = new THREE.BoxGeometry(w, h, d, nx, 3, nz), p = g.attributes.position; for (let i = 0; i < p.count; i++) {let x = p.getX(i), y = p.getY(i), z = p.getZ(i); const a = Math.max(0, Math.abs(x) - (w / 2 - r)), b = Math.max(0, Math.abs(z) - (d / 2 - r)), e = Math.min(1, Math.hypot(a, b) / r), top = (y / h + .5); y -= h * .72 * (1 - Math.sqrt(1 - e * e)) * top; const k = e > .98 ? .12 * top : 0; x -= Math.sign(x) * r * k; z -= Math.sign(z) * r * k; y += (vnoise(x * .9 / h + w, z * .9 / h) - .5) * h * .3 * top; p.setXYZ(i, x, y, z)} g.computeVertexNormals(); g.parameters = null; return g;

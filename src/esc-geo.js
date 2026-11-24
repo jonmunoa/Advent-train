@@ -2,6 +2,7 @@
    tres cubos (mate, satinado y metal) más uno sin luz; los que llevan textura o algo especial se quedan como están. */
 import {uvFoto} from './esc-real.js';
 import {THREE, mergeGeometries, geoOnly, LOWQ, cutMat} from './kit.js';
+import {conLuz} from './esc-luz.js';
 
 const CUBO = {
   mate: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .92}), satin: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .42}), metal: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .34, metalness: .72}), luz: new THREE.MeshBasicMaterial({vertexColors: true}),
@@ -32,6 +33,8 @@ const firma = (o, sitio) => sitio + (o.isInstancedMesh ? (o.instanceColor ? ' ic
 export function separa(root, sitio) {
   root.traverse(o => {
     const m = o.material; if (!o.isMesh || !m || Array.isArray(m)) return; const b = BASE.get(m) || m, f = firma(o, sitio); let q = COPIAS.get(b); if (!q) COPIAS.set(b, q = new Map());
-    let c = q.get(f); if (!c) {c = b; if (q.size) {c = b.clone(); c.onBeforeCompile = b.onBeforeCompile; c.customProgramCacheKey = b.customProgramCacheKey; c.userData = b.userData; BASE.set(c, b)} q.set(f, c)} o.material = c;
+    let c = q.get(f); if (!c) {
+      const o0 = b.lz0 || {f: b.onBeforeCompile, k: b.customProgramCacheKey}; c = b; if (q.size) {c = b.clone(); c.onBeforeCompile = o0.f; c.customProgramCacheKey = o0.k; c.userData = b.userData; BASE.set(c, b)}
+      if (sitio === 'dentro') {c.lz0 = c.lz0 || o0; conLuz(c)} q.set(f, c)} o.material = c;
   });
 }
