@@ -1,0 +1,157 @@
+/* La calle horneada: carga el bloque que se repite (m/calle, hecho por scripts/ciudad/hornea.mjs), con su luz ya calculada (dos rebotes,
+   sombras suaves y dirección dominante), y le pone materiales con foto, nieve, agua y ventanas con habitación dentro. */
+import {THREE, LOWQ, canvasTex, rng, lerp, clamp, sstep} from './kit.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+
+const DIR = 'm/calle/', url = f => new URL(DIR + f, document.baseURI).href;
+/* uniformes comunes: mapas de luz, cuánto luce cada escaparate y si están encendidas las luces de la calle */
+export const U = {tL: {value: null}, tDir: {value: null}, tE: {value: null}, tEnv: {value: null}, MX: {value: 1}, MW: {value: 1}, uB0: {value: new THREE.Vector3()}, uBS: {value: new THREE.Vector3(1, 1, 1)}, lz: {value: new Float32Array(12)}, lzB: {value: 0}, on: {value: 1}, esc: {value: 1}, uT: {value: 0}, envK: {value: 1}, sC: {value: null}, sZ: {value: null}, sPV: {value: new THREE.Matrix4()}, sV: {value: new THREE.Matrix4()}, sOn: {value: 0}};
+const RUIDO = 'float hB(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}float nB(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(hB(i),hB(i+vec3(1,0,0)),f.x),mix(hB(i+vec3(0,1,0)),hB(i+vec3(1,1,0)),f.x),f.y),mix(mix(hB(i+vec3(0,0,1)),hB(i+vec3(1,0,1)),f.x),mix(hB(i+vec3(0,1,1)),hB(i+vec3(1,1,1)),f.x),f.y),f.z);}';
+/* la luz de un escaparate en un punto: cada uno manda cerca del suyo */
+const LZ = 'uniform float lz[12];uniform float lzB;float luzEsc(float x){float u=(x+170.)/340.-lzB,s=0.,w=0.;int c=int(floor(u));for(int k=-1;k<=1;k++){int i=c+k;if(i<0||i>11)continue;float d=(u-.5-float(i))*340.,g=exp(-d*d/26000.);s+=lz[i]*g;w+=g;}return s/max(w,1e-4);}';
+const tex = new THREE.TextureLoader(); const phT = {}; const ph = (n, srgb) => phT[n] ||= (() => {const t = tex.load('m/ph2/' + n + '.webp'); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (n.startsWith('p_')) t.flipY = false; t.anisotropy = LOWQ ? 2 : 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t})();
+
+/* ---------- material horneado ----------
+   o: {d, n: texturas; k: repeticiones por unidad; tipo: liso | foto | nieve | suelo | prop} */
+function horneado({tipo, d, n, k = 1 / 90, nor = 1, color = [1, 1, 1], rug = 1, suelo = null}) {
+  const m = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1, metalness: 0}); m.userData.horno = true; m.userData.solo = true;
+  const u = {tA: {value: d || null}, tN: {value: n || null}, k: {value: k}, col: {value: new THREE.Color(...color)}, tS: {value: suelo ? suelo.n : null}, tSd: {value: suelo ? suelo.d : null}}, foto = tipo !== 'liso', pr = tipo === 'prop';
+  m.onBeforeCompile = s => {
+    Object.assign(s.uniforms, u, U); m.userData.s = s;
+    s.vertexShader = s.vertexShader.replace('#include <common>', `#include <common>
+uniform vec3 uB0,uBS;uniform float k;attribute vec4 tinte;attribute vec2 lmuv;${pr ? 'attribute vec2 puv;' : ''}varying vec2 vL,vB;varying vec4 vT;varying vec3 vPo,vNo;`).replace('#include <begin_vertex>', `vec3 transformed=uB0+position*uBS;vPo=(modelMatrix*vec4(transformed,1.)).xyz;vNo=objectNormal;vL=lmuv;vT=tinte;
+{vec3 a=abs(objectNormal);vB=${pr ? 'puv' : '(a.y>a.x&&a.y>a.z?transformed.xz:a.x>a.z?transformed.zy:transformed.xy)*k'};}`);
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', `#include <common>
+uniform sampler2D tL,tDir,tE,tA,tN,tS,tSd;uniform float MX,MW,on,esc,envK,k;uniform vec3 col;varying vec2 vL,vB;varying vec4 vT;varying vec3 vPo,vNo;float rugB,metB,snB;vec3 lmE,lmM,lmD;
+${LZ}${RUIDO}
+${tipo === 'suelo' && !LOWQ ? `uniform sampler2D sC,sZ;uniform mat4 sPV,sV;uniform float sOn;
+/* rayo reflejado por la pantalla del fotograma anterior */
+vec4 ssr(vec3 P,vec3 R,float ru,float j){float t=2.5+j*2.,st=3.2;vec3 q=P;float hit=0.;vec2 uv=vec2(0.);for(int i=0;i<26;i++){q=P+R*t;vec4 c=sPV*vec4(q,1.);if(c.w<=0.)break;uv=c.xy/c.w*.5+.5;if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)break;float z=-(sV*vec4(q,1.)).z,s=textureLod(sZ,uv,0.).r;if(z>s+.4&&z-s<st*1.6+5.){float a=t-st,b=t;for(int k=0;k<5;k++){float m=(a+b)*.5;q=P+R*m;c=sPV*vec4(q,1.);uv=c.xy/c.w*.5+.5;z=-(sV*vec4(q,1.)).z;s=textureLod(sZ,uv,0.).r;if(z>s+.2)b=m;else a=m;}hit=1.;t=b;break;}t+=st;st*=1.17;}
+if(hit<.5)return vec4(0.);vec2 e=smoothstep(vec2(0.),vec2(.12),uv)*smoothstep(vec2(1.),vec2(.88),uv);float lod=clamp(ru*t*.11,0.,5.);vec3 C=textureLod(sC,uv,lod).rgb;return vec4(min(C,vec3(9.)),e.x*e.y);}` : ''}
+mat3 marcoB(vec3 p,vec3 N,vec2 q){vec3 a=dFdx(p),b=dFdy(p);vec2 c=dFdx(q),e=dFdy(q);vec3 q1=cross(b,N),q0=cross(N,a),T=q1*c.x+q0*e.x,B=q1*c.y+q0*e.y;float D=max(dot(T,T),dot(B,B)),sc=D==0.?0.:inversesqrt(D);return mat3(T*sc,B*sc,N);}`)
+      .replace('#include <map_fragment>', `lmM=texture2D(tE,vL).rgb;rugB=1.;metB=0.;snB=0.;
+${tipo === 'liso' ? `diffuseColor.rgb=pow(vT.rgb,vec3(2.2));rugB=vT.a>.5?(vT.a-.502)*2.008:vT.a*2.008;metB=step(.5,vT.a);{float g=nB(vPo*vec3(.9,.16,.9)),g2=nB(vPo*.06);diffuseColor.rgb*=.86+.2*g2+.07*g;rugB=clamp(rugB+(g-.5)*.16+(g2-.5)*.14,.06,1.);}`
+        : tipo === 'nieve' ? `{float g=nB(vPo*.05),g2=nB(vPo*.6);diffuseColor.rgb=vec3(.80,.82,.86)*(.93+.1*g)*(.97+.05*g2);rugB=.72;snB=1.;}`
+        : tipo === 'suelo' ? `{vec4 A=texture2D(tA,vB);float h=A.a,n1=nB(vPo*.045),n2=nB(vPo*.21),n3=nB(vPo*.9);float sn=smoothstep(.40,.62,vT.a*1.12+(.5-h)*.62+(n2-.5)*.22+(n3-.5)*.1);float agua=smoothstep(.16,.5,vT.g*.75+(.5-h)*.9+(n1-.5)*1.1)*(1.-sn);vec3 c=A.rgb*col*(vT.r*2.);c*=mix(1.,.5,agua*.8+.2*(1.-sn));vec3 nv=vec3(.78,.80,.85)*(.9+.12*n1)*(.95+.08*n3);nv=mix(nv,nv*vec3(.72,.70,.69),smoothstep(.2,.9,vT.g)*.55*n2);diffuseColor.rgb=mix(c,nv,sn);rugB=mix(mix(.46,.09,agua),mix(.78,.5,vT.g*.7),sn);snB=sn;}`
+        : `{vec4 A=texture2D(tA,vB);diffuseColor.rgb=A.rgb*col*(${pr ? '1.' : 'vT.r*2.'});${pr ? '' : 'diffuseColor.rgb*=.82+.3*nB(vPo*vec3(.02,.012,.02));'}}`}
+${tipo === 'nieve' || tipo === 'suelo' ? '' : 'diffuseColor.rgb*=mix(.66,1.,smoothstep(0.,.34,lmM.g));'}`)
+      .replace('#include <roughnessmap_fragment>', `float roughnessFactor=rugB;vec3 nrB=vec3(.5,.5,1.);${foto ? `{vec4 Q=texture2D(tN,vB);nrB=Q.rgb;${tipo === 'foto' || pr ? `roughnessFactor=clamp(Q.b*${rug.toFixed(2)},.05,1.);` : ''}}` : ''}`)
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor=metB;')
+      .replace('#include <normal_fragment_maps>', `vec3 nLis=normal;${foto ? `{vec2 q=nrB.xy*2.-1.;${tipo === 'suelo' ? 'vec2 qs=(texture2D(tS,vPo.xz*.0111).xy*2.-1.)*.75+(texture2D(tS,vPo.xz*.047+.3).xy*2.-1.)*.6;q=mix(q*mix(.35,1.15,smoothstep(.06,.34,rugB)),qs,snB);' : tipo === 'nieve' ? 'q=q*.7+(texture2D(tN,vB*4.3+.37).xy*2.-1.)*.55;' : ''}q*=${nor.toFixed(2)};vec3 t=vec3(q,sqrt(max(0.,1.-dot(q,q))));normal=normalize(marcoB(-vViewPosition,normal,${tipo === 'suelo' ? 'vPo.xz*.02' : 'vB'})*t);}` : ''}
+{vec3 Vd=normalize(vViewPosition);float dV=length(vViewPosition);if(snB>.4&&dV<190.){float hq=hB(floor(vPo*3.1)+floor(Vd*4.)*3.);totalEmissiveRadiance+=vec3(.9,.95,1.)*step(.9965,hq)*smoothstep(190.,40.,dV)*.9*dot(pow(texture2D(tL,vL).rgb,vec3(2.4))*MX+lmM.r*lmM.r*MW,vec3(.33));}}`)
+      .replace('#include <lights_fragment_begin>', `vec3 geometryPosition=-vViewPosition;vec3 geometryNormal=normal;vec3 geometryViewDir=normalize(vViewPosition);vec3 geometryClearcoatNormal=vec3(0.);
+vec3 iblIrradiance=vec3(0.),clearcoatRadiance=vec3(0.),radiance=vec3(0.);
+vec3 LmB=pow(texture2D(tL,vL).rgb,vec3(2.4))*MX*mix(.16,1.,on);float WB=pow(lmM.r,2.4)*MW*luzEsc(vPo.x)*esc;
+float somB=1.;
+#if defined(USE_SHADOWMAP) && NUM_SPOT_LIGHT_SHADOWS > 0
+if(receiveShadow){SpotLightShadow sl=spotLightShadows[0];somB=getShadow(spotShadowMap[0],sl.shadowMapSize,sl.shadowIntensity,sl.shadowBias,sl.shadowRadius,vSpotLightCoord[0]);}
+#endif
+WB*=mix(.22,1.,somB);vec3 irradiance=LmB*mix(.8,1.,somB)+vec3(1.,.8,.58)*1.25*WB;
+vec3 dwB=texture2D(tDir,vL).xyz*2.-1.;float kdB=lmM.b;vec3 dvB=normalize((viewMatrix*vec4(dwB,0.)).xyz+vec3(0.,0.,1e-4));
+{float f=dot(nLis,dvB),g=dot(normal,dvB);irradiance*=mix(1.,clamp((max(g,0.)+.32)/(max(f,0.)+.32),.3,1.8),kdB*(1.-.6*snB));}
+{vec3 hB2=normalize(dvB+geometryViewDir);float nl=clamp(dot(normal,dvB),0.,1.);vec3 sp=BRDF_GGX(dvB,geometryViewDir,normal,material);reflectedLight.directSpecular+=irradiance*sp*smoothstep(0.,.2,nl)*kdB*.9;}`)
+      .replace('#include <lights_fragment_maps>', `#ifdef USE_ENVMAP
+{vec3 rf=getIBLRadiance(geometryViewDir,geometryNormal,material.roughness);float oc=clamp(dot(irradiance,vec3(.4))*1.6+lmM.g*.35,0.,1.);radiance+=rf*oc*envK;}
+#endif${tipo === 'suelo' && !LOWQ ? `
+if(sOn>.5&&material.roughness<.62&&snB<.8){vec3 Vw=normalize(vPo-cameraPosition),Nw=normalize((vec4(normal,0.)*viewMatrix).xyz);Nw=normalize(mix(Nw,vec3(0.,1.,0.),.55));vec3 Rw=reflect(Vw,Nw);Rw.y=max(Rw.y,.02);vec4 S=ssr(vPo+vec3(0.,.3,0.),normalize(Rw),material.roughness,hB(vPo*7.));float k=S.a*smoothstep(.62,.22,material.roughness)*(1.-snB);radiance=mix(radiance,S.rgb,k);}` : ''}`);
+  };
+  m.customProgramCacheKey = () => 'horno' + tipo + nor + rug; return m;
+}
+/* ---------- ventanas: habitación con profundidad detrás del cristal ---------- */
+function atlasCuartos() {
+  return canvasTex(1024, 768, (g, W, H) => {
+    const C = 256, cel = (i, j, f) => {g.save(); g.beginPath(); g.rect(i * C, j * C, C, C); g.clip(); g.translate(i * C, j * C); f(); g.restore()}, R = (c, x, y, w, h) => {g.fillStyle = c; g.fillRect(x, y, w, h)};
+    const papel = (c1, c2, q) => {R(c1, 0, 0, C, C); g.fillStyle = c2; if (q === 0) for (let x = 6; x < C; x += 22) g.fillRect(x, 0, 9, C); else if (q === 1) for (let y = 8; y < C; y += 24) for (let x = (y % 48 ? 8 : 20); x < C; x += 24) {g.beginPath(); g.ellipse(x, y, 4, 7, .5, 0, 7); g.fill()} else R(c2, 0, 150, C, 106)}, cuadro = (x, y, w, h, c) => {R('#3a2413', x - 5, y - 5, w + 10, h + 10); R('#b98f4a', x - 3, y - 3, w + 6, h + 6); const gr = g.createLinearGradient(0, y, 0, y + h); c.forEach((q, i) => gr.addColorStop(i / (c.length - 1), q)); g.fillStyle = gr; g.fillRect(x, y, w, h)}, libros = (x, y, w, r) => {let a = x; while (a < x + w - 6) {const bw = 4 + r() * 7, bh = 20 + r() * 14; R(['#6d1420', '#1d3a5a', '#274d33', '#b08a3a', '#4a2c4a', '#d8c9a4', '#2b2b30'][r() * 7 | 0], a, y - bh, bw, bh); a += bw + .8}};
+    const r = rng(7);
+    // fila 0: paredes del fondo de las casas
+    cel(0, 0, () => {papel('#b98e5c', '#a87c4c', 0); cuadro(96, 46, 70, 48, ['#8fb0c8', '#d8c8a0', '#54683e']); R('#4a2c18', 20, 150, 60, 106); for (const y of [182, 214, 246]) {R('#2e1a0e', 24, y, 52, 4); libros(26, y, 48, r)} R('#6b4424', 180, 190, 60, 8); R('#3a2413', 186, 198, 6, 58); R('#3a2413', 228, 198, 6, 58)});
+    cel(1, 0, () => {papel('#7e8f78', '#6f8069', 1); cuadro(40, 50, 44, 58, ['#c9b48a', '#7a5a3a']); cuadro(160, 44, 60, 44, ['#e6d6b0', '#a06a4a', '#3a3a4a']); R('#3b2a22', 80, 150, 100, 106); R('#1c120c', 96, 176, 68, 80); const f = g.createRadialGradient(130, 246, 4, 130, 246, 44); f.addColorStop(0, '#ffd98a'); f.addColorStop(.4, '#ff8a2c'); f.addColorStop(1, 'rgba(120,30,0,0)'); g.fillStyle = f; g.fillRect(90, 190, 80, 66); R('#5b4334', 70, 140, 120, 12); for (let i = 0; i < 3; i++) {R(['#b3162a', '#f1e6cc', '#1b5a40'][i], 88 + i * 34, 152, 14, 26)}});
+    cel(2, 0, () => {papel('#a8584a', '#984c40', 2); R('#e8dcc4', 0, 146, C, 5); cuadro(100, 36, 56, 70, ['#2f4a6a', '#8fa8b8', '#e8d8b0']); for (const x of [28, 196]) {R('#b98f4a', x + 10, 92, 4, 20); const f = g.createRadialGradient(x + 12, 84, 2, x + 12, 84, 40); f.addColorStop(0, '#fff3cf'); f.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = f; g.fillRect(x - 30, 44, 84, 80)} R('#3f2616', 60, 176, 136, 80); R('#5b3a22', 60, 170, 136, 9)});
+    cel(3, 0, () => {papel('#c8b690', '#bba77e', 1); R('#f0e8d8', 92, 30, 72, 120); R('#5a6f8a', 98, 36, 28, 52); R('#5a6f8a', 130, 36, 28, 52); R('#5a6f8a', 98, 92, 28, 52); R('#5a6f8a', 130, 92, 28, 52); cuadro(22, 60, 40, 50, ['#b8a080', '#6a4a3a']); R('#4d6a52', 180, 168, 60, 88); R('#3d5a44', 176, 160, 68, 12)});
+    // fila 1: muebles recortados
+    g.clearRect(0, C, W, C);
+    const arbol = (x, y, s) => {for (let i = 0; i < 5; i++) {g.fillStyle = ['#14382a', '#1a4433'][i % 2]; g.beginPath(); const w = (64 - i * 11) * s, yy = y - i * 30 * s; g.moveTo(x - w, yy); g.lineTo(x, yy - 52 * s); g.lineTo(x + w, yy); g.fill()} for (let i = 0; i < 60; i++) {const u = r(), w = (60 - u * 52) * s; g.fillStyle = ['#ffd86a', '#ff6a5a', '#8ad0ff', '#fff3cf'][i % 4]; g.beginPath(); g.arc(x + (r() - .5) * 2 * w * .8, y - u * 150 * s, 2.6 * s, 0, 7); g.fill()} g.fillStyle = '#ffe08a'; g.beginPath(); g.arc(x, y - 172 * s, 6 * s, 0, 7); g.fill()};
+    const lamp = (x, y, c) => {g.fillStyle = '#4a3220'; g.fillRect(x - 3, y, 6, C - y); const f = g.createRadialGradient(x, y - 14, 4, x, y - 14, 70); f.addColorStop(0, 'rgba(255,226,160,.85)'); f.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = f; g.fillRect(x - 70, y - 84, 140, 140); g.fillStyle = c; g.beginPath(); g.moveTo(x - 16, y - 34); g.lineTo(x + 16, y - 34); g.lineTo(x + 28, y + 2); g.lineTo(x - 28, y + 2); g.fill()};
+    const buta = (x, c) => {g.fillStyle = c; g.beginPath(); g.roundRect(x, 168, 92, 88, 16); g.fill(); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(x + 14, 206, 64, 14)};
+    cel(0, 1, () => {arbol(188, 246, .95); buta(16, '#6d2a2a')}); cel(1, 1, () => {lamp(50, 110, '#f3dcae'); buta(120, '#3f5a4a')}); cel(2, 1, () => {lamp(206, 96, '#e8c890'); g.fillStyle = '#2b1a12'; g.beginPath(); g.arc(96, 150, 17, 0, 7); g.fill(); g.beginPath(); g.roundRect(68, 166, 56, 100, 22); g.fill()}); cel(3, 1, () => {arbol(60, 246, .8); lamp(206, 120, '#f6e2b8')});
+    // fila 2: comercios
+    cel(0, 2, () => {R('#d8a25c', 0, 0, C, C); for (const y of [70, 130, 190, 246]) {R('#4f2e16', 0, y, C, 7); let x = 4; while (x < C - 12) {const w = 14 + r() * 18; g.fillStyle = ['#c98b4a', '#a8652c', '#e0ad6a', '#8a4f22'][r() * 4 | 0]; g.beginPath(); g.ellipse(x + w / 2, y - 8, w / 2, 8 + r() * 6, 0, 0, 7); g.fill(); x += w + 3}}});
+    cel(1, 2, () => {R('#8a6238', 0, 0, C, C); for (const y of [60, 110, 160, 210, 254]) {R('#3a2212', 0, y, C, 6); libros(2, y, C - 4, r)} for (const x of [84, 168]) R('#3a2212', x, 0, 6, C)});
+    cel(2, 2, () => {R('#c9a878', 0, 0, C, C); for (const y of [90, 160, 230]) {R('#5a3a22', 0, y, C, 6); let x = 6; while (x < C - 16) {const w = 12 + r() * 10; R(['#b3162a', '#1c6b45', '#f1e6cc', '#31506b', '#e0ad45'][r() * 5 | 0], x, y - 22 - r() * 8, w, 24); x += w + 9}} R('#4a2c18', 0, 236, C, 20)});
+    cel(3, 2, () => {g.clearRect(0, 0, C, C); for (const [x, c] of [[70, '#1c120c'], [176, '#241812']]) {g.fillStyle = c; g.beginPath(); g.arc(x, 128, 15, 0, 7); g.fill(); g.beginPath(); g.roundRect(x - 26, 142, 52, 120, 22); g.fill()} for (let x = 10; x < C; x += 20) {g.fillStyle = ['#ff6a5a', '#ffd86a', '#8affc0', '#8ac0ff'][(x / 20 | 0) % 4]; g.beginPath(); g.arc(x, 18 + Math.abs(Math.sin(x * .05)) * 14, 4, 0, 7); g.fill()}});
+  }, 'cuartos');
+}
+function ventanas(list) {
+  const n = list.length, P = [], Q = [], S = [], I = []; list.forEach(([x, y, z, w, h, on, r, s], i) => {for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {P.push(x + a * s * w / 2, y + b * h / 2, z); Q.push(a * .5 * w, b * .5 * h); S.push(w, h, on, r)} const k = i * 4; I.push(k, k + 1, k + 2, k, k + 2, k + 3)});
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('q', new THREE.Float32BufferAttribute(Q, 2)); g.setAttribute('v', new THREE.Float32BufferAttribute(S, 4)); g.setIndex(I); g.computeBoundingSphere();
+  const m = new THREE.ShaderMaterial({uniforms: {...U, map: {value: atlasCuartos()}, fogColor: {value: new THREE.Color()}, fogNear: {value: 1}, fogFar: {value: 2}}, fog: true,
+    vertexShader: `attribute vec2 q;attribute vec4 v;varying vec2 vQ;varying vec4 vV;varying vec3 vD,vW;varying float vS;
+#include <fog_pars_vertex>
+void main(){vQ=q;vV=v;vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;vS=position.z>200.?-1.:1.;vec3 d=w.xyz-cameraPosition;vD=vec3(d.x*vS,d.y,d.z*vS);vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
+#include <fog_vertex>
+}`, fragmentShader: `uniform sampler2D map;uniform float on;varying vec2 vQ;varying vec4 vV;varying vec3 vD,vW;varying float vS;
+#include <fog_pars_fragment>
+${RUIDO}
+vec4 cel(float i,float j,vec2 p){return texture2D(map,vec2((i+clamp(p.x,.01,.99))/4.,1.-(j+1.-clamp(p.y,.01,.99))/3.));}
+void main(){vec3 d=normalize(vD);d.z=min(d.z,-.02);bool ti=vV.z>1.5;float rw=max(vV.x*1.25,ti?vV.x*1.05:64.),rh=max(vV.y*1.12,ti?vV.y*1.1:78.),rd=ti?95.:74.;vec3 o=vec3(vQ+vec2(0.,vV.y*.5-rh*.5+ (rh-vV.y)*.62),0.);
+vec3 b=vec3(sign(d.x)*rw*.5,sign(d.y)*rh*.5,-rd),t=(b-o)/d;float tm=min(t.x,min(t.y,t.z));vec3 h=o+d*tm,c;float id=floor(vV.w*3.99);vec2 uv=vec2(h.x/rw+.5,h.y/rh+.5);vec3 N;
+if(tm==t.z){c=cel(id,ti?2.:0.,uv).rgb;if(ti)c=cel(floor(vV.w*3.),2.,uv).rgb;N=vec3(0.,0.,1.);}
+else if(tm==t.x){vec2 s=vec2(-h.z/rd,h.y/rh+.5);c=cel(id,0.,vec2(.02+.06*s.x,s.y)).rgb*.82;N=vec3(-sign(d.x),0.,0.);}
+else if(d.y<0.){c=vec3(.26,.14,.07)*(.8+.35*step(.5,fract(h.x*.12))*.4+.2*nB(vec3(h.xz*.3,1.)));N=vec3(0.,1.,0.);}else{c=vec3(.75,.68,.56);N=vec3(0.,-1.,0.);}
+vec3 lp=vec3((fract(vV.w*7.)-.5)*rw*.5,rh*.3,-rd*.45),L=lp-h;float ld=length(L);float li=(ti?1.5:1.05)*(.35+.65*max(0.,dot(N,L/ld)))*1500./(ld*ld+900.)+.16;c*=c;c*=li*vec3(1.,.78,.5)*1.9;
+// muebles a media profundidad
+{float tz=(-rd*(ti?.62:.5)-o.z)/d.z;vec3 m=o+d*tz;vec2 mu=vec2(m.x/rw+.5,(m.y+rh*.5)/(ti?rh*.95:rh));if(mu.x>0.&&mu.x<1.&&mu.y<1.&&mu.y>0.&&tz<tm&&(ti||min(vV.x,vV.y)>34.)){vec4 q=cel(ti?3.:id,ti?2.:1.,mu);vec3 qc=pow(q.rgb,vec3(2.2));c=mix(c,qc*(ti?1.2:1.6)*vec3(1.,.84,.62),q.a);}}
+// visillos junto al cristal
+if(!ti){float x=abs(vQ.x+d.x/-d.z*3.)/(vV.x*.5),pl=sin(vQ.x*1.7+sin(vQ.y*.05)*2.)*.5+.5;float ca=smoothstep(.52+.05*sin(vQ.y*.04+vV.w*9.),.6,x-.22*smoothstep(-.1,-.5,vQ.y/vV.y))*step(.18,fract(vV.w*5.3));vec3 tc=mix(vec3(.9,.72,.46),vec3(.52,.1,.1),step(.6,fract(vV.w*3.7)));c=mix(c,tc*(.5+.55*pl)*.85,ca*.9);}
+c*=mix(.1,1.,on);if(vV.z<.5)c=vec3(.006,.008,.014)+c*.012;
+// cristal: reflejo de la calle y escarcha en las esquinas
+float fr=.04+.5*pow(1.-clamp(-d.z,0.,1.),4.);vec3 rf=vec3(.035,.045,.085)*(.6+.8*nB(vec3(vQ*.05,vV.w*9.)))+vec3(.5,.3,.12)*.12*smoothstep(.55,.9,nB(vec3(vQ.x*.03+d.x*2.,vQ.y*.05,3.)));c+=rf*fr*2.;
+vec2 e=abs(vQ)/(vV.xy*.5);float fe=smoothstep(.62,1.15,length(pow(e,vec2(3.)))+ (nB(vec3(vQ*.35,2.))-.5)*.5-(e.y>0.&&vQ.y>0.?.12:0.));c=mix(c,c*.55+vec3(.16,.19,.26),fe*.5);
+gl_FragColor=vec4(c,1.);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+#include <fog_fragment>
+}`}); m.userData.solo = true; return new THREE.Mesh(g, m);
+}
+
+let DATOS = null;
+export async function cargaBloque() {
+  if (DATOS) return DATOS; const [j, b, s] = await Promise.all([fetch(url('bloque.json')).then(r => r.json()), fetch(url('bloque.bin')).then(r => r.arrayBuffer()), fetch(url('sondas.bin')).then(r => r.arrayBuffer()), MeshoptDecoder.ready]);
+  const bin = new Uint8Array(b), geos = j.partes.map(p => {
+    const vb = new Uint8Array(p.v * p.es), ib = new Uint32Array(p.i); MeshoptDecoder.decodeVertexBuffer(vb, p.v, p.es, bin.subarray(p.vb[0], p.vb[0] + p.vb[1])); MeshoptDecoder.decodeIndexBuffer(new Uint8Array(ib.buffer), p.i, 4, bin.subarray(p.ib[0], p.ib[0] + p.ib[1]));
+    const pos = new Uint16Array(p.v * 4), nor = new Int8Array(p.v * 4), lm = new Uint16Array(p.v * 2), ti = new Uint8Array(p.v * 4), puv = p.es > 20 ? new Uint16Array(p.v * 2) : null, dv = new DataView(vb.buffer), mn = [9e9, 9e9, 9e9], mx = [-9e9, -9e9, -9e9]; for (let i = 0; i < p.v; i++) {const o = i * p.es; for (let c = 0; c < 3; c++) {const q = pos[i * 4 + c] = dv.getUint16(o + c * 2, true); mn[c] = Math.min(mn[c], q); mx[c] = Math.max(mx[c], q); nor[i * 4 + c] = dv.getInt8(o + 8 + c)} lm[i * 2] = dv.getUint16(o + 12, true); lm[i * 2 + 1] = dv.getUint16(o + 14, true); for (let c = 0; c < 4; c++) ti[i * 4 + c] = vb[o + 16 + c]; if (puv) {puv[i * 2] = dv.getUint16(o + 20, true); puv[i * 2 + 1] = dv.getUint16(o + 22, true)}}
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 4, true)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 4, true)); g.setAttribute('lmuv', new THREE.BufferAttribute(lm, 2, true)); g.setAttribute('tinte', new THREE.BufferAttribute(ti, 4, true)); if (puv) g.setAttribute('puv', new THREE.BufferAttribute(puv, 2, true)); g.setIndex(new THREE.BufferAttribute(p.v < 65536 ? new Uint16Array(ib) : ib, 1)); const A = new THREE.Vector3(...mn.map((v, c) => j.B0[c] + v / 65535 * j.BS[c])), B = new THREE.Vector3(...mx.map((v, c) => j.B0[c] + v / 65535 * j.BS[c])); g.boundingSphere = new THREE.Sphere(A.clone().add(B).multiplyScalar(.5), A.distanceTo(B) / 2); g.boundingBox = new THREE.Box3(A, B); return {m: p.m, z: p.z, g}
+  });
+  // sondas (medio flotante → flotante)
+  const h = new Uint16Array(s), sh = new Float32Array(h.length); for (let i = 0; i < h.length; i++) {const q = h[i], e = (q >> 10) & 31, m = q & 1023; sh[i] = (q & 0x8000 ? -1 : 1) * (e ? Math.pow(2, e - 15) * (1 + m / 1024) : 0)}
+  const L = (f, o = {}) => {const t = tex.load(url(f)); t.flipY = false; t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; Object.assign(t, o); return t}; U.tL.value = L('luz.webp'); U.tDir.value = L('dir.webp'); U.tE.value = L('esc.webp'); U.MX.value = j.MX; U.MW.value = j.MW; U.uB0.value.set(...j.B0); U.uBS.value.set(...j.BS);
+  return DATOS = {...j, geos, sh};
+}
+let MAT = null;
+const modTex = {}; async function texProp(n) {return modTex[n] ||= {d: ph('p_' + n + '_d', true), n: ph('p_' + n + '_n')}}
+export async function materiales() {
+  if (MAT) return MAT; const F = (s, k, o = {}) => horneado({tipo: 'foto', d: ph(s + '_d', true), n: ph(s + '_n'), k: 1 / k, ...o});
+  MAT = {liso: horneado({tipo: 'liso'}), hielo: new THREE.MeshPhysicalMaterial({color: 0xcfe2f2, roughness: .08, metalness: 0, transparent: true, opacity: .55}), ladrillo: F('brick_wall_006', 135, {nor: 1.2, color: [.9, .82, .8]}), sillar: F('white_sandstone_blocks_02', 90, {nor: 1.1, color: [.92, .9, .88]}), sillar2: F('stone_block_wall', 92, {nor: 1.1, color: [1.5, 1.45, 1.4]}), revoco: F('painted_plaster_wall', 90, {nor: .9, color: [.95, .86, .72]}), piedra: F('sandstone_blocks_08', 160, {nor: .7, color: [.88, .86, .82]}), granito: F('stone_block_wall', 60, {nor: .5, color: [1.9, 1.95, 2.05]}), pizarra: F('roof_slates_03', 135, {nor: 1.2}), nieve: horneado({tipo: 'nieve', n: ph('snow_02_n'), k: 1 / 90, nor: .75}), acera: horneado({tipo: 'suelo', d: ph('pavement_03_d', true), n: ph('pavement_03_n'), k: 1 / 90, color: [.8, .8, .82], suelo: {n: ph('snow_02_n')}}), calzada: horneado({tipo: 'suelo', d: ph('cobblestone_square_d', true), n: ph('cobblestone_square_n'), k: 1 / 64, color: [.75, .76, .8], suelo: {n: ph('snow_02_n')}})};
+  MAT.luz = new THREE.ShaderMaterial({uniforms: {...U, fogColor: {value: new THREE.Color()}, fogNear: {value: 1}, fogFar: {value: 2}}, fog: true, vertexShader: 'uniform vec3 uB0,uBS;attribute vec4 tinte;varying vec4 vT;\n#include <fog_pars_vertex>\nvoid main(){vT=tinte;vec4 mvPosition=modelViewMatrix*vec4(uB0+position*uBS,1.);gl_Position=projectionMatrix*mvPosition;\n#include <fog_vertex>\n}', fragmentShader: 'uniform float on;varying vec4 vT;\n#include <fog_pars_fragment>\nvoid main(){vec3 c=vT.rgb*vT.rgb;gl_FragColor=vec4(c*(vT.a>.8?7.:5.5)*mix(.02,1.,on),1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n#include <fog_fragment>\n}'}); MAT.luz.userData.solo = true;
+  return MAT;
+}
+/* ---------- el bloque y sus copias a los lados ---------- */
+export class Bloques {
+  constructor(sc, D, M) {
+    this.D = D; this.grupos = []; this.g = new THREE.Group(); sc.add(this.g); const PAL = [[6, .55, .5], [6, 3.6, 1.1], [.8, 2.2, 6.4], [.7, 5, 1.5], [6, 4.6, 2.6]];
+    const vent = ventanas(D.ventanas), nb = D.bombillas.length / 4, bg = new THREE.IcosahedronGeometry(.82, LOWQ ? 0 : 1), bm = new THREE.MeshBasicMaterial({color: 0xffffff}), im0 = new THREE.InstancedMesh(bg, bm, nb), o = new THREE.Object3D(), c = new THREE.Color(); for (let i = 0; i < nb; i++) {o.position.set(D.bombillas[i * 4], D.bombillas[i * 4 + 1], D.bombillas[i * 4 + 2]); o.scale.set(1, 1.35, 1); o.updateMatrix(); im0.setMatrixAt(i, o.matrix); im0.setColorAt(i, c.setRGB(...PAL[D.bombillas[i * 4 + 3]]))} this.bm = bm; this.nb = nb; this.bomb = [];
+    for (let q = 0; q < 3; q++) {const G = new THREE.Group(); G.userData.zonas = [[], []]; for (const {m, z, g} of D.geos) {const mat = m.startsWith('prop:') ? this.prop(m.slice(5)) : M[m]; if (!mat) {console.warn('sin material', m); continue} const me = new THREE.Mesh(g, mat); me.matrixAutoUpdate = false; me.receiveShadow = !LOWQ && mat.userData.horno; me.castShadow = false; G.add(me); G.userData.zonas[z].push(me); if (m === 'hielo') me.visible = false}
+      const v = q ? vent.clone() : vent; G.add(v); const im = q ? new THREE.InstancedMesh(bg, bm, nb) : im0; if (q) {im.instanceMatrix = im0.instanceMatrix; im.instanceColor = im0.instanceColor} im.frustumCulled = false; G.add(im); this.bomb.push(im); this.g.add(G); this.grupos.push(G)}
+  }
+  prop(n) {return (this.props ||= {})[n] ||= horneado({tipo: 'prop', d: ph('p_' + n + '_d', true), n: ph('p_' + n + '_n')})}
+  mover(cx, dir, t) {const PER = this.D.PER, p0 = Math.round((cx + dir * 200 - 340) / PER); this.grupos.forEach((g, i) => {g.position.x = (p0 + (i === 0 ? 0 : i === 1 ? dir : -dir)) * PER; g.visible = i < 2 || Math.abs(cx - ((p0 - dir) * PER + 340)) < 760}); U.lzB.value = (p0 - 1) * 3; U.uT.value = t}
+  /* cuánto luce el escaparate n (0–1) */
+  luz(n, v) {const i = n - U.lzB.value; if (i >= 0 && i < 12) U.lz.value[i] = v}
+  encender(u) {U.on.value = u; this.bomb.forEach(b => {b.count = Math.floor(this.nb * u)})}
+  ver(v) {this.g.visible = v}
+  /* luz que llega a un punto (armónicos de orden 1): out = 4 × RGB; lzf(n) da cuánto luce cada escaparate */
+  sonda(x, y, z, lzf, out) {
+    const {NX, ZS, YS} = this.D.sondas, sh = this.D.sh, PER = this.D.PER, u = (((x - this.D.X0) / PER) % 1 + 1) % 1 * NX, i0 = Math.floor(u) % NX, fx = u - Math.floor(u), busca = (A, v) => {let k = 0; while (k < A.length - 2 && A[k + 1] < v) k++; return [k, clamp((v - A[k]) / (A[k + 1] - A[k]), 0, 1)]}, [kz, fz] = busca(ZS, z), [ky, fy] = busca(YS, y), lw = lzf(x); out.fill(0);
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) {const w = (a ? fx : 1 - fx) * (b ? fz : 1 - fz) * (c ? fy : 1 - fy); if (w < 1e-4) continue; const o = ((((i0 + a) % NX) * ZS.length + kz + b) * YS.length + ky + c) * 16; for (let q = 0; q < 4; q++) {const W = sh[o + 12 + q] * lw * 1.25 * U.esc.value; out[q * 3] += w * (sh[o + q] * lerp(.16, 1, U.on.value) + W); out[q * 3 + 1] += w * (sh[o + 4 + q] * lerp(.16, 1, U.on.value) + W * .8); out[q * 3 + 2] += w * (sh[o + 8 + q] * lerp(.16, 1, U.on.value) + W * .58)}} return out;
+  }
+}

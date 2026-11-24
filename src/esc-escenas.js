@@ -108,7 +108,7 @@ export class Escenas {
   /* una bola de nieve en arco de a a b */
   *bola(a, b, s = .5, alto = 10) {const o = this.prop([[SPH(2.3, 14, 10), MT.nieve]]); o.position.copy(a); yield* this.dur(s, u => {o.position.lerpVectors(a, b, u); o.position.y += Math.sin(u * PI) * alto}); o.visible = false; this.c.polvo(b.x, b.y, b.z); this.snd.clac()}
   /* un punto delante de la boca (k: cuánto se aparta) */
-  boca(f, k = .02) {const E = MEDIDAS[f === this.N ? 'nino' : 'madre'].E; f.g.updateMatrixWorld(true); return f.head.localToWorld(V(E[0] + .055 + k, E[1] - (f === this.N ? .062 : .068), 0))}
+  boca(f, k = .02) {const E = f.idP ? (q => [q.E[0], q.E[1] - f.D.cuello])(f.ojosP) : MEDIDAS[f === this.N ? 'nino' : 'madre'].E; f.g.updateMatrixWorld(true); return f.head.localToWorld(V(E[0] + .055 + k, E[1] - (f === this.N ? .062 : .068), 0))}
   /* plano desde dentro con los dos, de pecho para arriba */
   contraDos(x = -9, fov = 48, y = 56, z = -32, ly = 53) {this.plano(x, y, z, x + 1, ly, 20, fov, 9, true); this.plan.dos = true}
   cabeza(f, v = V()) {f.g.updateMatrixWorld(true); return f.head.getWorldPosition(v)}

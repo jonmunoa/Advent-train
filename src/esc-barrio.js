@@ -1,86 +1,30 @@
 /* El resto de la calle: cielo, calzada, casas de enfrente, luces colgadas de lado a lado, farolas, el puesto de castañas
    y la gente que pasa. Todo se repite cada tres tiendas (PER) y se recoloca con la cámara, así que la calle no se acaba. */
-import {adoquines} from './esc-real.js';
 import {THREE, mergeGeometries, rng, lerp, clamp, vnoise, fbm, LOWQ, M, canvasTex, phTex, dotTex, puffTex, BX, CY, TOR, SPH, PLN, o3} from './kit.js';
-import {Tienda, E, PASO, S} from './esc-calle.js';
-import {arbolito} from './esc-follaje.js';
+import {E, PASO, S} from './esc-calle.js';
+import {Bloques} from './esc-bloque.js';
+import {arbolito, guirnalda, corona} from './esc-follaje.js';
 import {Figura} from './esc-gente.js';
 import {juntar, CUBOS} from './esc-geo.js';
 
 export const PER = PASO * 3, ZF = 420;   // periodo de la calle y fachada de enfrente
 const GLb = (r, g, b) => new THREE.MeshBasicMaterial({color: new THREE.Color(r, g, b)}), C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .8, ...o});
 
-/* interior de un comercio: estanterías con luz cálida */
-const interior = k => canvasTex(512, 300, (g, w, h) => {
-  const r = rng(60 + k), gr = g.createRadialGradient(w / 2, h * .3, 20, w / 2, h * .4, w * .7); gr.addColorStop(0, '#ffd894'); gr.addColorStop(1, '#b4611f'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-  for (const y of [100, 180, 262]) {g.fillStyle = '#5a3218'; g.fillRect(0, y, w, 9); g.fillStyle = 'rgba(40,16,4,.35)'; g.fillRect(0, y + 9, w, 10); let x = 12; while (x < w - 20) {if (k === 0) {g.fillStyle = ['#c98b4a', '#a8652c', '#e0ad6a', '#f0d6a8'][Math.floor(r() * 4)]; const rw = 18 + r() * 26; g.beginPath(); g.ellipse(x + rw / 2, y - 10, rw / 2, 11 + r() * 8, 0, 0, 7); g.fill(); x += rw + 5} else if (k === 1) {const bw = 6 + r() * 10, bh = 38 + r() * 24; g.fillStyle = ['#8a1422', '#1d3a78', '#1b5a40', '#e0ad45', '#5a3a6a', '#f1e6cc', '#31506b'][Math.floor(r() * 7)]; g.fillRect(x, y - bh, bw, bh); x += bw + 1.5; if (r() < .08) x += 18} else {g.fillStyle = ['#b3162a', '#1c6b45', '#f1e6cc', '#31506b', '#e0ad45'][Math.floor(r() * 5)]; const cw = 14 + r() * 12; g.beginPath(); g.roundRect(x, y - 22 - r() * 14, cw, 30, 4); g.fill(); x += cw + 10}}}
-  g.fillStyle = '#3a1c0c'; for (let i = 0; i < 2; i++) {const x = 120 + i * 230 + r() * 40; g.beginPath(); g.arc(x, 150, 20, 0, 7); g.fill(); g.beginPath(); g.roundRect(x - 34, 168, 68, 140, 26); g.fill()}
-  g.lineWidth = 3; g.strokeStyle = '#2b1a12'; g.beginPath(); for (let x = 0; x <= w; x += 8) g.lineTo(x, 22 + Math.abs(Math.sin(x * .03)) * 14); g.stroke(); for (let x = 6; x < w; x += 16) {g.fillStyle = ['#ff5a4a', '#ffd35a', '#8affc0', '#7ab8ff'][(x / 16 | 0) % 4]; g.beginPath(); g.arc(x, 26 + Math.abs(Math.sin(x * .03)) * 14, 4, 0, 7); g.fill()}
-}, 'interior' + k);
 const cartel = (t, bg) => canvasTex(512, 72, (g, w, h) => {g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = '#d9a441'; g.lineWidth = 4; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = '#f6dfa4'; g.font = '400 40px "Alfa Slab One", Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, w / 2, h / 2 + 2)}, 'cartel' + t);
-const toldoT = c => {const t = canvasTex(64, 16, g => {g.fillStyle = '#f2e8d4'; g.fillRect(0, 0, 64, 16); g.fillStyle = c; g.fillRect(0, 0, 32, 16)}, 'toldo' + c).clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7, 1); t.needsUpdate = true; return t};
-
-/* casa de enfrente: comercio en el bajo y dos pisos con ventanas */
-class Casa extends Tienda {
-  build() {
-    const k = this.k, A = (...q) => this.a(...q), r = rng(140 + k), W = E.wood[(k + 2) % 3], WL = E.woodL[(k + 2) % 3], H = PASO / 2, alto = [430, 452, 410][k];
-    {const g = new THREE.BoxGeometry(PASO, alto, 10), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * PASO, uv.getY(i) * alto); A(g, E.wall[[1, 0, 2][k]], 0, alto / 2, -11)}
-    for (const y of [212, 336]) {for (const x of [-112, 0, 112]) this.ventana(x, y, 36, 64, r() < .72 ? (r() < .5 ? 1 : 2) : 0, (k + 1) % 3); A(BX(PASO, 5, 6), E.stone, 0, y - 64, -5)}
-    A(BX(PASO, 12, 22), E.stone, 0, alto + 4, -6); A(BX(PASO, 8, 25), E.snow, 0, alto + 13, -5); this.tejado(alto + 12);
-    for (const sd of [-1, 1]) for (let y = 4; y < alto; y += 17) A(BX(sd > 0 ? 8 : 6 + (Math.round(y / 17) % 2) * 4, 15, 12), E.stone, sd * (H - 4), y + 4, -5);
-    // comercio
-    const x = -38, vt = new THREE.MeshBasicMaterial({map: interior(k), color: new THREE.Color(1.5, 1.35, 1.1)}); A(BX(196, 150, 8), W, x, 75, -3); A(PLN(126, 78), vt, x - 22, 72, 1.6); A(BX(136, 5, 5), WL, x - 22, 112, 2); A(BX(140, 4, 14), WL, x - 22, 30, 4); A(BX(138, 3.4, 10), E.snow, x - 22, 33, 5); for (const q of [-63, -21, 21, 63]) A(BX(3, 80, 3), WL, x - 22 + q, 72, 2.6); for (const q of [-48, -8, 32]) A(BX(36, 17, 1.4), WL, x - 22 + q + 4, 15, 1.8);
-    A(BX(42, 108, 4), E.door[k], x + 68, 54, .6); A(PLN(26, 56), E.glass, x + 68, 72, 3.2); A(BX(26, 1.6, 1.4), E.door[k], x + 68, 72, 3.6); A(SPH(1.6), E.gold, x + 52, 52, 4); this.corona(x + 68, 86, 4.6, 8.6, 2.7, 0); A(BX(52, 4, 12), E.stone, x + 68, 2, 4);
-    A(PLN(176, 24), new THREE.MeshBasicMaterial({map: cartel(['Panadería', 'Librería', 'Café'][k], ['#5a1620', '#17372c', '#1b2c52'][k]), color: new THREE.Color(1, .96, .88)}), x, 133, 1.6);
-    {const t = new THREE.PlaneGeometry(150, 34, 1, 1); A(t, new THREE.MeshStandardMaterial({map: toldoT(['#b3162a', '#1b5a40', '#274173'][k]), roughness: .9, side: THREE.DoubleSide}), x - 20, 118, 17, -.95); A(BX(150, 2.6, 30), E.snow, x - 20, 121.4, 15, .62)}
-    this.guirnalda([[-H + 14, 168, 6], [-90, 152, 8], [-20, 166, 7], [50, 152, 8], [H - 14, 168, 6]], 3.2, 40);
-    for (const q of [x - 96, x + 98]) {A(BX(5, 11, 5), E.iron, q, 96, 5); A(BX(3.4, 7, 3.4), E.lamp, q, 96, 6.4)}
-    // portal de las casas
-    {const px = 118; A(BX(56, 124, 4), E.frame, px, 62, -1.6); A(BX(42, 106, 3), E.door[(k + 1) % 3], px, 53, .4); A(PLN(26, 22), E.glass2, px, 88, 2.4); A(BX(30, 22, 1.2), E.shutter[k], px, 24, 2.2); A(BX(30, 22, 1.2), E.shutter[k], px, 54, 2.2); this.corona(px, 88, 3.6, 7.8, 2.5, 0); A(BX(62, 4, 13), E.stone, px, 126, 2); A(BX(64, 3.4, 13), E.snow, px, 129.6, 2.4); this.abeto(px - 42, 18, .95)}
-    for (let q = 0; q < 14; q++) A(new THREE.SphereGeometry(1, 10, 6, 0, 6.28, 0, 1.57).scale(10 + r() * 14, 4 + r() * 5, 7 + r() * 6), E.snow, -H + 8 + r() * (PASO - 16), -.4, 5 + r() * 5);
-    this.cierra();
-  }
-}
-
 export class Barrio {
-  constructor(sc) {
-    this.sc = sc; this.t = 0; this.grupos = [];
-    this.cielo(); this.suelo(); this.enfrente(); this.luces(); this.curiosidades(); this.fondo();
+  constructor(sc, D, M) {
+    this.sc = sc; this.t = 0; this.grupos = []; this.bloques = new Bloques(sc, D, M);
+    this.cielo(); this.follaje(D); this.curiosidades(); this.fondo();
   }
+  /* guirnaldas y coronas de abeto de las fachadas (van con el bloque) */
+  follaje(D) {const L = [], A = (g, m) => L.push([g, m]), inner = new THREE.Group(); D.guirnaldas.forEach((q, i) => guirnalda(A, q.p, q.r, Math.round(q.p.length * 9), {semilla: 5 + i})); D.coronas.forEach(([x, y, z, R, r], i) => {const s = z > 200 ? Math.PI : 0, M = new THREE.Matrix4().makeRotationY(s).setPosition(x, y, z), n0 = L.length; corona(A, 0, 0, 0, R, r, {semilla: 3 + i}); for (let k = n0; k < L.length; k++) L[k][0].applyMatrix4(M)}); juntar(L, inner, {sombra: false}); this.bloques.grupos.forEach((G, i) => G.add(i ? inner.clone() : inner))}
+  /* noche nublada de nevada: el resplandor de la ciudad enciende las nubes por abajo */
   cielo() {
-    const g = new THREE.SphereGeometry(2400, 32, 20), col = new Float32Array(g.attributes.position.count * 3), P = g.attributes.position, a = new THREE.Color('#2b2c63'), b = new THREE.Color('#141c4a'), c = new THREE.Color('#060a22'), q = new THREE.Color(); for (let i = 0; i < P.count; i++) {const u = clamp(P.getY(i) / 2400, 0, 1); u < .25 ? q.lerpColors(a, b, u / .25) : q.lerpColors(b, c, (u - .25) / .75); col.set([q.r, q.g, q.b], i * 3)} g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const G = this.sky = new THREE.Group(); G.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false})));
-    const r = rng(21), n = LOWQ ? 260 : 520, p = new Float32Array(n * 3), cc = new Float32Array(n * 3); for (let i = 0; i < n; i++) {const an = r() * 6.28, el = .06 + Math.pow(r(), .8) * 1.4; p.set([Math.cos(an) * Math.cos(el) * 2200, Math.sin(el) * 2200, Math.sin(an) * Math.cos(el) * 2200], i * 3); const k = .35 + r() * .9; cc.set([k, k, k * 1.08], i * 3)} const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(p, 3)); sg.setAttribute('color', new THREE.BufferAttribute(cc, 3)); G.add(new THREE.Points(sg, new THREE.PointsMaterial({size: 2.2, sizeAttenuation: false, map: dotTex, transparent: true, depthWrite: false, vertexColors: true, fog: false})));
-    for (const sd of [-1, 1]) {const m = new THREE.Sprite(new THREE.SpriteMaterial({map: canvasTex(256, 256, (x, w) => {const h = x.createRadialGradient(128, 128, 30, 128, 128, 128); h.addColorStop(0, 'rgba(220,228,255,.5)'); h.addColorStop(1, 'rgba(160,180,255,0)'); x.fillStyle = h; x.fillRect(0, 0, w, w); x.fillStyle = '#f4f1e2'; x.beginPath(); x.arc(128, 128, 40, 0, 7); x.fill(); x.fillStyle = 'rgba(160,164,180,.35)'; for (const [a, b, c] of [[114, 118, 11], [142, 134, 8], [128, 150, 6], [150, 112, 5]]) {x.beginPath(); x.arc(a, b, c, 0, 7); x.fill()}}, 'luna'), fog: false, transparent: true, depthWrite: false, color: new THREE.Color(1.25, 1.25, 1.3)})); m.position.set(sd * 1850, 640, 760); m.scale.set(380, 380, 1); G.add(m)}
-    G.traverse(o => {o.renderOrder = o.isMesh ? 20 : 21; o.frustumCulled = false}); this.sc.add(G);
-  }
-  suelo() {
-    /* la nieve del suelo se calcula a media resolución: el ruido es suave y así cuesta la cuarta parte */
-    const mitad = (w, h, f) => {const W = w >> 1, H = h >> 1, a = new Float32Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) a[y * W + x] = f(x * 2, y * 2); return (x, y) => {const X = x / 2, Y = y / 2, i = X | 0, j = Y | 0, i1 = Math.min(W - 1, i + 1), j1 = Math.min(H - 1, j + 1), u = X - i, v = Y - j; return (a[j * W + i] * (1 - u) + a[j * W + i1] * u) * (1 - v) + (a[j1 * W + i] * (1 - u) + a[j1 * W + i1] * u) * v}};
-    const acT = canvasTex(512, 512, (g, w, h) => {const r = rng(8); g.fillStyle = '#7f8698'; g.fillRect(0, 0, w, h); for (let y = 0; y < 16; y++) for (let x = -1; x < 9; x++) {const l = 84 + r() * 36; g.fillStyle = `rgb(${l},${l + 2},${l + 10})`; g.fillRect(x * 64 + (y % 2) * 32 + 3, y * 32 + 3, 58, 26)} const id = g.getImageData(0, 0, w, h), NM = mitad(w, h, (x, y) => fbm(x * .018, y * .018) + vnoise(x * .09, y * .09) * .14), BL = [226, 232, 246]; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {const k = clamp((NM(x, y) - .40) * 7, 0, 1), o = (y * w + x) * 4, gr = vnoise(x * .3, y * .3) * 10; for (let c = 0; c < 3; c++) id.data[o + c] = lerp(id.data[o + c], BL[c] - gr, .35 + .65 * k)} g.putImageData(id, 0, 0)}, 'acera'), n = 24;
-    const caT = canvasTex(512, 512, (g, w, h) => {const r = rng(18); g.fillStyle = '#5f6678'; g.fillRect(0, 0, w, h); for (let y = 0; y < 32; y++) for (let x = -1; x < 17; x++) {const l = 66 + r() * 34; g.fillStyle = `rgb(${l},${l + 2},${l + 12})`; g.beginPath(); g.roundRect(x * 32 + (y % 2) * 16 + 2, y * 16 + 2, 28, 12, 4); g.fill()} const id = g.getImageData(0, 0, w, h), NM = mitad(w, h, (x, y) => fbm(x * .012 + 3, y * .02) + vnoise(x * .08, y * .08) * .18), BL = [214, 222, 240]; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {const rut = Math.min(Math.abs(y - 150), Math.abs(y - 362)), nn = NM(x, y), gr = vnoise(x * .25, y * .25) * 14, k = clamp((nn - .30 + Math.min(.4, rut / 200)) * 4.5, 0, 1) * clamp(rut / 26, .12, 1), o = (y * w + x) * 4; for (let c = 0; c < 3; c++) id.data[o + c] = lerp(id.data[o + c], BL[c] - gr, k)} g.putImageData(id, 0, 0)}, 'calzada');
-    const tex = (t, L, D) => {const q = t.clone(); q.wrapS = q.wrapT = THREE.RepeatWrapping; q.repeat.set(n * L, D); q.needsUpdate = true; return q}, nv = (a, b) => phTex('snow_02_nor', a, b), LG = PASO * n / 2;
-    const mk = (t, d, z, y, L, D, ry) => {const tx = tex(t, L, D), m = new THREE.Mesh(new THREE.PlaneGeometry(LG, d).rotateX(-Math.PI / 2), adoquines(new THREE.MeshStandardMaterial({map: tx, roughness: ry, normalMap: nv(50, d / 90), normalScale: new THREE.Vector2(.7, .7)}), d > 200 ? 84 : 104)); m.position.set(0, y, z); this.sc.add(m); return m};
-    this.planos = [mk(acT, 132, 64, 0, 1.2, 1.05, .9), mk(caT, 206, 232, -6, .9, 1, .78), mk(acT, 96, 380, 0, 1.2, .75, .9)]; const L = []; for (const [z, sd] of [[131, 1], [333, -1]]) {L.push([BX(LG, 7.4, 8).translate(0, -3, z), E.stone]); L.push([BX(LG, 3.2, 9).translate(0, 2, z), E.snow]); const r = rng(z); for (let i = 0; i < 70; i++) L.push([new THREE.SphereGeometry(1, 8, 5, 0, 6.28, 0, 1.57).scale(14 + r() * 26, 4 + r() * 6, 5 + r() * 6).translate((i / 70 - .5) * PER * 3 + r() * 20, -5, z + sd * (6 + r() * 4)), E.snow])} this.bord = new THREE.Group(); juntar(L, this.bord, {sombra: false}); this.sc.add(this.bord);
-  }
-  enfrente() {
-    this.casas = [0, 1, 2].map(k => new Casa(k, '')); const base = new THREE.Group(); this.casas.forEach((c, k) => {c.g.position.set(-k * PASO, 0, 0); base.add(c.g)});
-    // las tres casas en una malla por material
-    const funde = g => {g.updateMatrixWorld(true); const by = new Map(), o = new THREE.Group(), rest = []; g.traverse(m => {if (!m.isMesh) return; if (m.isInstancedMesh) {rest.push(m); return} const key = m.material; if (!by.has(key)) by.set(key, []); const q = m.geometry.clone().applyMatrix4(m.matrixWorld); by.get(key).push([q, m.renderOrder])}); by.forEach((l, m) => {const me = new THREE.Mesh(mergeGeometries(l.map(x => x[0]), false), m); me.renderOrder = l[0][1]; o.add(me)}); rest.forEach(m => {const c = m.clone(); c.position.setFromMatrixPosition(m.matrixWorld); o.add(c)}); return o}; this.frentes = []; const lejos = new THREE.Group(); this.casas.forEach((c, k) => {const g = c.copia(null); g.position.set(-k * PASO, 0, 0); lejos.add(g)}); const cercaF = funde(base), lejosF = funde(lejos); for (let i = 0; i < 3; i++) {const g = new THREE.Group(); g.rotation.y = Math.PI; g.position.z = ZF; g.add(i === 1 ? cercaF : i ? lejosF : lejosF.clone()); this.sc.add(g); this.frentes.push(g)}
-  }
-  /* luces colgadas de lado a lado de la calle, con su estrella en medio, y resplandor de farolas */
-  luces() {
-    const N = LOWQ ? 22 : 34, per = PASO / 2, n = LOWQ ? 7 : 10, P = [], L = [], cols = [[2.3, 1.5, .6], [2.3, 1.5, .6], [2.2, .35, .3], [2.3, 1.5, .6], [.5, 1.1, 2.3]]; this.lg = new THREE.Group();
-    const estrella = (x, y, z, r, m) => {const pt = k => {const a = -Math.PI / 2 + k * Math.PI * .8; return [z + Math.cos(a) * r, y - Math.sin(a) * r]}; for (let k = 0; k < 5; k++) {const [z0, y0] = pt(k), [z1, y1] = pt(k + 1), l = Math.hypot(z1 - z0, y1 - y0); L.push([BX(1.6, l, 1.6).rotateX(Math.atan2(z1 - z0, y1 - y0)).translate(x, (y0 + y1) / 2, (z0 + z1) / 2), m])}};
-    const copo = (x, y, z, r, m) => {for (let k = 0; k < 3; k++) L.push([BX(1.5, r * 2, 1.5).rotateX(k * Math.PI / 3).translate(x, y, z), m]); for (let k = 0; k < 6; k++) {const a = k * Math.PI / 3, cy = y + Math.cos(a) * r * .62, cz = z + Math.sin(a) * r * .62; for (const q of [-.6, .6]) L.push([BX(1.2, r * .42, 1.2).translate(0, r * .21, 0).rotateX(a + q).translate(x, cy, cz), m])}};
-    const oro = GLb(2.6, 1.7, .62), bl = GLb(1.5, 1.9, 2.6), rj = GLb(2.4, .42, .34);
-    for (let i = -2; i < n - 2; i++) {const x = i * per + 85, y0 = 214, sag = 40; for (let j = 0; j <= N; j++) {const u = j / N; P.push([x, y0 - Math.sin(u * Math.PI) * sag, lerp(4, ZF - 4, u), cols[(j + i + 10) % 5]])} L.push([new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, y0, 2), new THREE.Vector3(x, y0 - sag * 2, ZF / 2), new THREE.Vector3(x, y0, ZF - 2)), 18, .5, 4), E.iron]); const z = ZF / 2; if (i & 1) {estrella(x, 146, z, 25, oro); estrella(x, 146, z, 13, bl)} else {copo(x, 146, z, 24, bl); L.push([SPH(3, 10, 8).translate(x, 146, z), oro])} L.push([BX(.6, 22, .6).translate(x, 182, z), E.iron]); for (const zz of [120, 300]) {copo(x, 176, zz, 11, i & 1 ? bl : oro); L.push([BX(.5, 16, .5).translate(x, 192, zz), E.iron])} for (const zz of [70, 350]) estrella(x, 190, zz, 9, i & 1 ? rj : oro)}
-    juntar(L, this.lg, {sombra: false}); const im = this.bom = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.85, 1), new THREE.MeshBasicMaterial({color: 0xffffff}), P.length); P.forEach(([x, y, z, c], i) => {o3.position.set(x, y, z); o3.rotation.set(0, 0, 0); o3.scale.set(1, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); im.setColorAt(i, new THREE.Color(...c))}); im.frustumCulled = false; this.lg.add(im); this.lg.traverse(o => {o.frustumCulled = false}); this.sc.add(this.lg);
-    // halos (un solo dibujo)
-    const H = []; for (let i = -2; i < 5; i++) {const X0 = i * PASO; H.push([X0 - PASO / 2 + 8, 133, 122, 120, 1, .66, .3], [X0 + 170, 133, 342, 120, 1, .66, .3], [X0 + 85, 146, ZF / 2, 110, .9, .62, .3], [X0 + 255, 146, ZF / 2, 110, .42, .55, .85], [X0, 70, 8, 190, .85, .5, .2], [X0 + 60, 74, ZF - 12, 170, .8, .48, .2])}
-    const hp = new Float32Array(H.length * 3), hs = new Float32Array(H.length * 4); H.forEach((h, i) => {hp.set(h.slice(0, 3), i * 3); hs.set([h[4], h[5], h[6], h[3]], i * 4)}); const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.BufferAttribute(hp, 3)); hg.setAttribute('q', new THREE.BufferAttribute(hs, 4)); this.hu = {k: {value: 500}, map: {value: dotTex}}; const hm = new THREE.Points(hg, new THREE.ShaderMaterial({uniforms: this.hu, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: 'uniform float k;attribute vec4 q;varying vec3 c;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=min(q.w*k/-mv.z,420.);c=q.rgb*smoothstep(1500.,500.,-mv.z)*smoothstep(30.,140.,-mv.z);gl_Position=projectionMatrix*mv;}', fragmentShader: 'uniform sampler2D map;varying vec3 c;void main(){float a=texture2D(map,gl_PointCoord).a;gl_FragColor=vec4(c*a*a*.2,1.);}'})); hm.frustumCulled = false; hm.renderOrder = 6; this.halo = hm; this.lg.add(hm);
-    // farolas de la otra acera
-    const F = []; for (let i = -1; i < 4; i++) {const x = i * PASO + 170, z = 342; F.push([CY(3.4, 5, 10, 10).translate(x, 5, z), E.iron], [CY(1.5, 2.2, 118, 8).translate(x, 64, z), E.iron], [BX(22, 1.4, 1.4).translate(x, 112, z), E.iron], [CY(7, 4.4, 15, 6).translate(x, 131, z), E.lamp], [CY(7.6, 7.6, 1.6, 6).translate(x, 139, z), E.iron], [new THREE.ConeGeometry(8.4, 7, 6).translate(x, 143, z), E.iron], [new THREE.ConeGeometry(8.8, 4.6, 8).translate(x, 145.6, z), E.snow])} juntar(F, this.lg, {sombra: false});
+    const G = this.sky = new THREE.Group(), m = new THREE.ShaderMaterial({side: THREE.BackSide, depthWrite: false, fog: false, uniforms: {t: {value: 0}}, vertexShader: 'varying vec3 d;void main(){d=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: `uniform float t;varying vec3 d;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}float f(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p=p*2.03+7.;a*=.5;}return s;}
+void main(){vec3 v=normalize(d);float e=max(v.y,0.);vec2 p=v.xz/(e+.22)*1.3+vec2(t*.004,0.);float c=f(p+f(p*1.7)*.7),b=f(p*3.1+4.);vec3 base=mix(vec3(.052,.046,.052),vec3(.010,.013,.024),smoothstep(0.,.55,e));vec3 nub=mix(vec3(.10,.078,.070),vec3(.026,.028,.040),smoothstep(0.,.6,e));vec3 col=mix(base,nub,smoothstep(.34,.72,c)*(.6+.5*b));float lu=pow(max(0.,dot(v,normalize(vec3(.72,.42,-.1)))),60.);col+=vec3(.16,.17,.21)*lu*smoothstep(.75,.35,c);gl_FragColor=vec4(col,1.);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+}`}); this.skyM = m; G.add(new THREE.Mesh(new THREE.SphereGeometry(2300, 32, 16), m)); G.traverse(o => {o.renderOrder = 20; o.frustumCulled = false}); this.sc.add(G);
   }
   /* puesto de castañas, árboles en maceta y muñeco de nieve; y tres personas que pasan por enfrente */
   curiosidades() {
@@ -111,16 +55,16 @@ export class Barrio {
       if (sd < 0) {G.scale.x = 1; G.rotation.y = 0} G.userData.sd = sd; G.traverse(o => {o.frustumCulled = false}); this.sc.add(G); return G});
   }
   /* las luces de la calle se van encendiendo (u de 0 a 1) */
-  encender(u) {this.on = u; this.bom.count = Math.floor(this.bom.instanceMatrix.count * u); if (!this.luzM) this.luzM = this.lg.children.filter(o => o.isMesh && !o.isInstancedMesh && o.material === CUBOS.luz); this.luzM.forEach((m, i) => {m.visible = u > .45}); this.halo.visible = u > .6}
+  encender(u) {this.on = u; this.bloques.encender(u)}
   hoy(v) {this.cg.visible = !v; this.hoyV = v; this.gente.forEach(f => {f.g.visible = !v}); this.humo.forEach(s => {s.visible = !v})}
   /* mirando un escaparate de frente no se ve nada de esto */
-  ver(v) {this.lg.visible = this.sky.visible = v; this.cg.visible = v && !this.hoyV; const g = v && !this.hoyV; this.frentes.forEach(g => {g.visible = v}); this.humo.forEach(h => {h.visible = g}); this.gente.forEach(f => {f.g.visible = g}); if (!v) this.fin.forEach(g => {g.visible = false})}
+  ver(v) {this.sky.visible = v; this.cg.visible = v && !this.hoyV; const g = v && !this.hoyV; this.humo.forEach(h => {h.visible = g}); this.gente.forEach(f => {f.g.visible = g}); if (!v) this.fin.forEach(g => {g.visible = false})}
   /* cx: cámara; dir: hacia dónde se anda; u: píxeles por unidad a distancia 1 (para los halos) */
   mover(cx, dir, dt, t, kpx) {
-    const c = Math.round(cx / PASO) * PASO, p0 = Math.round((cx + dir * 260) / PER) * PER; this.sky.position.x = cx; this.planos.forEach(m => {m.position.x = c}); this.bord.position.x = p0; this.lg.position.x = c + (dir > 0 ? 0 : -PASO); this.hu.k.value = kpx;
-    this.frentes.forEach((g, i) => {g.position.x = p0 + (dir > 0 ? i - 1 : 1 - i) * PER}); this.copias.forEach((g, i) => {g.position.x = p0 + (i ? (dir > 0 ? PER : -PER) : 0)}); this.fin.forEach(G => {G.position.x = cx + G.userData.sd * 1500; G.visible = G.userData.sd === dir && this.sky.visible});
+    const c = Math.round(cx / PASO) * PASO, p0 = Math.round((cx + dir * 260) / PER) * PER; this.sky.position.x = cx; this.bloques.mover(cx, dir, t);
+    this.copias.forEach((g, i) => {g.position.x = p0 + (i ? (dir > 0 ? PER : -PER) : 0)}); this.fin.forEach(G => {G.position.x = cx + G.userData.sd * 1500; G.visible = G.userData.sd === dir && this.sky.visible});
     const hx = p0 + 214; this.humo.forEach((s, i) => {const u = (t * .22 + i / 4) % 1; s.position.set(hx + Math.sin(t + i * 2) * 3 + u * 8, 48 + u * 52, 122); s.scale.setScalar(14 + u * 34); s.material.opacity = .2 * Math.sin(u * Math.PI)});
     this.gente.forEach((f, i) => {const q = this.paseantes[i]; if (!q) {f.g.position.set(p0 + 206, -6, 152); f.update(dt, t, 0); return} q.x += q.v * dt; if (q.x < cx - 900) q.x += 1800; else if (q.x > cx + 900) q.x -= 1800; f.g.position.set(q.x, 0, q.z); f.yaw = q.v > 0 ? 0 : Math.PI; f.update(dt, t, Math.abs(q.v))});
-    this.bom.material.color.setScalar(.82 + .18 * Math.sin(t * 1.3));
+    this.bloques.bm.color.setScalar(.85 + .15 * Math.sin(t * 1.3));
   }
 }

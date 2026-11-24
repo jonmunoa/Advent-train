@@ -10,12 +10,14 @@ import {Vista, FOVD} from './esc-vista.js';
 import {Mundo} from './esc-mundos.js';
 import {TEMAS} from './esc-dias.js';
 import {MAPS} from './esc-vias.js';
-import {Tienda, Local, Huellas, nevada, rotuloTex, rotuloFondo, papelTex, S, PASO, VX, VY0, VY1} from './esc-calle.js';
+import {Local, Huellas, nevada, rotuloTex, rotuloFondo, papelTex, S, PASO, VX, VY0, VY1} from './esc-calle.js';
 import {N, DIAS, estado, previa as previaDe, pedido, falta, tope} from './esc-historia.js';
 import {Escenas, ROPAS, REPARTO} from './esc-escenas.js';
 import {Figura} from './esc-gente.js';
 import {cargaGente, VIDRIO} from './esc-cara.js';
+import {cargaPersonas} from './esc-persona.js';
 import {Barrio, PER} from './esc-barrio.js';
+import {cargaBloque, materiales, U as UB} from './esc-bloque.js';
 import {juntar, separa} from './esc-geo.js';
 import {marcasEsc, pedirTexto, cleanText, cleanUrl, isoDay, sitioDe, ESC as NESC} from './esc-eco.js';
 import CFG from '../config.js';
@@ -37,13 +39,13 @@ const PEDIDO = pedido(location.search, location.hash), TODOS = {...previaDe(N), 
 const renderer = new THREE.WebGLRenderer({canvas, antialias: LOWQ, powerPreference: 'high-performance', stencil: false});
 const MAXPR = Math.min(devicePixelRatio || 1, 2); let dynPR = Math.min(coarse ? 1.5 : 1.5, MAXPR);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = true; renderer.autoClear = false;
-const calle = new THREE.Scene(), dentro = new THREE.Scene(); calle.fog = new THREE.Fog('#262a5c', 260, 1500); dentro.fog = new THREE.Fog('#b9c6e0', 5000, 6000); renderer.setClearColor('#0b1330', 1);
+const calle = new THREE.Scene(), dentro = new THREE.Scene(); calle.fog = new THREE.Fog(new THREE.Color(.040, .037, .043), 220, 1700); dentro.fog = new THREE.Fog('#b9c6e0', 5000, 6000); renderer.setClearColor('#0b1330', 1);
 const camera = new THREE.PerspectiveCamera(48, 1, 2, 2600); let ENV = null;
 /* el reflejo del entorno es caro: solo lo llevan el metal y lo barnizado */
 function reflejos(root, k) {root.traverse(o => {for (const m of [].concat(o.material || [])) if (m.isMeshStandardMaterial && !m.envMap && (m.metalness > .3 || m.roughness < .36 || (m.isMeshPhysicalMaterial && m.clearcoat > 0))) {m.envMap = ENV; m.envMapIntensity = k; m.needsUpdate = true}})}
 {const es = new THREE.Scene(); es.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({color: 0x161826, side: THREE.BackSide}))); for (const [x, y, z, c, r] of [[-30, 20, 10, [9, 5, 2], 8], [20, 30, 20, [5, 4, 3], 9], [0, 5, 40, [2, 2, 3], 10], [30, 8, -12, [1.5, 2, 5], 6]]) {const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8), new THREE.MeshBasicMaterial({color: new THREE.Color(...c)})); m.position.set(x, y, z); es.add(m)} const pm = new THREE.PMREMGenerator(renderer), t = pm.fromScene(es, .03).texture; pm.dispose(); ENV = t}
 // luz de la calle: luna fría y, por cada escaparate cercano, una luz cálida
-calle.add(new THREE.HemisphereLight(0x9aa6dc, 0x6a5560, 1.0)); const luna = new THREE.DirectionalLight(0xbccaff, .6); luna.position.set(160, 300, 220); calle.add(luna);
+const hemiC = new THREE.HemisphereLight(0x8d96b8, 0x7a6a5c, .22); calle.add(hemiC); const luna = new THREE.DirectionalLight(0xbccaff, .12); luna.position.set(160, 300, 220); calle.add(luna);
 const calor = [0, 1].map(() => {const l = new THREE.PointLight(0xffb066, 0, 420, 1.3); calle.add(l); return l}), farol = new THREE.PointLight(0xffb870, LOWQ ? 420 : 800, 280, 1.5); calle.add(farol);
 /* relleno suave desde la cámara, solo en las escenas, para que las caras no se queden a oscuras */
 const relleno = new THREE.DirectionalLight(0xffe6d2, 0); calle.add(relleno, relleno.target);
@@ -54,11 +56,11 @@ let contraL = 0; const hemiD = new THREE.HemisphereLight(0xa6b8f4, 0x7d7f9c, .86
 const post = LOWQ ? null : new Post(renderer), portrait = () => camera.aspect < .8;
 /* lo que se ve del niño desde dentro: una foto de la calle que se pinta en el cristal solo cuando se mira hacia él */
 const portalRT = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType}), pU = {m: {value: portalRT.texture}, r: {value: new THREE.Vector2()}};
-let verCalle = true, verPortal = false, fr = 0;
+let verCalle = true, verPortal = false, fr = 0, ssrOk = false;
 function draw() {
   fr++; if (renderer.shadowMap.enabled && fr % (E.st === 'paseo' || E.st === 'inicio' ? 12 : 3) === 1) foco.shadow.needsUpdate = true; if (vent.castShadow) vent.shadow.needsUpdate = vent.intensity > 1 && (E.st === 'escena' || fr % 2 === 0);
   if (verPortal) {const ex = renderer.toneMapping; locs.forEach(l => {l.g.visible = false}); lejos.forEach(l => {l.g.visible = false}); renderer.toneMapping = THREE.NoToneMapping; renderer.setRenderTarget(portalRT); renderer.clear(); renderer.render(calle, camera); renderer.setRenderTarget(null); renderer.toneMapping = ex}
-  const L = verCalle ? [calle, dentro] : [dentro]; if (post) post.render(L, camera); else {renderer.setRenderTarget(null); renderer.clear(); L.forEach(s => renderer.render(s, camera))}
+  const L = verCalle ? [calle, dentro] : [dentro]; if (post) {if (post.alto) {UB.sC.value = post.half.texture; UB.sZ.value = post.ln.texture; UB.sOn.value = verCalle && ssrOk ? 1 : 0} post.render(L, camera); UB.sV.value.copy(camera.matrixWorldInverse); UB.sPV.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); ssrOk = verCalle} else {renderer.setRenderTarget(null); renderer.clear(); L.forEach(s => renderer.render(s, camera))}
 }
 let vw = 1, vh = 1, MSFIJO = false; function resize() {const w = vw = innerWidth, h = vh = innerHeight; renderer.setPixelRatio(dynPR); renderer.setSize(w, h, false); const W = Math.floor(w * dynPR), H = Math.floor(h * dynPR); if (post) {post.size(W, H); if (!MSFIJO) post.msaa(dynPR > 1.3 ? 2 : 4)} const q = LOWQ ? .5 : .85; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0)); pU.r.value.set(W, H); camera.aspect = w / h; camera.updateProjectionMatrix()}
 addEventListener('resize', resize);
@@ -174,18 +176,22 @@ function enfoca(dt) {
 }
 /* las tiendas y las maquetas se recolocan delante de quien pasea; solo se mueve y se dibuja lo que se ve */
 const kpx = () => renderer.getPixelRatio() * innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+const SON = new Float32Array(12); let sonT = 0;
+/* la luz que recoge cada persona donde está */
+function alumbra() {const B = barrio && barrio.bloques; if (!B) return; const lzf = x => {const n = Math.round(x / PASO), L = locs.find(l => l.n === n); return L ? L.luz ?? 1 : tapado(n) ? .12 : 1}; for (const f of [nino, madre, ...ESCN.ext, ...barrio.gente]) {if (!f || !f.U || !f.g.visible) continue; const p = f.g.position; B.sonda(p.x, f.n ? 34 : 56, clamp(p.z, 10, 400), lzf, SON); f.U.shS.value.forEach((v, i) => {const k = sonT ? .25 : 1; v.x += (SON[i * 3] - v.x) * k; v.y += (SON[i * 3 + 1] - v.y) * k; v.z += (SON[i * 3 + 2] - v.z) * k})} sonT = 1}
 function colocar(dt, t) {
+  alumbra();
   const cx = cam.p.x, px = kpx(), din = E.st === 'dentro', esc = E.st === 'escena', bi = cx + E.dir * (esc ? 0 : 250), vis = new Set();
   for (let k = 0; k < 3; k++) {
     const n = din && k === mod(E.n, 3) ? E.n : sitioDe(k, bi, PASO), x = WX(n), L = locs[k], F = lejos[k], cer = tapado(n); viste(L, n); L.g.position.x = x; L.g.visible = true; viste(F, n + 3 * E.dir); F.g.position.x = x + E.dir * PER; F.g.visible = !din; const c = cristal[k]; c.position.x = x;
     const cerca = din ? n === E.n : esc ? Math.abs(x - cx) < 300 : E.st === 'mira' ? Math.abs(x - cx) < 120 : Math.abs(E.az) > .7 ? Math.abs(x - cx) < 285 : ((x - cx) * E.dir > -95 && (x - cx) * E.dir < (LOWQ ? 240 : 285)) || (n === E.n && E.st !== 'paseo' && Math.abs(x - cx) < 400), abre = n >= 0 && n < N && n <= AB(); let m = null;
     if (abre && cerca) {m = MU.get(n); if (!m) prepara(n)} if (m) {vis.add(n); m.g.position.set(x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.smU.k.value = px * K; if (m.copos) {m.copos.t.value = t; m.copos.k.value = px * K; if (din) m.copos.c.value.copy(vista.pos)} m.update(dt, t)}
-    L.foto.visible = !m && !din; c.visible = !!m && verCalle; F.foto.visible = !din; F.papel.visible = F.tapado; const T = tiendas[k];
+    L.foto.visible = !m && !din; c.visible = !!m && verCalle; F.foto.visible = !din; F.papel.visible = F.tapado; 
     // el papel cae cuando se enciende
-    L.cae = cer ? 0 : Math.min(1.2, (L.cae ?? 1.2) + dt * 1.25); if (L.ult !== n) {L.ult = n; L.cae = cer ? 0 : 1.2} const u = L.cae / 1.2; L.papel.visible = u < 1; L.papel.position.y = (VY0 + VY1) / 2 - u * u * 92; L.papel.rotation.x = u * u * .5; L.papel.position.z = -.4 + u * 2.4; L.luz = lerp(L.luz ?? 1, cer ? .12 : 1, 1 - Math.exp(-2.4 * dt)); if (!listo) L.luz = cer ? .12 : 1; T.bm.material.color.setScalar((.62 + .38 * Math.sin(t * 1.9 + k)) * (.25 + .75 * L.luz)); if (T.charco) T.charco.visible = L.luz > .3;
+    L.cae = cer ? 0 : Math.min(1.2, (L.cae ?? 1.2) + dt * 1.25); if (L.ult !== n) {L.ult = n; L.cae = cer ? 0 : 1.2} const u = L.cae / 1.2; L.papel.visible = u < 1; L.papel.position.y = (VY0 + VY1) / 2 - u * u * 92; L.papel.rotation.x = u * u * .5; L.papel.position.z = -.4 + u * 2.4; L.luz = lerp(L.luz ?? 1, cer ? .12 : 1, 1 - Math.exp(-2.4 * dt)); if (!listo) L.luz = cer ? .12 : 1; barrio.bloques.luz(n, L.luz); barrio.bloques.luz(n + 3 * E.dir, tapado(n + 3 * E.dir) ? .12 : 1);
   }
   for (const [n, m] of MU) if (!vis.has(n)) {m.g.visible = false; if (!m.tren.parado) m.tren.s = (m.tren.s + 6.2 * dt) % m.T.L}
-  const ord = [0, 1, 2].sort((a, b) => Math.abs(locs[a].g.position.x - cx) - Math.abs(locs[b].g.position.x - cx)); calor.forEach((l, i) => {const q = locs[ord[i]], x = q.g.position.x; l.position.set(x, 82, -26); l.intensity = (LOWQ ? 430 : 1250) * (din ? .34 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .24 : 1) * sstep(360, 220, Math.abs(x - cx))}); {const q = locs[ord[0]], x = q.g.position.x, k = sstep(172, 96, Math.abs(x - (esc ? WX(E.n) : cx))); if (vent.castShadow) {vent.position.set(x, 112, -92); vent.target.position.set(x, 6, 110); vent.target.updateMatrixWorld(); vent.intensity = 2700 * k * (din ? .3 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .16 : 1); calor[0].intensity *= 1 - .6 * k}} {const k = esc ? (cam.p.z < 2 ? (LOWQ ? .7 : .5) : LOWQ ? .95 : .95) : E.st === 'dentro' ? 0 : .16; relleno.intensity = damp(relleno.intensity, k * (E.oscuro ?? 1), 4, dt); {const dx = cam.l.x - cam.p.x, dz = cam.l.z - cam.p.z; relleno.position.set(cam.p.x + dz * .5, cam.p.y + Math.hypot(dx, dz) * .42 + 12, cam.p.z - dx * .5)} relleno.target.position.copy(cam.l); relleno.target.updateMatrixWorld()} const fx = din || esc ? WX(E.n) : E.st === 'paseo' || E.st === 'inicio' ? locs[ord[0]].g.position.x : WX(E.st === 'sale' ? Math.round(E.x / PASO) : E.n); foco.position.set(fx - 46, 130, 78); foco.target.position.set(fx, 40, -40); foco.target.updateMatrixWorld(); farol.position.set(Math.round((cx + E.dir * 90 + PASO / 2) / PASO) * PASO - PASO / 2 + 8, 124, 112); farol.intensity = LOWQ ? 420 : 800; farol.distance = 280; if (E.tren24) {farol.position.set(WX(E.n) + 10, 150, 170); farol.intensity = 5200; farol.distance = 900}
+  const ord = [0, 1, 2].sort((a, b) => Math.abs(locs[a].g.position.x - cx) - Math.abs(locs[b].g.position.x - cx)); calor.forEach((l, i) => {const q = locs[ord[i]], x = q.g.position.x; l.position.set(x, 82, -26); l.intensity = (LOWQ ? 430 : 1250) * (din ? .34 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .24 : 1) * sstep(360, 220, Math.abs(x - cx))}); {const q = locs[ord[0]], x = q.g.position.x, k = sstep(172, 96, Math.abs(x - (esc ? WX(E.n) : cx))); if (vent.castShadow) {vent.position.set(x, 112, -92); vent.target.position.set(x, 6, 110); vent.target.updateMatrixWorld(); vent.intensity = 1100 * k * (din ? .3 : 1) * q.luz * (E.oscuro ?? 1) * (esc && cam.p.z < 2 ? .16 : 1); calor[0].intensity *= 1 - .6 * k}} {const k = esc ? (cam.p.z < 2 ? (LOWQ ? .7 : .5) : LOWQ ? .95 : .95) : E.st === 'dentro' ? 0 : .16; relleno.intensity = damp(relleno.intensity, k * (E.oscuro ?? 1), 4, dt); {const dx = cam.l.x - cam.p.x, dz = cam.l.z - cam.p.z; relleno.position.set(cam.p.x + dz * .5, cam.p.y + Math.hypot(dx, dz) * .42 + 12, cam.p.z - dx * .5)} relleno.target.position.copy(cam.l); relleno.target.updateMatrixWorld()} const fx = din || esc ? WX(E.n) : E.st === 'paseo' || E.st === 'inicio' ? locs[ord[0]].g.position.x : WX(E.st === 'sale' ? Math.round(E.x / PASO) : E.n); foco.position.set(fx - 46, 130, 78); foco.target.position.set(fx, 40, -40); foco.target.updateMatrixWorld(); farol.position.set(Math.round((cx + E.dir * 90 + PASO / 2) / PASO) * PASO - PASO / 2 + 8, 124, 112); farol.intensity = LOWQ ? 420 : 800; farol.distance = 280; if (E.tren24) {farol.position.set(WX(E.n) + 10, 150, 170); farol.intensity = 5200; farol.distance = 900}
   const frente = E.st === 'mira' && (E.u > .12 || E.t > 1.6) && Math.abs(E.az) < .5; barrio.ver(!frente); if (frente) lejos.forEach(l => {l.g.visible = false});
   if (!din || verPortal) barrio.mover(din ? WX(E.n) : cx, E.dir, dt, t, px); const tm = E.tormenta || 0; nieve.t.value += dt * (1 + tm * 2.6); nieve.c.value.set(cam.p.x + E.dir * (E.st === 'paseo' ? 90 : 0), 120, Math.max(90, cam.p.z - 60)); nieve.k.value = px * (1 + tm * .8); calle.fog.near = lerp(260, 20, tm); calle.fog.far = lerp(1500, 520, tm); chispas.paso(dt, px); if (obra && !FAST) obraPaso();
 }
@@ -445,10 +451,10 @@ const LM = THREE.DefaultLoadingManager, fotos = {n: 0, t: 0}; LM.onProgress = (u
 const texturas = async () => {const t0 = performance.now(); while (fotos.n < fotos.t && performance.now() - t0 < 5000) await new Promise(r => setTimeout(r, 40))};
 async function boot() {
   resize(); $('intro').classList.add('carga'); prog(.05); const fonts = document.fonts ? Promise.all(['400 80px "Alfa Slab One"', '500 40px Rubik', '400 40px Yesteryear'].map(f => document.fonts.load(f))).catch(() => {}) : null;
-  await cargaGente(['nino', 'madre', 'manos', 'juguetes']); haceJuguetes(); prog(.4); await fonts; const resto = cargaGente(['mayor', 'hombre', 'viejo']); if (REPARTO[CAL.abiertos]) await resto;
-  for (let k = 0; k < 3; k++) {prog(.5 + k * .08, 'Abriendo las tiendas…'); await tick(); const t = new Tienda(k, ''); calle.add(t.g); tiendas.push(t); const cp = t.copia(); locs.push(new Local(t.g, k)); lejos.push(new Local(cp, k)); calle.add(cp)}
-  prog(.76, 'Colgando las luces…'); await tick(); barrio = new Barrio(calle); huellas = new Huellas(calle); nieve = nevada(dentro, LOWQ ? 420 : 900); cristales(); await ponMarcas();
-  prog(.86, 'Poniendo la bufanda…'); await tick(); vestir(); if (LOWQ) {ligero(dentro); ligero(calle)} else {barrio.planos[0].receiveShadow = barrio.planos[1].receiveShadow = true} separa(calle, 'calle'); separa(dentro, 'dentro'); reflejos(calle, .22);
+  await Promise.all([cargaGente(['nino', 'madre', 'manos', 'juguetes']), cargaPersonas(['nino', 'madre'])]); haceJuguetes(); prog(.4); await fonts; const resto = cargaGente(['mayor', 'hombre', 'viejo']); if (REPARTO[CAL.abiertos]) await resto;
+  for (let k = 0; k < 3; k++) {prog(.5 + k * .08, 'Abriendo las tiendas…'); await tick(); const t = {g: new THREE.Group()}, cp = new THREE.Group(); calle.add(t.g, cp); tiendas.push(t); locs.push(new Local(t.g, k)); lejos.push(new Local(cp, k))}
+  prog(.76, 'Colgando las luces…'); await tick(); barrio = new Barrio(calle, await cargaBloque(), await materiales()); huellas = new Huellas(calle); nieve = nevada(dentro, LOWQ ? 420 : 900); cristales(); await ponMarcas();
+  prog(.86, 'Poniendo la bufanda…'); await tick(); vestir(); if (LOWQ) {ligero(dentro); ligero(calle)} separa(calle, 'calle'); separa(dentro, 'dentro'); reflejos(calle, .22);
   prog(.93, 'Encendiendo el escaparate…'); await tick(); const T0 = performance.now(), mar = n => {if (DEBUG) console.log(n, Math.round(performance.now() - T0))}; SINFOTO = true; coloca0(); mar('coloca'); const pc = compila(calle); mar('compila calle'); await tick(); const m0 = mundo(E.n); mar('mundo'); m0.g.visible = true; const cd = () => {const ps = [compila(dentro, FOTORT)]; if (LOWQ) ps.push(compila(dentro, null)); return Promise.all(ps)}; const pd = cd(); mar('compila dentro'); if (E.n > 0) {await tick(); mundo(E.n - 1).g.visible = true; await cd()} mar('mundo 2'); await pd; await texturas(); mar('texturas'); mar('esperar dentro'); SINFOTO = false; for (const q of [E.n, E.n - 1]) if (q >= 0) {fotografia(q); version++} mar('fotos'); await pc; mar('esperar calle');
   FAST = true; paso(1 / 60); E.st = 'inicio'; for (let i = 0; i < 30; i++) paso(1 / 30); mar('pasos'); await compila(calle); mar('programas'); FAST = false; listo = true; draw(); mar('primer dibujo'); prepAu(); const cal = () => {if (E.st !== 'escena' && ESCN.calienta(AB())) setTimeout(cal, 180)}; setTimeout(cal, 400); $('intro').classList.remove('carga'); $('go').disabled = false; prog(1, 'Dame la mano'); caption();
 }
