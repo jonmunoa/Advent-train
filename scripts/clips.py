@@ -1,7 +1,7 @@
 """Graba las escenas de cada día como vídeos verticales (1080×1920, 30 fps) para TikTok, Reels o Shorts.
 
 Fotograma a fotograma, sin depender de la velocidad del ordenador. Necesita Playwright (como las pruebas), numpy y ffmpeg.
-La música es una caja de música con «Noche de paz» (dominio público); el 18 solo suena el viento.
+La música es una caja de música con «Noche de paz» (dominio público).
 
 Uso:
   python scripts/clips.py 1,6,18        # días 1–24; 25 campanadas, 26 cabalgata, 27 Reyes
@@ -64,20 +64,19 @@ async def main():
         await pg.evaluate("window.__noAdapt=true;document.body.insertAdjacentHTML('beforeend','<div id=rot></div><div id=cie><div><b>El tren</b><i>del escaparate</i><span></span></div></div>');__esc.empezar();__esc.hold(true)")
         for k, d in enumerate(DIAS):
             await pg.evaluate(f'__esc.ponDia({d})'); await pg.wait_for_timeout(1400)
-            await pg.evaluate("(()=>{for(let i=0;i<600&&__esc.st==='paseo'&&Math.abs(__esc.E.x-__esc.n*340)>130;i++)__esc.step(1/30)})()")
-            await pg.evaluate(f"document.getElementById('rot').textContent={NOMBRE.get(d, f'{d} de diciembre')!r};document.querySelector('#cie span').textContent={'' if d == 27 else 'Mañana se enciende otro, a las 18:00'!r}")
+            await pg.evaluate("(()=>{for(let i=0;i<600&&__esc.st==='paseo'&&Math.abs(__esc.E.x-__esc.n*340)>80;i++)__esc.step(1/30)})()")
+            await pg.evaluate(f"document.getElementById('rot').textContent={NOMBRE.get(d, f'{d} de diciembre')!r};document.querySelector('#cie span').textContent={'' if d in (24, 27) else 'Mañana se enciende otro, a las 18:00'!r}")
             out = OUT / f'dia-{d:02d}.mp4'; tmp = pathlib.Path(tempfile.mkdtemp()); wav = tmp / 'a.wav'; vid = tmp / 'v.mp4'
             ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', str(FPS), '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'medium', str(vid)], stdin=subprocess.PIPE)
             n, fin, cola = 0, 0, int(2.6 * FPS)
             while n < FPS * 110:
                 t = n / FPS; v = min(1, t / .6) * min(1, max(0, (3.4 - t) / .8)); u = 0 if not fin else min(1, (n - fin) / (FPS * .8))
-                st = await pg.evaluate(f"(async()=>{{const e=__esc;{'' if fin and n - fin > FPS * .5 else 'e.step(1/30,1/30,true);'}document.getElementById('rot').style.opacity={v:.3f};document.getElementById('cie').style.opacity={u if d != 27 else 0:.3f};await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return e.st}})()")
+                st = await pg.evaluate(f"(async()=>{{const e=__esc;{'' if fin and n - fin > FPS * .5 else 'e.step(1/30,1/30,true);'}document.getElementById('rot').style.opacity={v:.3f};document.getElementById('cie').style.opacity={u if d not in (24, 27) else 0:.3f};await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return e.st}})()")
                 ff.stdin.write(await pg.screenshot(type='jpeg', quality=93)); n += 1
                 if not fin and st not in ('paseo', 'escena', 'llega'): fin = n
-                if not fin and d == 27 and await pg.evaluate("__esc.ESCN.t>70&&document.getElementById('texto').classList.contains('on')"): cola = int(5 * FPS)
-                if fin and n - fin > (cola if d != 27 else 4): break
+                if fin and n - fin > (cola if d not in (24, 27) else 4): break
             ff.stdin.close(); ff.wait(); dur = n / FPS
-            with wave.open(str(wav), 'wb') as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes(caja(dur, d == 18).tobytes())
+            with wave.open(str(wav), 'wb') as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes(caja(dur).tobytes())
             subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(vid), '-i', str(wav), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest', str(out)], check=True)
             print(out.name, f'{dur:.1f} s', f'{out.stat().st_size / 1e6:.1f} MB', flush=True)
         await b.close()
