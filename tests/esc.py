@@ -155,11 +155,11 @@ async def main():
         r['vol'] = await pg.evaluate("getComputedStyle(document.getElementById('bVolver')).visibility")
         check('pinchar un escaparate entra en él con un vuelo sin saltos', r['a'] == 'dentro' and q['sitio'] == 'cristal' and r['w'] < 14 and not r['v'] and r['vol'] == 'visible' and r['nav'] == 'flex', str({k: r[k] for k in ('a', 'w', 'v', 'vol', 'nav')}) + str(q))
         # la cámara de cine: se enciende al entrar, no pierde el tren y se suelta al mover
-        r = await pg.evaluate("""(()=>{const V=__esc.vista,m=__esc.mundo(__esc.E.k),P=new Set(),c0=V.cine;let n=0,ve=0,tu=0,sal=0,cor=0,ant=__esc.eng.camera.position.clone(),pl=V.plano,pri=null;
+        r = await pg.evaluate("""(()=>{const V=__esc.vista,m=__esc.mundo(__esc.E.k),P=new Set(),c0=V.cine;let n=0,ve=0,ra=0,peor=0,sal=0,cor=0,ant=__esc.eng.camera.position.clone(),pl=V.plano,pri=null;
           for(let i=0;i<1500;i++){__esc.step(1/30,1/30,true);const c=__esc.eng.camera.position,d=c.distanceTo(ant);ant=c.clone();if(d>3)cor++;if(d>1.6&&d<=3)sal++;P.add(V.plano);
-            if(i%3===0){const on=[0,1,2].some(k=>{const v=m.tren.cars[k].getWorldPosition(c.clone()).project(__esc.eng.camera);return Math.abs(v.x)<1&&Math.abs(v.y)<1&&v.z<1});n++;if(on)ve++;if(pri===null&&i===0)pri=on}}
-          return {c0,n,ve,cor,sal,P:[...P],pri,b:document.getElementById('bCine').getAttribute('aria-pressed'),f:V.cam.focus}})()""")
-        check('al entrar, la cámara de cine sigue al tren desde fuera y va cambiando de plano', r['c0'] and r['b'] == 'true' and not r['f'] and len(r['P']) >= 4 and 5 <= r['cor'] <= 16 and r['ve'] > r['n'] * 0.93, str(r))
+            if(i%3===0){const on=m.tren.cars.some((q,k)=>{if(m.tren.inTunnel(k))return false;const v=m.tren.cars[k].getWorldPosition(c.clone()).project(__esc.eng.camera);return Math.abs(v.x)<1&&Math.abs(v.y)<1&&v.z<1});n++;if(on){ve++;ra=0}else peor=Math.max(peor,++ra/10);if(pri===null&&i===0)pri=on}}
+          return {c0,n,ve,peor,cor,sal,P:[...P],pri,b:document.getElementById('bCine').getAttribute('aria-pressed'),f:V.cam.focus}})()""")
+        check('al entrar, la cámara de cine sigue al tren desde fuera y va cambiando de plano', r['c0'] and r['b'] == 'true' and not r['f'] and len(r['P']) >= 4 and 5 <= r['cor'] <= 16 and r['ve'] > r['n'] * 0.9 and r['peor'] < 3, str(r))
         if SHOTS:
             await pg.evaluate('__esc.hold(false)')
             await pg.wait_for_timeout(500)

@@ -13,7 +13,7 @@ const mod = (x, L) => ((x % L) + L) % L;
 
 /* opc: {camera, canvas, pick(x, y, margen), over(x, y), onFocus(f), onHint(), onCine(v), cut(v)} */
 export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}) {
-  const cine = new Cine(); let cineOn = false;
+  const cine = new Cine(), cp2 = new THREE.Vector3(); let cineOn = false;
   let on = false, M = null, W = null; const Wi = new THREE.Matrix4(), up = V3();
   const CTR = new THREE.Vector3(0, 8, -3), cam = {az: Math.PI / 2, el: .5, d: 100, tgt: CTR.clone(), azT: null, vx: 0, vz: 0, vaz: 0, vel: 0, focus: null, faz: Math.PI / 2, fel: .3, fd: 17, fdT: 17, back: null};
   const cp = V3(), cl = V3(), dir = V3(), t1 = V3(), t2 = V3();                    // cp, cl: cámara que se ve (posición y punto al que mira, en la maqueta)
@@ -109,7 +109,7 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut}
   function nudge(dx, dy) {toca(); setCine(false); if (cam.focus) return rotate(-dx * 1.2, -dy); if (bl.t < 1) anchor(); const k = 2.1 * cam.d * tanH / innerHeight, s = Math.sin(cam.az), c = Math.cos(cam.az), v = 6; cam.vx = clamp(cam.vx + (s * dx + c * dy) * k * v, -1.4 * cam.d, 1.4 * cam.d); cam.vz = clamp(cam.vz + (-c * dx + s * dy) * k * v, -1.4 * cam.d, 1.4 * cam.d)}
   const toLocal = v => v.applyMatrix4(Wi);
   return {
-    get on() {return on}, get cam() {return cam}, get ptrs() {return ptrs}, get flying() {return bl.t < 1}, get inT() {return cutK >= .5}, get cine() {return cineOn}, get plano() {return cineOn ? cine.tipo : ''}, setCine,
+    get on() {return on}, get cam() {return cam}, get ptrs() {return ptrs}, get flying() {return bl.t < 1}, get inT() {return cutK >= .5}, get cine() {return cineOn}, get plano() {return cineOn ? cine.tipo : ''}, get planoN() {return cine.num}, get apunta() {return cineOn ? cp2.fromArray(cine.l).applyMatrix4(W) : null}, setCine,
     /* entra en la maqueta m desde la cámara que se ve (o desde delante del cristal) */
     entra(m, {desde, dur = 1.5, cine: conCine = false} = {}) {cineOn = false; M = m; m.g.updateMatrixWorld(true); W = m.g.matrixWorld; Wi.copy(W).invert(); up.set(0, 1, 0).transformDirection(W); on = true; ptrs.clear(); touched = false; cutK = 0; cam.focus = null; stop(); cam.tgt.copy(CTR); cam.d = defD(); cam.el = homeEl(); cam.az = Math.PI / 2; lastIn = now(); if (desde) {cp.copy(desde.p); cl.copy(desde.l)} else {camera.getWorldDirection(dir); cp.copy(camera.position); cl.copy(cp).add(dir); toLocal(cp); toLocal(cl)} blend(dur); if (conCine) {cineOn = true; cine.empieza(M, {aspecto: camera.aspect, delante: true})} if (onFocus) onFocus(null); if (onCine) onCine(cineOn)},
     sale() {on = false; cineOn = false; if (onCine) onCine(false); ptrs.clear(); zm.on = false; cam.focus = null; cutK = 0; cutOp = 0; cut(0); canvas.classList.remove('dr'); camera.up.set(0, 1, 0); if (onFocus) onFocus(null)},
