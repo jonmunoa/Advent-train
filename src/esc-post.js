@@ -21,6 +21,8 @@ export class Post {
     this.rt = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType, samples: 4, resolveDepthBuffer: true, depthTexture: new THREE.DepthTexture(4, 4, THREE.UnsignedIntType)});
     // se quita el multimuestreo ya dentro del dibujo (después de las sombras, que vuelven a enlazar el búfer) para no resolverlo a medias
     this.pinza = new THREE.Mesh(tri, new THREE.MeshBasicMaterial({colorWrite: false, depthWrite: false, depthTest: false})); this.pinza.frustumCulled = false; this.pinza.renderOrder = -1e4; this.pinza.onBeforeRender = () => {if (this.abierto) this.rt.samples = 0};
+    // reloj de la gráfica: cuánto tarda cada fotograma de verdad (para ajustar la resolución)
+    const gl = renderer.getContext(), tq = gl.getExtension('EXT_disjoint_timer_query_webgl2'); this.tq = tq && {gl, e: tq, cola: [], ms: 0, n: 0};
     this.foco = {a: 0, d: 100}; this.cocR = RT(); this.boke = RT(); this.half = RT({generateMipmaps: alto, minFilter: alto ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter}); this.dof = RT(); this.dof2 = RT(); this.b = [0, 1, 2, 3, 4, 5].map(() => RT());
     this.ln = RT({type: THREE.FloatType, format: THREE.RedFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.aoA = RT({format: THREE.RGFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.aoB = RT({format: THREE.RGFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.nie = RT(); this.ex = [0, 1].map(() => RT({type: THREE.HalfFloatType, format: THREE.RGBAFormat})); this.exi = 0; this.ex.forEach(t => t.setSize(1, 1));
     const Z = this.zu = {z: {value: null}, nf: {value: V2(2, 2600)}, fo: {value: new THREE.Vector3(100, 0, 9)}}, P = this.pr = {value: V2(1, 1)};
@@ -79,10 +81,12 @@ gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
   }
   /* w, h: lo que se ve en pantalla; la escena se dibuja a «esc» veces ese tamaño */
   size(w, h) {
-    const W = Math.max(2, Math.round(w * this.esc)), H = Math.max(2, Math.round(h * this.esc)); this.rt.setSize(W, H); const s = (t, k) => t.setSize(Math.max(2, Math.round(W / k)), Math.max(2, Math.round(H / k))); s(this.half, 2); if (this.alto) {s(this.cocR, 2); s(this.boke, 2); s(this.dof, 4); s(this.dof2, 4); s(this.ln, 2); s(this.aoA, 2); s(this.aoB, 2)} s(this.nie, 4); this.b.forEach((t, i) => s(t, 4 << i));
+    this.w = w; this.h = h; const W = Math.max(2, Math.round(w * this.esc)), H = Math.max(2, Math.round(h * this.esc)); this.rt.setSize(W, H); const s = (t, k) => t.setSize(Math.max(2, Math.round(W / k)), Math.max(2, Math.round(H / k))); s(this.half, 2); if (this.alto) {s(this.cocR, 2); s(this.boke, 2); s(this.dof, 4); s(this.dof2, 4); s(this.ln, 2); s(this.aoA, 2); s(this.aoB, 2)} s(this.nie, 4); this.b.forEach((t, i) => s(t, 4 << i));
   }
   msaa(n) {if (this.samples === n) return; this.samples = n; this.rt.dispose(); this.rt.samples = n}
   paso(mat, src, dst, uni) {mat.uniforms.m.value = src ? src.texture || src : null; if (uni) for (const k in uni) mat.uniforms[k].value = uni[k]; mesh.material = mat; this.r.setRenderTarget(dst); this.r.render(mesh, cam)}
+  /* empieza a medir / recoge lo medido */
+  mide(ini) {const t = this.tq; if (!t) return; const {gl, e} = t; if (ini) {if (t.cola.length > 4) {t.q = null; return} t.q = gl.createQuery(); gl.beginQuery(e.TIME_ELAPSED_EXT, t.q); return} if (t.q) {gl.endQuery(e.TIME_ELAPSED_EXT); t.cola.push(t.q); t.q = null} while (t.cola.length && gl.getQueryParameter(t.cola[0], gl.QUERY_RESULT_AVAILABLE)) {const q = t.cola.shift(); if (!gl.getParameter(e.GPU_DISJOINT_EXT)) {t.ms += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; t.n++} gl.deleteQuery(q)}}
   px(t, k = 1) {return new THREE.Vector2(k / t.width, k / t.height)}
   /* luces que se ven en la niebla: lista de {p: Vector3 (mundo), c: Color, r: radio del foco} */
   ponLuces(list, camera) {let n = 0; for (const q of list) {if (n >= NL) break; const L = this.luces[n]; const p = this._v || (this._v = V3()); p.copy(q.p).applyMatrix4(camera.matrixWorldInverse); if (p.z > 260) continue; L.set(p.x, p.y, p.z, q.r * q.r); this.lucesC[n].set(q.c.r, q.c.g, q.c.b); n++} this.nU.n.value = n}
@@ -92,7 +96,7 @@ gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
     list.forEach((s, i) => {this.abierto = i < list.length - 1; if (this.abierto && this.pinza.parent !== s) s.add(this.pinza); r.render(s, camera); rt.samples = this.samples; this.abierto = false});
   }
   render(list, camera) {
-    this.escenas(list, camera); const {rt, half, b, u} = this, Z = this.zu, R = 9 * rt.height / 900, E = camera.projectionMatrix.elements; u.rs.value.set(rt.width, rt.height); this.pr.value.set(1 / E[0], 1 / E[5]); Z.z.value = rt.depthTexture; Z.nf.value.set(camera.near, camera.far);
+    this.mide(true); this.escenas(list, camera); const {rt, half, b, u} = this, Z = this.zu, R = 9 * rt.height / 900, E = camera.projectionMatrix.elements; u.rs.value.set(rt.width, rt.height); this.pr.value.set(1 / E[0], 1 / E[5]); Z.z.value = rt.depthTexture; Z.nf.value.set(camera.near, camera.far);
     const ao = this.alto && !this.sinAO, ni = !this.sinNiebla && this.nU.n.value > 0 && this.alto;
     if (this.alto) this.paso(this.lin, null, this.ln);
     if (ao) {this.aoU.px.value.copy(this.px(this.ln)); this.aoU.kp.value = E[5] * this.ln.height * .5; this.paso(this.gtao, this.ln, this.aoA); this.paso(this.bil, this.aoA, this.aoB, {p: new THREE.Vector2(1 / this.ln.width, 0)}); this.paso(this.bil, this.aoB, this.aoA, {p: new THREE.Vector2(0, 1 / this.ln.height)}); u.ao.value = this.aoA.texture; u.ap.value.copy(this.px(this.ln))} u.ak.value = ao ? this.aoK ?? 1 : 0;
@@ -105,6 +109,6 @@ gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
     // exposición
     {const a = this.ex[this.exi], c = this.ex[this.exi ^= 1]; this.exU.a.value = a.texture; this.exU.k.value = this.exN ? .035 : 1; this.exN = 1; this.paso(this.expo, b[3], c); u.ea.value = c.texture}
     this.r.autoClear = false; for (let i = b.length - 1; i > 0; i--) this.paso(this.up, b[i], b[i - 1], {p: this.px(b[i]), k: .86});
-    u.b.value = b[0].texture; u.d.value = this.dof.texture; u.bk.value = Math.min(.14, this.bloom * .1) / 2.2; this.paso(this.fin, rt, null);
+    u.b.value = b[0].texture; u.d.value = this.dof.texture; u.bk.value = Math.min(.14, this.bloom * .1) / 2.2; this.paso(this.fin, rt, null); this.mide(false);
   }
 }

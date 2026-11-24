@@ -36,9 +36,9 @@ const store = {get(k) {try {return localStorage.getItem(k)} catch (e) {return nu
 const PEDIDO = pedido(location.search, location.hash), TODOS = {...previaDe(N), todos: true}; let CAL = PEDIDO ? previaDe(PEDIDO) : estado(); if (/[?&]todos\b/.test(location.search) || location.hash === '#todos' || (!CAL.temporada && store.get('advx-esc-todos') === '1')) CAL = TODOS; else if (!CAL.temporada) CAL = previaDe(1);
 
 /* ================= motor ================= */
-const renderer = new THREE.WebGLRenderer({canvas, antialias: LOWQ, powerPreference: 'high-performance', stencil: false});
+const renderer = new THREE.WebGLRenderer({canvas, antialias: false, powerPreference: 'high-performance', stencil: false});
 const MAXPR = Math.min(devicePixelRatio || 1, 2); let dynPR = Math.min(coarse ? 1.5 : 1.5, MAXPR);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = true; renderer.autoClear = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = true; renderer.autoClear = false; renderer.debug.checkShaderErrors = DEBUG;
 const calle = new THREE.Scene(), dentro = new THREE.Scene(); calle.fog = new THREE.Fog(new THREE.Color(.040, .037, .043), 220, 1700); dentro.fog = new THREE.Fog('#b9c6e0', 5000, 6000); renderer.setClearColor('#0b1330', 1);
 const camera = new THREE.PerspectiveCamera(48, 1, 2, 2600); let ENV = null;
 /* el reflejo del entorno es caro: solo lo llevan el metal y lo barnizado */
@@ -53,16 +53,16 @@ const relleno = new THREE.DirectionalLight(0xffe6d2, 0); calle.add(relleno, rell
 const vent = new THREE.SpotLight(0xffbb7a, 0, 640, .98, .9, 1.22); if (!LOWQ) {vent.castShadow = true; vent.shadow.autoUpdate = false; vent.shadow.mapSize.set(1024, 1024); vent.shadow.camera.near = 60; vent.shadow.camera.far = 480; vent.shadow.bias = -.0008; vent.shadow.normalBias = .7; vent.shadow.radius = 5; calle.add(vent, vent.target)}
 // luz de dentro: foco cálido con sombras sobre la maqueta que se mira, y relleno azul
 let contraL = 0; const hemiD = new THREE.HemisphereLight(0x9fb2dc, 0x6f6a6e, .5); dentro.add(hemiD); const foco = new THREE.DirectionalLight(0xffdcb4, 2.1); foco.castShadow = !LOWQ; foco.shadow.autoUpdate = false; foco.shadow.mapSize.set(2048, 2048); Object.assign(foco.shadow.camera, {left: -92, right: 92, top: 74, bottom: -56, near: 1, far: 300}); foco.shadow.bias = -.0005; foco.shadow.normalBias = .2; dentro.add(foco, foco.target);
-const post = LOWQ ? null : new Post(renderer), portrait = () => camera.aspect < .8;
+const post = new Post(renderer, {alto: !LOWQ}), portrait = () => camera.aspect < .8;
 /* lo que se ve del niño desde dentro: una foto de la calle que se pinta en el cristal solo cuando se mira hacia él */
 const portalRT = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType}), pU = {m: {value: portalRT.texture}, r: {value: new THREE.Vector2()}};
 let verCalle = true, verPortal = false, fr = 0, ssrOk = false;
 function draw() {
   fr++; if (renderer.shadowMap.enabled && fr % (E.st === 'paseo' || E.st === 'inicio' ? 12 : 3) === 1) foco.shadow.needsUpdate = true; if (vent.castShadow) vent.shadow.needsUpdate = vent.intensity > 1 && (E.st === 'escena' || fr % 2 === 0);
   if (verPortal) {const ex = renderer.toneMapping; locs.forEach(l => {l.g.visible = false}); lejos.forEach(l => {l.g.visible = false}); renderer.toneMapping = THREE.NoToneMapping; renderer.setRenderTarget(portalRT); renderer.clear(); renderer.render(calle, camera); renderer.setRenderTarget(null); renderer.toneMapping = ex}
-  const L = verCalle ? [calle, dentro] : [dentro]; if (post) {if (post.alto) {UB.sC.value = post.half.texture; UB.sZ.value = post.ln.texture; UB.sOn.value = verCalle && ssrOk ? 1 : 0} post.nU.dn.value = E.st === 'mira' ? lerp(.3, .07, E.u) : E.st === 'escena' ? .2 : .34; post.ponLuces(verCalle && barrio && E.st !== 'dentro' ? barrio.bloques.niebla(camera, lzf) : [], camera); post.render(L, camera); UB.sV.value.copy(camera.matrixWorldInverse); UB.sPV.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); ssrOk = verCalle} else {renderer.setRenderTarget(null); renderer.clear(); L.forEach(s => renderer.render(s, camera))}
+  const L = verCalle ? [calle, dentro] : [dentro]; if (post) {if (post.alto) {UB.sC.value = post.half.texture; UB.sZ.value = post.ln.texture; UB.sOn.value = verCalle && ssrOk && UB.ssr !== false ? 1 : 0} post.nU.dn.value = E.st === 'mira' ? lerp(.3, .07, E.u) : E.st === 'escena' ? .2 : .34; post.ponLuces(verCalle && barrio && E.st !== 'dentro' ? barrio.bloques.niebla(camera, lzf) : [], camera); post.render(L, camera); UB.sV.value.copy(camera.matrixWorldInverse); UB.sPV.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); ssrOk = verCalle} else {renderer.setRenderTarget(null); renderer.clear(); L.forEach(s => renderer.render(s, camera))}
 }
-let vw = 1, vh = 1, MSFIJO = false; function resize() {const w = vw = innerWidth, h = vh = innerHeight; renderer.setPixelRatio(dynPR); renderer.setSize(w, h, false); const W = Math.floor(w * dynPR), H = Math.floor(h * dynPR); if (post) {post.size(W, H); if (!MSFIJO) post.msaa(dynPR > 1.3 ? 2 : 4)} const q = LOWQ ? .5 : .85; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0)); pU.r.value.set(W, H); camera.aspect = w / h; camera.updateProjectionMatrix()}
+let vw = 1, vh = 1, MSFIJO = false; function resize() {const w = vw = innerWidth, h = vh = innerHeight; renderer.setPixelRatio(dynPR); renderer.setSize(w, h, false); const W = Math.floor(w * dynPR), H = Math.floor(h * dynPR); if (post) {post.size(W, H); if (!MSFIJO) post.msaa(LOWQ || dynPR > 1.3 ? (LOWQ ? 4 : 2) : 4)} const q = LOWQ ? .5 : .85; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0)); pU.r.value.set(W, H); camera.aspect = w / h; camera.updateProjectionMatrix()}
 addEventListener('resize', resize);
 
 /* ================= lo que hay en la calle ================= */
@@ -436,12 +436,20 @@ $('go').onclick = empezar;
 /* ================= bucle ================= */
 let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, lento = 0, alT = 0, HOLD = false; const dbg = DEBUG ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0;
 function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'dentro' && !E.hoy && (E.st !== 'mira' || f === madre)) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
-let calT = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (coarse && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
+let calT = 0; function loop(now) {requestAnimationFrame(loop); const raw = (now - last) / 1000; if (TOPE30 && !ptrs.size && !vista.ptrs.size && raw < 1 / 40) return; last = now; if (!listo) return; if (!HOLD) paso(Math.min(.05, raw));
   if (!FAST || SUAVE) escucha(); pasoFondo(Math.min(.2, raw), now); if (!CAL.previa && now - calT > 20000) {calT = now; const c = estado(); if (c.abiertos !== CAL.abiertos) {CAL = c.temporada ? c : previaDe(1)} caption(); if (calAb()) pintaCal()} if (hov && !ptrs.size && enCalle()) {const q = E.st !== 'inicio' && queHay(hov.x, hov.y); canvas.classList.toggle('pt', !!q); sobre = !!(q && q.n === E.n && q.sitio !== 'rotulo'); hov = null} if (now - quietoT > 6000 && E.st !== 'escena') document.body.classList.add('quieto'); if (post) post.u.t.value = now / 1000;
   if (dbg) renderer.info.reset(); draw(); if (dbg) {dN++; dT += raw; if (dT > .5) {dbg.textContent = `${Math.round(dN / dT)} fps · ${(dT / dN * 1000).toFixed(1)} ms · pr ${dynPR.toFixed(2)} · ${renderer.info.render.calls} dc · ${(renderer.info.render.triangles / 1000).toFixed(0)}k · ${E.st}`; dN = dT = 0}}
   adapta(raw, now)}
-/* si va justo: primero baja la resolución hasta 1×, luego sombras y MSAA, y por último el brillo */
-function adapta(raw, now) {if (window.__noAdapt || document.hidden || raw > .2) return; fA += raw; if (++fN < 40 || now - lastAdj < 1300) return; const a = fA / fN, g = coarse ? 1 / 30 : 1 / 60; fA = fN = 0; lastAdj = now; if (a < g * 1.25) {lento = 0; return} if (++lento < 2) return; if (dynPR > 1) {dynPR = Math.max(1, dynPR - .2); resize()} else if (post && post.samples > 2) {MSFIJO = true; post.msaa(2)} else if (renderer.shadowMap.enabled && a > g * 1.6) {foco.castShadow = false; vent.castShadow = false; renderer.shadowMap.enabled = false} else if (post && !post.sinFoco && a > g * 1.4) post.sinFoco = true; else if (post && post.bloom > 0 && a > g * 2.2) post.bloom = 0}
+/* 60 por segundo: se mide lo que tarda la gráfica y se ajusta a cuánta resolución se dibuja la escena (el pase final la sube con nitidez).
+   Si ni al mínimo llega, se quita lo caro por orden; en un móvil que no puede, se fija a 30 para que al menos vaya parejo */
+let TOPE30 = false, quita = 0, subeT = 0, techo = 1; const ESCMIN = coarse ? .55 : .6;
+function ponEsc(v) {post.esc = v; post.size(post.w, post.h)}
+const QUITA = [() => {MSFIJO = true; post.msaa(2)}, () => {UB.ssr = false}, () => {foco.shadow.mapSize.set(1024, 1024); if (foco.shadow.map) {foco.shadow.map.dispose(); foco.shadow.map = null}}, () => {post.sinFoco = true}, () => {post.sinAO = true}, () => {foco.castShadow = vent.castShadow = false; renderer.shadowMap.enabled = false}, () => {if (coarse) TOPE30 = true}];
+function adapta(raw, now) {
+  if (window.__noAdapt || document.hidden || raw > .2) return; fA += raw; if (++fN < 45 || now - lastAdj < 900) return; const a = fA / fN * 1000, t = post.tq, g = t && t.n > 8 ? t.ms / t.n : 0; fA = fN = 0; lastAdj = now; if (t) {t.ms = 0; t.n = 0} if (TOPE30) return;
+  const mal = g ? g > 14.4 || (a > 18.6 && g > 11.5) : a > 18.6, bien = g ? g < 10.4 && a < 17.6 : a < 17.2; if (mal) {lento++; subeT = 0; if (post.esc > ESCMIN + .01) {const k = g ? Math.sqrt(12.4 / Math.max(g, 12.5)) : .9; if (subeT === 0 && techoT(now)) techo = Math.min(techo, post.esc); ponEsc(Math.max(ESCMIN, Math.round(post.esc * clamp(k, .78, .95) * 50) / 50))} else if (lento > 2 && quita < QUITA.length) {QUITA[quita++](); lento = 0}} else {lento = 0; if (bien && post.esc < techo && ++subeT > (g ? 2 : 6)) {subeT = 0; ultS = now; ponEsc(Math.min(techo, post.esc + .05))}}
+}
+let ultS = -1e9; const techoT = now => now - ultS < 2600;   // si al subir se atragantó enseguida, ese es el techo
 const prog = (p, t) => {$('lBar').style.transform = `scaleX(${p})`; if (t) $('go').textContent = t};
 /* móvil: materiales con barniz pasados a estándar */
 const LIGERO = new WeakMap();
