@@ -36,7 +36,6 @@ export class Tren {
     const L0 = this.cars[0], lp = L0.userData.lamp, lens = new THREE.Mesh(SPH(.21, 14, 10), M.lamp); lens.position.copy(lp); L0.add(lens);
     if (lp.x < 3.5) lens.scale.setScalar(.8); const cg = new THREE.ConeGeometry(3.6, 20, 24, 1, true); cg.translate(0, -10, 0); cg.rotateZ(Math.PI / 2);
     this.beam = new THREE.Mesh(cg, HAZ); this.beam.position.set(lp.x + .2, lp.y, lp.z); L0.add(this.beam);
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(11, 7).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({map: dotTex, color: new THREE.Color(.5, .36, .16), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending})); glow.position.set(9, RT + .05, 0); L0.add(glow);
     this.pose();
   }
   carS(i) {return this.s + this.off[i]}
