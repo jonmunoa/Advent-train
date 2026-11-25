@@ -74,11 +74,11 @@ class Costura {
   constructor(fig) {this.f = fig; this.b = fig.huesos; this.P = []; this.F = []}
   mas(g, t, c, h, {x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, ao} = {}) {this.P.push({g, t, c, h, x, y, z, rx, ry, rz, ao}); return this}
   /* ribete de pelo: capas a partir de la superficie */
-  pelo(g, c, h, {x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, l = .02, cae = .25} = {}) {this.F.push({g, c, h, x, y, z, rx, ry, rz, l, cae}); return this}
+  pelo(g, c, h, {x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, l = .02, cae = .25, piel = false} = {}) {this.F.push({g, c, h, x, y, z, rx, ry, rz, l, cae, piel}); return this}
   une(L, extra) {
     const out = []; for (const p of L) {
       _m.compose(V3(p.x, p.y, p.z), _q.setFromEuler(_e.set(p.rx, p.ry, p.rz)), V3(1, 1, 1)); const g0 = p.g; g0.applyMatrix4(_m); const ni = g0.index ? g0 : g0, n = ni.attributes.position.count, ps = ni.attributes.position, col = new Float32Array(n * 3), tk = new Float32Array(n).fill(TELA[p.t] ?? 0), si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), fn = typeof p.c === 'function'; if (!fn) _c.set(p.c);
-      for (let i = 0; i < n; i++) {const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i); if (fn) p.c(x, y, z, _c, i); col.set([_c.r, _c.g, _c.b], i * 3); if (typeof p.h === 'function') {const W = p.h(x, y, z); let s = 0; W.forEach(q => {s += q[1]}); W.slice(0, 4).forEach((q, k) => {si[i * 4 + k] = this.b.indexOf(q[0]); sw[i * 4 + k] = q[1] / s})} else {si[i * 4] = this.b.indexOf(p.h); sw[i * 4] = 1}}
+      for (let i = 0; i < n; i++) {const x = ps.getX(i), y = ps.getY(i), z = ps.getZ(i); if (fn) p.c(x, y, z, _c, i); col.set([_c.r, _c.g, _c.b], i * 3); if (typeof p.h === 'function') {const W = p.h(x, y, z); let s = 0; W.forEach(q => {s += q[1]}); W.slice(0, 4).forEach((q, k) => {si[i * 4 + k] = this.b.indexOf(q[0]); sw[i * 4 + k] = q[1] / s})} else {si[i * 4] = this.b.indexOf(p.h); sw[i * 4] = 1}} if (p.piel && ni.attributes.skinIndex) {si.set(ni.attributes.skinIndex.array.subarray(0, n * 4)); sw.set(ni.attributes.skinWeight.array.subarray(0, n * 4))}
       const g = new THREE.BufferGeometry(); for (const k of ['position', 'normal', 'uv']) g.setAttribute(k, ni.attributes[k] || new THREE.BufferAttribute(new Float32Array(n * 2), 2)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('tk', new THREE.BufferAttribute(tk, 1)); g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); if (ni.index) g.setIndex(ni.index); else g.setIndex([...Array(n).keys()]);
       if (!extra) {out.push(g); continue}
       const NP = this.f.simple ? 1 : NPELO; for (let k = 0; k <= NP; k++) {const u = k / NP, h = g.clone(), q = h.attributes.position, nn = h.attributes.normal; for (let i = 0; i < n; i++) q.setXYZ(i, q.getX(i) + nn.getX(i) * p.l * u, q.getY(i) + nn.getY(i) * p.l * u - p.l * p.cae * u * u, q.getZ(i) + nn.getZ(i) * p.l * u); h.setAttribute('capa', new THREE.BufferAttribute(new Float32Array(n).fill(u), 1)); out.push(h)}
@@ -105,7 +105,7 @@ export class Figura {
   }
   /* persona de MakeHuman: cabeza, pelo y ropa hechas; aquí solo manos y botas */
   vistePersona(C, id, R, D) {
-    const n = this.n, sr = this.sr; this.hem = 0; [0, 1].forEach(i => this.mano(C, i, n ? 'manopla' : 'mano', n ? 1.06 : sr ? 1.14 : 1.0, R.mano, n ? 'punto' : R.mano === 0xf0c4a4 ? 'piel' : 'cuero')); for (const [k, c] of [['barba', R.barba], ['bigote', R.barba || (R.bigote && R.pelo)]]) {const g = c && trozo(id, k); if (g) C.pelo(g.clone(), c, this.head, k === 'barba' ? {l: .05, cae: .55} : {l: .016, cae: .5})}
+    const n = this.n, sr = this.sr; this.hem = 0; [0, 1].forEach(i => this.mano(C, i, n ? 'manopla' : 'mano', n ? 1.06 : sr ? 1.14 : 1.0, R.mano, n ? 'punto' : R.mano === 0xf0c4a4 ? 'piel' : 'cuero'));
     this.piernas2(C, n ? {r: [[0, .05], [.5, .046], [1, .04]], color: R.pant, bota: 'botaNino', kb: 1.12, colB: R.bota, colS: 0x241610} : sr ? {r: [[0, .06], [.5, .05], [1, .04]], color: R.pant, bota: 'zapato', kb: 1.02, colB: R.bota, colS: 0x0e0a07, caña: -.005} : {r: [[0, .02], [.45, .03], [.62, .05], [1, .044]], color: R.pant, t: 'lana', bota: 'botaMadre', kb: 1, colB: R.bota, colS: 0x15100c, caña: .18});
     if (n) {const b = trozo(id, 'borla'); if (b) C.pelo(b.clone(), BLANCO, this.pomH, {l: .022, cae: .1})} if (sr) {this.bag = new THREE.Group(); this.tro.add(this.bag)} else if (!n) this.hazBolsa(); monta(this, id, R);
   }
