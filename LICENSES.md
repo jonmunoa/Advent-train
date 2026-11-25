@@ -21,6 +21,7 @@
 | Textura "dark_wood" | Poly Haven — https://polyhaven.com/a/dark_wood | CC0 1.0 | `m/ph/dark_wood_*.webp` (escaparates: traviesas y madera oscura) |
 | Textura "pine_bark" | Poly Haven — https://polyhaven.com/a/pine_bark | CC0 1.0 | `m/ph/pine_bark_*.webp` (escaparates: troncos) |
 | Ramitas de "fir_tree_01" | Poly Haven — https://polyhaven.com/a/fir_tree_01 | CC0 1.0 | `m/ph/rama.webp`, `rama_nieve.webp` y `abeto.webp`, compuestas con `scripts/rama.py` |
+| meshoptimizer 1.2.0 (simplificador) | Arseny Kapoulkine — https://github.com/zeux/meshoptimizer | MIT | `src/vendor/meshopt_simplifier.js` (escaparates en el móvil: niveles de detalle) |
 | Sofá "Sofa_01" | Poly Haven — https://polyhaven.com/a/Sofa_01 | CC0 1.0 | `m/ph/Sofa_01.glb` |
 | Butaca "ArmChair_01" | Poly Haven — https://polyhaven.com/a/ArmChair_01 | CC0 1.0 | `m/ph/ArmChair_01.glb` |
 | Mesilla "ClassicNightstand_01" | Poly Haven — https://polyhaven.com/a/ClassicNightstand_01 | CC0 1.0 | `m/ph/ClassicNightstand_01.glb` |

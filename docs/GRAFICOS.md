@@ -63,6 +63,13 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 - Arreglos: huecos de las ruedas y los botones (arco de 6,283), gente hundida en el hielo, carga recortada al seguir su vagón, fotos perdidas en el móvil al pasar de 24 texturas.
 - Medidas: PC 59–60 fps; móvil CPU ×4 55–60 (en la v31, 57–60): baja unos segundos al montar la vecina. 89/89 pruebas.
 
+**v34 (25-11-2026).** Jon: «no están nítidos del todo» y «cuando hago zoom con el móvil no va fluido, lo has jodido».
+- Zoom: la cámara se acercaba y subía sola con retardo, y el zoom volvía a medir la distancia ya acortada en cada fotograma. Ahora, un campo de altura mínima continuo, sin nada que dependa del tiempo; inercia en el pellizco; sin tirón al tocar por primera vez ni al aparecer el cristal.
+- Nitidez: el móvil dibujaba a 1,5× y el navegador lo estiraba. Ahora el lienzo va a los píxeles de la pantalla y la escena llega hasta 2,6× si la gráfica puede; último paso bicúbico con nitidez; fotos medio nivel más finas; sombras del sol a 2048. Fuera el desenfoque de miniatura y casi todo el de profundidad. Más contraste. La cordillera y el valle, con grano de roca.
+- Coste: niveles de detalle (meshoptimizer en un hilo aparte), casillas en una llamada, ruido con textura 3D, cielo más barato. La mitad de triángulos y de gráfica.
+- El niño, sin los mechones sueltos que parecían rayas en la sien.
+- 89/89 pruebas.
+
 ## Lo que falta para acercarse más
 - Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
 - Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.
