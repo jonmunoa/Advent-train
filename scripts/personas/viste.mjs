@@ -10,7 +10,7 @@ const CAB = () => [[HU.head, 1]], TRO = () => [[HU.tro, 1]];
 /* contorno de la cabeza (piel) para ajustar gorros: radio por ángulo y altura desde su centro */
 function craneo(C) {const p = C.piezas[0].V.filter(q => q[1] > C.ojos.E[1] - .02), cx = (Math.min(...p.map(q => q[0])) + Math.max(...p.map(q => q[0]))) / 2, top = Math.max(...p.map(q => q[1])); return {cx, top, rx: (Math.max(...p.map(q => q[0])) - Math.min(...p.map(q => q[0]))) / 2, rz: Math.max(...p.map(q => Math.abs(q[2])).filter((_, i) => p[i][1] > C.ojos.E[1] + .035))}}
 /* tira plana con grosor (bufanda colgando, trabillas) */
-function tira(nombre, na, nb, f, g, pes, col) {return sup(nombre, na * 2, nb, (a, b) => {const u = a * 2, frente = u <= 1, s = frente ? u : 2 - u, {p, n} = f(s, b), e = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(s * 2 - 1), 6))) * g * (frente ? 1 : -1); return [p[0] + n[0] * e, p[1] + n[1] * e, p[2] + n[2] * e]}, pes, {col})}
+function tira(nombre, na, nb, f, g, pes, col) {return Object.assign(sup(nombre, na * 2, nb, (a, b) => {const u = a * 2, frente = u <= 1, s = frente ? u : 2 - u, {p, n} = f(s, b), e = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(s * 2 - 1), 6))) * g * (frente ? 1 : -1); return [p[0] + n[0] * e, p[1] + n[1] * e, p[2] + n[2] * e]}, pes, {col}), {doble: true})}
 
 export function viste(id, C, s) {
   const D = medidas(C), B = cuerpo(C), out = [], yE = C.ojos.E[1], cr = craneo(C), abs = [], negro = [255, 255, 255, 255];
@@ -59,7 +59,7 @@ export function viste(id, C, s) {
   /* barba y bigote: trozos de la piel de la cara, para las capas de pelo */
   if (s.barba) {const m = C.piezas[0], E = C.ojos.E, k = C.ojos.R / .0155, yB = E[1] - .07 * k, trozo = (nombre, ok) => {const u = new Map(), o = {nombre, V: [], N: [], UV: [], IX: [], S: [], C: []}; for (let t = 0; t < m.IX.length; t += 3) {const q = [m.IX[t], m.IX[t + 1], m.IX[t + 2]]; if (!q.every(i => ok(m.V[i]))) continue; for (const i of q) {let n = u.get(i); if (n === undefined) {n = o.V.length; u.set(i, n); o.V.push(m.V[i].map((c, a) => c + m.N[i][a] * .0015)); o.N.push(m.N[i]); o.UV.push([m.V[i][2] * 1, m.V[i][1] * 1]); o.S.push([[HU.head, 1]]); o.C.push([255, 255, 255, 255])} o.IX.push(n)}} return o}; const labio = p => Math.abs(p[2]) < .026 * k && Math.abs(p[1] - yB) < .0115 * k && p[0] > E[0] - .01; const B2 = trozo('barba', p => p[1] < E[1] - .028 * k - .03 * Math.max(0, 1 - Math.abs(p[2]) / (.05 * k)) && p[1] > E[1] - .135 * k && p[0] > E[0] - .085 * k && !labio(p) && !(p[1] > yB + .006 && Math.abs(p[2]) < .04 * k)), B3 = trozo('bigote', p => p[1] > yB + .005 * k && p[1] < yB + .022 * k && Math.abs(p[2]) < .034 * k && p[0] > E[0] - .015); [B2, B3].forEach(q => {if (q.IX.length) out.push(q)})}
   /* junta por material y hornea la oclusión */
-  const G = new Map(); out.forEach(m => {if (!G.has(m.nombre)) G.set(m.nombre, []); G.get(m.nombre).push(m)}); const P = [...G].map(([n, L]) => une(n, L)); const cab = C.piezas.filter(m => m.nombre === 'piel' || m.nombre === 'pelo'); cab.forEach(m => {m.C = m.V.map(() => [255, 255, 255, 255])}); oclusion([...P, ...cab], [], 48, .13);
+  const G = new Map(); out.forEach(m => {if (!G.has(m.nombre)) G.set(m.nombre, []); G.get(m.nombre).push(m)}); const cab = C.piezas.filter(m => m.nombre === 'piel' || m.nombre === 'pelo'); cab.forEach(m => {m.C = m.V.map(() => [255, 255, 255, 255])}); oclusion([...out, ...cab], [], 48, .13); const P = [...G].map(([n, L]) => une(n, L));
   return {piezas: [...C.piezas, ...P], D};
 }
 const rayas = v => (v > .58 && v < .66) || (v > .72 && v < .8) || (v > .86 && v < .94);

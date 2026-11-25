@@ -201,7 +201,7 @@ export function vagon(nombre) {
 }
 
 /* móvil: los materiales lisos de un coche van en una sola malla con el color por vértice */
-const VCOL = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .42, metalness: .12});
+const VCOL = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .42, metalness: .12}); VCOL.customProgramCacheKey = () => 'gasv';   // la mugre la pone el material ligero (esc-ligero.js)
 export function ligera(lista, mat) {
   const L = [], o = [], c = new THREE.Color(); for (const [g0, m] of lista) {const M = typeof m === 'string' ? mat[m] : m; if (m === 'lac' || m === 'lisa' || M.isMeshBasicMaterial || M.vertexColors || M.map) {o.push([g0, m]); continue} const g = new THREE.BufferGeometry(), q = g0.index ? g0.toNonIndexed() : g0, n = q.attributes.position.count, a = new Float32Array(n * 3); c.copy(M.color); if (M.metalness > .7) c.multiplyScalar(1.25); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('position', q.attributes.position); g.setAttribute('normal', q.attributes.normal); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); L.push(g)}
   if (L.length) o.push([mergeGeometries(L, false), VCOL]); return o;

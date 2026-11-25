@@ -1,7 +1,7 @@
 /* Las maquetas en el móvil: todo lo que es un color liso o una foto conocida se funde por grupo y lleva un solo material barato
    (sol, cielo, luz local y faro calculados aquí, sin las luces de three). Lo raro (agua, terreno, ramas, rótulos) se queda como está. */
 import {THREE, CUT} from './kit.js';
-import {ULZ, LUZ_GLSL, LUZ_VERT} from './esc-luz.js';
+import {ULZ, LUZ_GLSL, LUZ_VERT, SOL_GLSL} from './esc-luz.js';
 
 const P = 512, MAXC = 24; let nCapas = 0; const capaDe = new Map(), cola = [];
 const tFotos = new THREE.DataArrayTexture(null, P, P, MAXC); tFotos.format = THREE.RGBAFormat; tFotos.type = THREE.UnsignedByteType; tFotos.colorSpace = THREE.SRGBColorSpace; tFotos.wrapS = tFotos.wrapT = THREE.RepeatWrapping; tFotos.magFilter = THREE.LinearFilter; tFotos.minFilter = THREE.LinearMipmapLinearFilter; tFotos.generateMipmaps = true; tFotos.anisotropy = 2; tFotos.source.dataReady = false; tFotos.needsUpdate = true;
@@ -11,10 +11,10 @@ const NV = [new THREE.Vector4(2, 3, 0, 0)], nvDe = new Map();
 export const LDEN = {dl: {value: new THREE.Vector3(0, 1, 0)}, dlc: {value: new THREE.Color()}, hs: {value: new THREE.Color()}, hg: {value: new THREE.Color()}};
 const UNI = {...ULZ, ...LDEN, tF: {value: tFotos}, nv: {value: Array.from({length: 8}, () => new THREE.Vector4(2, 3, 0, 1))}, cutA: CUT.a, cutB: CUT.b, cutR: CUT.r, fogColor: {value: new THREE.Color()}, fogNear: {value: 1}, fogFar: {value: 2}};
 const RUIDO = 'float hR(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}float nR(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(hR(i),hR(i+vec3(1,0,0)),f.x),mix(hR(i+vec3(0,1,0)),hR(i+vec3(1,1,0)),f.x),f.y),mix(mix(hR(i+vec3(0,0,1)),hR(i+vec3(1,0,1)),f.x),mix(hR(i+vec3(0,1,1)),hR(i+vec3(1,1,1)),f.x),f.y),f.z);}';
-const crea = () => {const m = new THREE.ShaderMaterial({fog: true, uniforms: {}, vertexShader: `attribute vec3 color;attribute vec4 capa;varying vec2 vU;varying vec3 vN,vC,vPo;flat varying ivec4 vK;uniform vec3 cutA,cutB;uniform float cutR;uniform mat4 lzI;uniform float lzF,lzP;varying vec3 vLz,vLw;varying float vLc;
+const crea = () => {const m = new THREE.ShaderMaterial({fog: true, uniforms: {}, vertexShader: `attribute vec3 color;attribute vec4 capa;varying vec2 vU;varying vec3 vN,vC,vPo,vOb;flat varying ivec4 vK;uniform vec3 cutA,cutB;uniform float cutR;uniform mat4 lzI;uniform float lzF,lzP;varying vec3 vLz,vLw;varying float vLc;
 #include <common>
 #include <fog_pars_vertex>
-void main(){vec3 transformed=position,n=normal;vPo=position;vC=color;vK=ivec4(capa+.5);
+void main(){vec3 transformed=position,n=normal;vPo=vOb=position;vC=color;vK=ivec4(capa+.5);
 #ifdef USE_INSTANCING
 n=mat3(instanceMatrix)*n;vPo=(instanceMatrix*vec4(position,1.)).xyz;
 #endif
@@ -30,15 +30,16 @@ ${LUZ_VERT}
 /* lo que se cruza entre la cámara y el coche que se sigue se aparta (se manda fuera del fondo) */
 if(cutR>.01){vec3 ab=cutB-cutA;float t=clamp(dot(vLw-cutA,ab)/dot(ab,ab),0.,1.);if(t<.82&&length(vLw-cutA-ab*t)<cutR*.62*(.25+.75*t))gl_Position.z=gl_Position.w*1.5;}
 #include <fog_vertex>
-}`, fragmentShader: `precision highp sampler2DArray;uniform sampler2DArray tF,lzT;uniform vec4 nv[8];uniform vec3 dl,dlc,hs,hg;uniform float lzK;uniform vec4 faP;uniform vec3 faD;varying vec2 vU;varying vec3 vN,vC,vPo,vLz,vLw;flat varying ivec4 vK;varying float vLc;
+}`, fragmentShader: `precision highp sampler2DArray;uniform sampler2DArray tF,lzT;uniform vec4 nv[8];uniform vec3 dl,dlc,hs,hg;uniform float lzK;uniform vec4 faP;uniform vec3 faD;varying vec2 vU;varying vec3 vN,vC,vPo,vOb,vLz,vLw;flat varying ivec4 vK;varying float vLc;
 #include <fog_pars_fragment>
 ${RUIDO}
+${SOL_GLSL}
 ${LUZ_GLSL}
 void main(){vec3 c=vC;if(vK.x>0)c*=texture(tF,vec3(vU,float(vK.x-1))).rgb;if((vK.y&1)==1){gl_FragColor=vec4(c,1.);
 #include <fog_fragment>
 return;}
-vec3 n=normalize(vN);float ru=float(vK.z)/255.;if(vK.w>0){vec4 q=nv[vK.w];float s=smoothstep(q.x,q.y,n.y+(nR(vPo*1.9)-.5)*.3)*q.z;c=mix(c,vec3(.84,.885,.96)*(.96+.06*nR(vPo*5.)),s);ru=mix(ru,.84,s);}
-float nl=max(dot(n,dl),0.);vec3 irr=mix(hg,hs,.5*n.y+.5)+dlc*nl,o=c*(irr*.31831+luzLocal(n,vLz,vLw,vLc));if(ru<.7){vec3 V=normalize(cameraPosition-vLw),H=normalize(V+dl);float e=mix(120.,8.,ru*1.4),me=(vK.y&2)==2?1.:0.;o+=mix(vec3(.05),c,me)*dlc*pow(max(dot(n,H),0.),e)*nl*(1.-ru)*(me>.5?2.2:1.4)+mix(vec3(.04),c*.5,me)*hs*pow(1.-max(dot(n,V),0.),4.)*(1.-ru);}
+vec3 n=normalize(vN);float ru=float(vK.z)/255.;if((vK.y&8)==8){float a=nR(vOb*2.3),b=nR(vOb*vec3(9.,2.2,9.)),z=clamp((1.-smoothstep(.7,3.1,vOb.y+(a-.5)*1.1))*.42+smoothstep(.62,.9,b)*.14,0.,1.);c=mix(c*(.92+.14*a),vec3(.085,.07,.06),z*.62);ru=min(1.,ru+z*.5);}if(vK.w>0){vec4 q=nv[vK.w];float s=smoothstep(q.x,q.y,n.y+(nR(vPo*1.9)-.5)*.3)*q.z;c=mix(c,vec3(.84,.885,.96)*(.96+.06*nR(vPo*5.)),s);ru=mix(ru,.84,s);}
+float nl=max(dot(n,dl),0.);if(nl>.01)nl*=solS(vLz,n,vLc);vec3 irr=mix(hg,hs,.5*n.y+.5)+dlc*nl,o=c*(irr*.31831+luzLocal(n,vLz,vLw,vLc));if(ru<.7){vec3 V=normalize(cameraPosition-vLw),H=normalize(V+dl);float e=mix(120.,8.,ru*1.4),me=(vK.y&2)==2?1.:0.;o+=mix(vec3(.05),c,me)*dlc*pow(max(dot(n,H),0.),e)*nl*(1.-ru)*(me>.5?2.2:1.4)+mix(vec3(.04),c*.5,me)*hs*pow(1.-max(dot(n,V),0.),4.)*(1.-ru);}
 gl_FragColor=vec4(o,1.);
 #include <fog_fragment>
 }`}); Object.assign(m.uniforms, UNI); m.userData.solo = m.userData.noSepara = true; return m};
@@ -62,7 +63,7 @@ const cc = new THREE.Color(), ID = new THREE.Matrix4();
 /* añade a una geometría el color por vértice y los datos del material (capa, marcas, rugosidad, nieve) */
 function viste(g0, m, sinIndice) {
   let g = g0; if (sinIndice && g.index) g = g.toNonIndexed(); const n = g.attributes.position.count, b = m.isMeshBasicMaterial, vc = m.vertexColors && g.attributes.color, co = new Float32Array(n * 3), ca = new Uint8Array(n * 4); cc.copy(m.color); if (!b && m.metalness > .5) cc.multiplyScalar(1.15); if (!b && m.emissive && m.emissive.getHex()) cc.addScaledVector ? 0 : 0; {const a = vc && !vc.isInterleavedBufferAttribute && !vc.normalized ? vc.array : null, w = vc ? vc.itemSize : 3; for (let i = 0; i < n; i++) {co[i * 3] = cc.r * (a ? a[i * w] : vc ? vc.getX(i) : 1); co[i * 3 + 1] = cc.g * (a ? a[i * w + 1] : vc ? vc.getY(i) : 1); co[i * 3 + 2] = cc.b * (a ? a[i * w + 2] : vc ? vc.getZ(i) : 1)}}
-  let q = 0; if (m.map) q = capa(m.map) + 1; let nv = 0; const N = m.userData.nieve; if (N) {const k = N.join(); if (!nvDe.has(k) && nvDe.size < 7) {nvDe.set(k, nvDe.size + 1); UNI.nv.value[nvDe.size].set(N[0], N[1], N[2], 1)} nv = nvDe.get(k) || 0} const fl = (b ? 1 : 0) | (!b && m.metalness > .5 ? 2 : 0), ru = b ? 255 : Math.round(m.roughness * 255); new Uint32Array(ca.buffer).fill(q | fl << 8 | ru << 16 | nv << 24);
+  let q = 0; if (m.map) q = capa(m.map) + 1; let nv = 0; const N = m.userData.nieve; if (N) {const k = N.join(); if (!nvDe.has(k) && nvDe.size < 7) {nvDe.set(k, nvDe.size + 1); UNI.nv.value[nvDe.size].set(N[0], N[1], N[2], 1)} nv = nvDe.get(k) || 0} const fl = (String(m.customProgramCacheKey()).startsWith('gas') ? 8 : 0) | (b ? 1 : 0) | (!b && m.metalness > .5 ? 2 : 0), ru = b ? 255 : Math.round(m.roughness * 255); new Uint32Array(ca.buffer).fill(q | fl << 8 | ru << 16 | nv << 24);
   const h = new THREE.BufferGeometry(); h.setAttribute('position', g.attributes.position); h.setAttribute('normal', g.attributes.normal); h.setAttribute('uv', g.attributes.uv || new THREE.BufferAttribute(new Float32Array(n * 2), 2)); h.setAttribute('color', new THREE.BufferAttribute(co, 3)); h.setAttribute('capa', new THREE.BufferAttribute(ca, 4)); if (g.index) h.setIndex(g.index); return h;
 }
 const junta = L => {const n = L.reduce((s, g) => s + g.attributes.position.count, 0), h = new THREE.BufferGeometry(); for (const [k, w, T] of [['position', 3, Float32Array], ['normal', 3, Float32Array], ['uv', 2, Float32Array], ['color', 3, Float32Array], ['capa', 4, Uint8Array]]) {const a = new T(n * w); let o = 0; for (const g of L) {const q = g.attributes[k]; if (q.array.constructor === T && !q.isInterleavedBufferAttribute) a.set(q.array.subarray(0, q.count * w), o); else for (let i = 0; i < q.count; i++) for (let c = 0; c < w; c++) a[o + i * w + c] = q.getComponent(i, c); o += q.count * w} h.setAttribute(k, new THREE.BufferAttribute(a, w))} return h};
