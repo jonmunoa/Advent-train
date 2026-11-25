@@ -344,3 +344,6 @@ void main(){vec2 q=gl_PointCoord*2.-1.;float r=dot(q,q);if(r>1.)discard;float nv
 }`});
   m.userData.solo = true; const q = new THREE.Points(g, m); q.frustumCulled = false; q.pon = (i, x, y, z, col) => {p.set([x, y, z], i * 3); c.set([col.r, col.g, col.b], i * 3)}; return q;
 }
+
+/* manchas y huellas pegadas al suelo: se acercan un poco a la cámara sin moverse de sitio en pantalla, para que no las corten los bultos de la nieve */
+export const pegada=(m,d=3)=>{m.onBeforeCompile=s=>{s.vertexShader=s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\nmvPosition.xyz*=1.-'+d.toFixed(1)+'/max(length(mvPosition.xyz),'+(d*3).toFixed(1)+');gl_Position=projectionMatrix*mvPosition;')};m.customProgramCacheKey=()=>'peg'+d;return m};

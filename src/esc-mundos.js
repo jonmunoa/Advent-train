@@ -32,12 +32,12 @@ const CFG = [
 ];
 
 /* nieve con el tono del día, sin dejar de ser nieve */
-const suelo = t => {const S = t.suelo, l = (S[0] + S[1] + S[2]) / 3, k = t.noche ? .5 : .45; return S.map(v => lerp(v, lerp(l, 1, .55), k))};
+const suelo = t => {const S = t.suelo, l = (S[0] + S[1] + S[2]) / 3, k = t.noche ? .6 : .85; return S.map(v => lerp(v, lerp(l, 1, .55), k))};
 export class Mundo {
   /* i: día - 1. q: estilo de partida (0 pueblo, 1 montaña, 2 polo); tema: colores del día (esc-dias.js) */
   constructor(i, tema) {this.i = i; this.m = mapaOf(i); this.q = this.m.sem; this.tema = tema || null; const q = i; this.T = this.m.T; this.g = new THREE.Group(); this.anim = []; this.S = []; this.bulbs = [[], [], []]; this.smokeAt = []; this.r = rng(77 + q * 31); this.glows = []; this.focosL = []; this.bloq = []; this.taken = []; this.cfg = {...CFG[this.q], ...(tema ? tema.tren : null), tipo: TREN_DE[i] || 'americana'};
     // la luz de fuera: sol bajo del color del horizonte, luna o día de ventisca
-    {const t = tema || BASE3[this.q], mz = (a, b, k) => new THREE.Color(a).lerp(new THREE.Color(b), k), n = t.noche; this.sol = n ? {c: new THREE.Color(0xb2c0ea), k: .66, hs: new THREE.Color(0x6a7cb4), hg: new THREE.Color(0x2c2f42), hk: .3, lz: 1.45, ev: .84} : t.tormenta ? {c: new THREE.Color(0xd6e0f2), k: 1.1, hs: new THREE.Color(0xa8b8d4), hg: new THREE.Color(0x70747e), hk: .55, lz: 1.2, ev: 1.15} : {c: mz(0xffcf9c, t.cielo[3], .35), k: 2.9, hs: mz(0x7f9ae0, t.cielo[1], .3), hg: new THREE.Color(0x4c4c5c), hk: .44, lz: 1, ev: 1.28}}}
+    {const t = tema || BASE3[this.q], mz = (a, b, k) => new THREE.Color(a).lerp(new THREE.Color(b), k), n = t.noche; this.sol = n ? {c: new THREE.Color(0xb2c0ea), k: .66, hs: new THREE.Color(0x6a7cb4), hg: new THREE.Color(0x2c2f42), hk: .3, lz: 1.45, ev: .84} : t.tormenta ? {c: new THREE.Color(0xd6e0f2), k: 1.1, hs: new THREE.Color(0xa8b8d4), hg: new THREE.Color(0x70747e), hk: .55, lz: 1.2, ev: 1.15} : {c: mz(0xffd8ae, t.cielo[3], .22), k: 2.8, hs: mz(0x93a8d6, t.cielo[1], .18), hg: new THREE.Color(0x50525e), hk: .62, lz: 1, ev: 1.28}}}
   /* ---------- ayudas ---------- */
   gy(x, z) {const G = this.GR, fx = clamp((x - G.x0) / G.dx, 0, G.nx - 1.001), fz = clamp((z - G.z0) / G.dz, 0, G.nz - 1.001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, h = G.h, n = G.nx; return lerp(lerp(h[j * n + i], h[j * n + i + 1], u), lerp(h[(j + 1) * n + i], h[(j + 1) * n + i + 1], u), v)}
   slope(x, z) {return Math.hypot(this.gy(x + 1, z) - this.gy(x - 1, z), this.gy(x, z + 1) - this.gy(x, z - 1)) / 2}

@@ -1,6 +1,6 @@
 /* Las tres tiendas con escaparate, la nieve que cae y las huellas. Unidades de la calle: 45 = 1 metro.
    Cada módulo (una tienda) mide PASO de ancho; la calle da la vuelta: los tres se van recolocando delante de quien pasea. */
-import {THREE, mergeGeometries, rng, lerp, clamp, hash2, vnoise, fbm, LOWQ, M, MD, canvasTex, phTex, dotTex, stoneTex, plankTex, woodTex, flat, obj, fuse, geoOnly, BX, CY, TOR, SPH, PLN, o3, rep, loadImg, rrect} from './kit.js';
+import {THREE, mergeGeometries, rng, lerp, clamp, hash2, vnoise, fbm, LOWQ, M, MD, canvasTex, phTex, dotTex, stoneTex, plankTex, woodTex, flat, obj, fuse, geoOnly, BX, CY, TOR, SPH, PLN, o3, rep, loadImg, rrect, pegada} from './kit.js';
 import {juntar} from './esc-geo.js';
 import {foto, nevar, losa} from './esc-real.js';
 import {guirnalda, corona, arbolito} from './esc-follaje.js';
@@ -99,7 +99,7 @@ export const rotuloFondo = k => ROTC[((k % 3) + 3) % 3];
 
 /* huellas en la nieve: se van marcando y las viejas se borran */
 export class Huellas {
-  constructor(scene, n = 120) {this.n = n; this.i = 0; const tx = canvasTex(32, 64, g => {g.fillStyle = 'rgba(30,38,66,.9)'; g.filter = 'blur(2px)'; g.beginPath(); g.ellipse(16, 20, 8, 14, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(16, 48, 7, 9, 0, 0, 7); g.fill()}, 'huella'); this.m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({map: tx, transparent: true, opacity: .5, depthWrite: false}), n); this.m.frustumCulled = false; this.m.renderOrder = 1; const z = new THREE.Matrix4().makeScale(0, 0, 0); for (let i = 0; i < n; i++) this.m.setMatrixAt(i, z); scene.add(this.m)}
+  constructor(scene, n = 120) {this.n = n; this.i = 0; const tx = canvasTex(32, 64, g => {g.fillStyle = 'rgba(30,38,66,.9)'; g.filter = 'blur(2px)'; g.beginPath(); g.ellipse(16, 20, 8, 14, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(16, 48, 7, 9, 0, 0, 7); g.fill()}, 'huella'); this.m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 2).rotateX(-Math.PI / 2), pegada(new THREE.MeshBasicMaterial({map: tx, transparent: true, opacity: .5, depthWrite: false})), n); this.m.frustumCulled = false; this.m.renderOrder = 1; const z = new THREE.Matrix4().makeScale(0, 0, 0); for (let i = 0; i < n; i++) this.m.setMatrixAt(i, z); scene.add(this.m)}
   put(x, z, a, s) {o3.position.set(x, .5, z); o3.rotation.set(0, a - Math.PI / 2, 0); o3.scale.set(s, 1, s); o3.updateMatrix(); this.m.setMatrixAt(this.i, o3.matrix); this.i = (this.i + 1) % this.n; this.m.instanceMatrix.needsUpdate = true; o3.scale.set(1, 1, 1); o3.rotation.set(0, 0, 0)}
 }
 /* nieve que cae: la mueve la gráfica (vértices), alrededor de la cámara */
