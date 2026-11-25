@@ -374,4 +374,4 @@ export const pegada=(m,d=3)=>{m.onBeforeCompile=s=>{s.vertexShader=s.vertexShade
 }
 /* ruido en el móvil: una textura de 64³ en lugar de ocho cuentas por punto (y los niveles de la textura lo suavizan de lejos, sin hormigueo) */
 export const T3R = {value: null}; if (LOWQ) {const n = 64, d = new Uint8Array(n * n * n), r = rng(77); for (let i = 0; i < d.length; i++) d[i] = r() * 256; const t = new THREE.Data3DTexture(d, n, n, n); t.format = THREE.RedFormat; t.unpackAlignment = 1; t.wrapS = t.wrapT = t.wrapR = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; T3R.value = t}
-export const RUIDO3 = 'uniform sampler3D t3R;float hR(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}float nR(vec3 x){return texture(t3R,x*.015625+.0078125).r;}';
+export const RUIDO3 = 'uniform sampler3D t3R;float hR(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}float nR(vec3 x){vec3 i=floor(x),f=fract(x);return texture(t3R,(i+f*f*(3.-2.*f))*.015625+.0078125).r;}';

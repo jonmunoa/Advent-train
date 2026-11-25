@@ -4,6 +4,7 @@
 import {THREE, LOWQ} from './kit.js';
 import {BW, BD} from './esc-vias.js';
 import {ULZ} from './esc-luz.js';
+import {corrientes} from './esc-nivel.js';
 
 const W = 1024, H = 512, FW = 2048, FH = 1024, SOL = new THREE.Vector3(-82, 64, 78).normalize();
 const mapa = (w, h) => {const d = new THREE.DepthTexture(w, h, THREE.UnsignedShortType); d.compareFunction = THREE.LessEqualCompare; d.minFilter = d.magFilter = THREE.LinearFilter; const t = new THREE.WebGLRenderTarget(w, h, {format: THREE.RedFormat, type: THREE.UnsignedByteType, depthTexture: d, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false}); t.scissorTest = true; return t};
@@ -19,7 +20,7 @@ function reparte(root, no) {
   const G = new Map(), pon = (m, o) => {if (!G.has(m)) G.set(m, []); G.get(m).push(o)}; const ve = o => {if (no.includes(o)) return; const m = o.material; if (o.isMesh && m && !m.transparent && m.visible !== false && !o.userData.sinSombra) {if (m.alphaTest && m.map) {const k = m.map.uuid + (o.isInstancedMesh ? 'i' : ''); if (!CALADO.has(k)) CALADO.set(k, ciego({map: m.map, alphaTest: m.alphaTest})); pon(CALADO.get(k), o)} else pon(o.isInstancedMesh ? INST : LISO, o)} o.children.forEach(ve)}; ve(root); return [...G];
 }
 function pinta(renderer, rt, x, y, w, h, grupos, m) {
-  const r0 = renderer.getRenderTarget(), ac = renderer.autoClear; cam.matrixWorld.copy(m.g.matrixWorld); cam.matrixWorldInverse.copy(m.g.matrixWorld).invert(); rt.viewport.set(x, y, w, h); rt.scissor.set(x, y, w, h); renderer.setRenderTarget(rt); renderer.autoClear = false; renderer.clear(true, true, false); for (const [mat, l] of grupos) {const H = []; for (const o of l) if (o.children.length) {H.push([o, o.children]); o.children = []} esc.overrideMaterial = mat; esc.children = l; renderer.render(esc, cam); for (const [o, c] of H) o.children = c} esc.children = []; renderer.autoClear = ac; renderer.setRenderTarget(r0);
+  const r0 = renderer.getRenderTarget(), ac = renderer.autoClear; cam.matrixWorld.copy(m.g.matrixWorld); cam.matrixWorldInverse.copy(m.g.matrixWorld).invert(); rt.viewport.set(x, y, w, h); rt.scissor.set(x, y, w, h); renderer.setRenderTarget(rt); renderer.autoClear = false; renderer.clear(true, true, false); for (const [mat, l] of grupos) {const H = []; for (const o of l) if (o.children.length) {H.push([o, o.children]); o.children = []} esc.overrideMaterial = mat; esc.children = l; corrientes(l, () => renderer.render(esc, cam)); for (const [o, c] of H) o.children = c} esc.children = []; renderer.autoClear = ac; renderer.setRenderTarget(r0);
 }
 /* al arrancar: las dos texturas, vacías (sin ellas los sombreadores no tendrían de dónde leer) */
 export function preparaSombras(renderer, tilt) {

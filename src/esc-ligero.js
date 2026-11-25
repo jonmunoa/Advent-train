@@ -3,7 +3,7 @@
 import {THREE, CUT, T3R, RUIDO3} from './kit.js';
 import {ULZ, LUZ_GLSL, LUZ_VERT, SOL_GLSL} from './esc-luz.js';
 import {ACABADO_GLSL} from './esc-acabado.js';
-import {nivela1} from './esc-nivel.js';
+import {nivela1, abre, manda, cierra} from './esc-nivel.js';
 
 const P = 512, MAXC = 30; let nCapas = 0; const capaDe = new Map(), cola = [];
 const tFotos = new THREE.DataArrayTexture(null, P, P, MAXC); tFotos.format = THREE.RGBAFormat; tFotos.type = THREE.UnsignedByteType; tFotos.colorSpace = THREE.SRGBColorSpace; tFotos.wrapS = tFotos.wrapT = THREE.RepeatWrapping; tFotos.magFilter = THREE.LinearFilter; tFotos.minFilter = THREE.LinearMipmapLinearFilter; tFotos.generateMipmaps = true; tFotos.anisotropy = 4; tFotos.source.dataReady = false; tFotos.needsUpdate = true;
@@ -46,12 +46,12 @@ vec3 n=normalize(vN);
 if(!gl_FrontFacing)n=-n;
 #endif
 float ru=float(vK.z)/255.;if((vK.y&8)==8){float a=nR(vOb*2.3),b=nR(vOb*vec3(9.,2.2,9.)),z=clamp((1.-smoothstep(.7,3.1,vOb.y+(a-.5)*1.1))*.42+smoothstep(.62,.9,b)*.14,0.,1.);c=mix(c*(.92+.14*a),vec3(.085,.07,.06),z*.62);ru=min(1.,ru+z*.5);}{int ka=vK.y>>4;if(ka>0){float m0=0.;acabado(ka,vOb,n,length(fwidth(vOb)),c,ru,m0);}if(vPv.x>.004){float sn=nieveAc(vPo,n,vPv.x,vPv.y);c=mix(c,vec3(.84,.885,.96)*(.95+.07*nR(vPo*5.)),sn);ru=mix(ru,.84,sn);}}if(vK.w>0){vec4 q=nv[vK.w];float s=smoothstep(q.x,q.y,n.y+(nR(vPo*1.9)-.5)*.3)*q.z;c=mix(c,vec3(.84,.885,.96)*(.96+.06*nR(vPo*5.)),s);ru=mix(ru,.84,s);}
-{/* la nieve lisa, con grano y bultos */float w=smoothstep(.5,.62,min(c.r,min(c.g,c.b)));if(w>.01){float a=nR(vPo*2.1),b=nR(vPo*6.7+3.);c*=mix(1.,.9+.13*a+.07*b,w);n=normalize(n+(vec3(nR(vPo*3.3),.5,nR(vPo*3.3+21.))-.5)*.13*w);}}
+{/* la nieve lisa, con grano y bultos */float w=smoothstep(.5,.62,min(c.r,min(c.g,c.b)));if(w>.01){float a=nR(vPo*2.1),b=nR(vPo*6.7+3.);c*=mix(1.,.93+.09*a+.05*b,w);n=normalize(n+(vec3(nR(vPo*3.3),.5,nR(vPo*3.3+21.))-.5)*.07*w);}}
 float nl=max(dot(n,dl),0.);if(nl>.01)nl*=solS(vLz,n,vLc);vec3 irr=mix(hg,hs,.5*n.y+.5)+dlc*nl,o=c*(irr*.31831+luzLocal(n,vLz,vLw,vLc));if(ru<.7){vec3 V=normalize(cameraPosition-vLw),H=normalize(V+dl);float e=mix(120.,8.,ru*1.4),me=(vK.y&2)==2?1.:0.;o+=mix(vec3(.05),c,me)*dlc*pow(max(dot(n,H),0.),e)*nl*(1.-ru)*(me>.5?2.2:1.4)+mix(vec3(.04),c*.5,me)*hs*pow(1.-max(dot(n,V),0.),4.)*(1.-ru);}
 gl_FragColor=vec4(o,1.);
 #include <fog_fragment>
 }`}); Object.assign(m.uniforms, UNI); m.userData.solo = m.userData.noSepara = true; return m};
-export const MATE = {n: crea(), i: crea(), c: crea(), d: crea({side: THREE.DoubleSide, defines: {DOBLE: 1}})};
+export const MATE = {n: crea(), i: crea(), c: crea(), d: crea({side: THREE.DoubleSide, defines: {DOBLE: 1}}), m: crea(), md: crea({side: THREE.DoubleSide, defines: {DOBLE: 1}})};
 /* todas las que esperan, de golpe (al arrancar o al saltar a otra maqueta) */
 export function subeTodas(renderer) {for (let k = 0; k < 60 && cola.length; k++) {const n = cola.length; sube1(renderer); if (cola.length === n) break}}
 
@@ -78,7 +78,12 @@ const junta = L => {const n = L.reduce((s, g) => s + g.attributes.position.count
 /* funde lo fijo de cada grupo y cambia el material del resto; cede de vez en cuando */
 export function* compacta(root, niv = null) {
   const pares = new Map(), otros = []; root.traverse(o => {if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !apto(o.material) || o.geometry.morphAttributes.position) return; if (!o.isInstancedMesh && !o.children.length && o.visible && (o.userData.fijo || (o.parent === root && (o.updateMatrix(), o.matrix.equals(ID))))) {const D = o.material.side === THREE.DoubleSide ? 1 : 0, P = pares.get(o.parent) || [[], []]; pares.set(o.parent, P); P[D].push(o)} else if (o.material.side === THREE.FrontSide) otros.push(o)});
-  for (const [p, LL] of pares) for (const [dob, L] of LL.entries()) {if (!L.length) continue; yield; const G = []; for (const o of L) {const g = viste(o.geometry, o.material, true); o.updateMatrix(); const e = o.matrix.elements; if (e[12] || e[13] || e[14] || e[0] !== 1 || e[5] !== 1 || e[10] !== 1) {g.setAttribute('position', g.attributes.position.clone()); g.setAttribute('normal', g.attributes.normal.clone()); g.applyMatrix4(o.matrix)} G.push(g); if (G.length % 6 === 5) yield} const me = new THREE.Mesh(G.length > 1 ? junta(G) : G[0], dob ? MATE.d : MATE.n); me.matrixAutoUpdate = false; me.updateMatrix(); me.userData.ligera = true; L.forEach(o => p.remove(o)); p.add(me); if (niv && me.geometry.attributes.position.count > 2400) {yield; nivela1(me, niv, me.geometry.attributes.position.count > 30000 ? 32 : 0)}}
+  const mueve = (o, g) => {o.updateMatrix(); const e = o.matrix.elements; if (e[12] || e[13] || e[14] || e[0] !== 1 || e[5] !== 1 || e[10] !== 1) {g.setAttribute('position', g.attributes.position.clone()); g.setAttribute('normal', g.attributes.normal.clone()); g.applyMatrix4(o.matrix)} return g}, junto = (G, dob) => {const me = new THREE.Mesh(G.length > 1 ? junta(G) : G[0], dob ? MATE.d : MATE.n); me.matrixAutoUpdate = false; me.updateMatrix(); me.userData.ligera = true; return me};
+  for (const [p, LL] of pares) for (const [dob, L] of LL.entries()) {
+    if (!L.length) continue; yield; const nv = L.reduce((s, o) => s + (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count), 0), id = nv > 2400 ? abre(niv, p, dob ? MATE.md : MATE.m, 24, () => p.add(junto(L.map(o => mueve(o, viste(o.geometry, o.material, true))), dob))) : 0;
+    if (id) {let n = 0; for (const o of L) {manda(id, mueve(o, viste(o.geometry, o.material, false))); if ((n += o.geometry.attributes.position.count) > 5000) {n = 0; yield}} cierra(id); L.forEach(o => p.remove(o)); continue}
+    const G = []; for (const o of L) {G.push(mueve(o, viste(o.geometry, o.material, true))); if (G.length % 6 === 5) yield} const me = junto(G, dob); L.forEach(o => p.remove(o)); p.add(me); if (niv && nv > 2400) {yield; nivela1(me, niv, 24, dob ? MATE.md : MATE.m)}
+  }
   // instancias hermanas (mismas matrices): van en una sola, y el color de instancia solo tiñe lo que lo llevaba
   const quita = new Set(); for (const o of otros) {const H = o.isInstancedMesh && o.userData.con; if (!H || quita.has(o)) continue; const L = [o, ...H].filter(q => otros.includes(q)); if (L.length < 2) continue; yield; const con = L.find(q => q.instanceColor), G = L.map(q => {const g = viste(q.geometry, q.material, true); if (con && !q.instanceColor) {const a = g.attributes.capa.array; for (let i = 1; i < a.length; i += 4) a[i] |= 4} return g}); o.geometry = junta(G); if (con && con !== o) o.instanceColor = con.instanceColor; o.material = con ? MATE.c : MATE.i; L.slice(1).forEach(q => {quita.add(q); if (q.parent) q.parent.remove(q)}); quita.add(o); if (niv) {yield; nivela1(o, niv)}}
   yield; for (const o of otros) {if (quita.has(o)) continue; o.geometry = viste(o.geometry, o.material, false); o.material = o.isInstancedMesh ? (o.instanceColor ? MATE.c : MATE.i) : MATE.n; const g = o.geometry, nt = (g.index ? g.index.count : g.attributes.position.count) / 3; if (niv && nt > 40 && nt * (o.isInstancedMesh ? o.count : 1) > 700) {yield; nivela1(o, niv)}}
