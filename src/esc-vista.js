@@ -80,7 +80,10 @@ export function Vista({camera, canvas, pick, over, onFocus, onHint, onCine, cut,
   function libra(dt) {
     const G = techo(M); let nec = cam.el; const h = Math.cos(cam.el) * cam.d, c = Math.cos(cam.az), s = Math.sin(cam.az); for (let k = 2; k <= 8; k++) {const u = k / 8, g = gy(cam.tgt.x + c * h * u, cam.tgt.z + s * h * u) + (k === 8 ? 1.9 : .5); nec = Math.max(nec, Math.atan2(g - cam.tgt.y, h * u))}
     const q = clamp(nec - cam.el, 0, 1.2); if (dt > 0) cam.sube = lerp(cam.sube, q, 1 - Math.exp(-(q > cam.sube ? 12 : 2.6) * dt)); const el = Math.min(Math.max(ELMAX, cam.el), cam.el + cam.sube);
-    let u = 1; for (; u > .16; u -= .02) {pos(el, cam.d * u); if (pp.y > tapa(G, pp.x, pp.z)) break} if (dt > 0) cam.corta = lerp(cam.corta, u, 1 - Math.exp(-(u < cam.corta ? 18 : 4) * dt)); return el;
+    let u = 1; for (; u > .16; u -= .02) {pos(el, cam.d * u); if (pp.y > tapa(G, pp.x, pp.z)) break}
+    // algo ancho (un buzón, un molino) justo delante: se pasa al otro lado
+    {const grande = v => {pos(el, cam.d * v); const y = pp.y + 1.5, X = pp.x, Z = pp.z; return tapa(G, X, Z) > y + .8 && tapa(G, X - s * 2.4, Z + c * 2.4) > y && tapa(G, X + s * 2.4, Z - c * 2.4) > y}; let v = u, hay = false; for (; v > Math.max(.3, 9 / cam.d) && (v > .5 || hay); v -= .03) {const b = grande(v); if (hay && !b) break; if (b) hay = true} if (hay && v > Math.max(.3, 9 / cam.d)) u = v - .03}
+    if (dt > 0) cam.corta = lerp(cam.corta, u, 1 - Math.exp(-(u < cam.corta ? 18 : 4) * dt)); return el;
   }
   function freePose(dt = 0) {const el = libra(dt); pos(el, cam.d * cam.corta); const g = gy(pp.x, pp.z) + 1.3; if (pp.y < g) pp.y = g; ll.copy(cam.tgt)}
   /* pone la cámara (en coordenadas de la maqueta) */
