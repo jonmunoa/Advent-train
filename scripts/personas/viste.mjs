@@ -18,7 +18,7 @@ export function viste(id, C, s) {
   const pone = (grupo, m) => {m.nombre = grupo; out.push(m); return m};
   /* ---- abrigo ---- */
   const A = abrigo(C, B, D, {...s.abrigo(D)}), hem = D.bajo = s.abrigo(D).y1, pT = pesoTronco(D, hem); pone('abrigo', A.malla('abrigo', pT, null, {canto: .01}));
-  const M = [0, 1].map(i => {const t = manga(D, i, s.manga); pone('abrigo', t.malla('abrigo', pesoManga(D, i), null)); return t});
+  const M = [0, 1].map(i => {const t = manga(D, i, s.manga), m = t.malla('abrigo', pesoManga(D, i), null); m.manga = true; pone('abrigo', m); return t});
   /* tapeta delantera y solapa de la costura */
   const ang = th => ((-th / (2 * PI)) % 1 + 1) % 1, bDe = y => {let lo = 0, hi = 1; for (let k = 0; k < 24; k++) {const m = (lo + hi) / 2; A.en(ang(0), m).p[1] > y ? lo = m : hi = m} return lo};
   const borde = (th, y0, y1, off, w = .0) => {const b0 = bDe(y0), b1 = bDe(y1); return tira('abrigo', 10, 60, (u, v) => A.en(ang(th + (u - .5) * w), lerp(b0, b1, v), off), .0035, pT)};
@@ -75,7 +75,8 @@ export function viste(id, C, s) {
   const G = new Map(); out.forEach(m => {if (!G.has(m.nombre)) G.set(m.nombre, []); G.get(m.nombre).push(m)}); const cab = C.piezas.filter(m => m.nombre === 'piel' || m.nombre === 'pelo'); const {E, R} = C.ojos, kE = R / .0155; let nar = [-1]; C.piezas[0].V.forEach(p => {if (Math.abs(p[2]) < .01 * kE && p[1] < E[1] - .018 * kE && p[1] > E[1] - .056 * kE && p[0] > nar[0]) nar = p});
   // colores de frío en la cara (canal rojo: 255 = sin rubor): mejillas, punta de la nariz, orejas y un poco la barbilla
   const rubor = p => {const g = (x, y, z, r) => Math.exp(-(((p[0] - x) ** 2 + (p[1] - y) ** 2 + (Math.abs(p[2]) - z) ** 2) / (r * kE) ** 2)); if (p[1] < E[1] - .12 * kE) return 0; return Math.min(1, .85 * g(E[0] - .004, E[1] - .038 * kE, E[2] + .014 * kE, .024) + .9 * g(nar[0] - .006, nar[1], 0, .015) + .35 * g(E[0], E[1] - .098 * kE, 0, .016) + .75 * g(E[0] - .088 * kE, E[1] - .012 * kE, .078 * kE, .024))};
-  cab.forEach(m => {m.C = m.V.map(p => [m.nombre === 'piel' ? Math.round(255 * (1 - rubor(p))) : 255, 255, 255, 255])}); oclusion([...out, ...cab], [], 48, .13); const P = [...G].map(([n, L]) => une(n, L));
+  cab.forEach(m => {m.C = m.V.map(p => [m.nombre === 'piel' ? Math.round(255 * (1 - rubor(p))) : 255, 255, 255, 255])}); /* las mangas no oscurecen el cuerpo: al mover el brazo se veía la mancha en el costado */
+  const mg = out.filter(m => m.manga), cu = out.filter(m => !m.manga); oclusion([...cu, ...cab], [], 48, .13); if (mg.length) {const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...cu, ...cab].flatMap(m => m.IX.flatMap(i => m.V[i])), 3)); oclusion(mg, [g], 48, .1); mg.forEach(m => m.C.forEach(c => {c[3] = Math.round(Math.max(c[3], 255 * (.42 + .58 * c[3] / 255)))}))} const P = [...G].map(([n, L]) => une(n, L));
   return {piezas: [...C.piezas, ...P], D};
 }
 const rayas = v => (v > .58 && v < .66) || (v > .72 && v < .8) || (v > .86 && v < .94);

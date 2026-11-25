@@ -59,7 +59,7 @@ export function sup(nombre, na, nb, f, pes, {cerrada = true, cb = false, inv = 1
 
 /* ================= prendas ================= */
 /* D: medidas de la figura (cadera, hombro, etc.) */
-export function pesoTronco(D, hem) {return (x, y, z) => {const k = sstep(D.cad - .02, D.cad + (D.sho - D.cad) * .45, y), f = sstep(D.hip + .06, hem, y) * .95, s = clamp(z / (D.lw * 2.2) * .5 + .5, 0, 1), W = [[HU.tro, k], [HU.cad, (1 - k) * (1 - f)], [HU.falL, (1 - k) * f * (1 - s)], [HU.falR, (1 - k) * f * s]].filter(q => q[1] > .004); // cerca del hombro, algo del brazo
+export function pesoTronco(D, hem) {return (x, y, z) => {const k = sstep(D.cad - .02, D.cad + (D.sho - D.cad) * .45, y), f = sstep(D.hip + .06, hem, y) * .95, s = sstep(-D.lw * 1.15, D.lw * 1.15, z), W = [[HU.tro, k], [HU.cad, (1 - k) * (1 - f)], [HU.falL, (1 - k) * f * (1 - s)], [HU.falR, (1 - k) * f * s]].filter(q => q[1] > .004); // cerca del hombro, algo del brazo
   const i = z < 0 ? 0 : 1, d = Math.hypot(y - D.sho, Math.abs(z) - D.sw, x - D.sx), a = sstep(.13, .03, d) * .42 * sstep(.03, .09, Math.abs(z)); if (a > .01) {W.forEach(q => {q[1] *= 1 - a}); W.push([i ? HU.armR : HU.armL, a])} return W.sort((p, q) => q[1] - p[1]).slice(0, 4)}}
 export function pesoManga(D, i) {return (x, y, z) => {const k = sstep(D.sho - D.a1 + D.a1 * .3, D.sho - D.a1 - D.a1 * .3, y), h = sstep(D.sho - .05, D.sho + .05, y) * .5; return [[i ? HU.armR : HU.armL, (1 - k) * (1 - h)], [i ? HU.anteR : HU.anteL, k], [HU.tro, (1 - k) * h]].filter(q => q[1] > .004)}}
 
