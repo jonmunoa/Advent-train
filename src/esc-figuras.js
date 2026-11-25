@@ -52,3 +52,5 @@ export function crowd(pose, n, par) {
   const V2 = pose === 'pie' ? [{sem: 0}, {sem: 1, falda: true}, {sem: 2}] : pose === 'skate' ? [{sem: 1}, {sem: 2, falda: true}] : pose === 'ski' ? [{sem: 0, casco: true}, {sem: 1, casco: true}] : [{sem: 3}], k = Math.min(V2.length, Math.max(1, Math.ceil(n / 3))), G = V2.slice(0, k).map((o, a) => grupo(pose, Math.ceil((n - a) / k), par, o)), S = f => ({setMatrixAt(i, m) {G[i % k][f].setMatrixAt(i / k | 0, m)}, instanceMatrix: {set needsUpdate(v) {G.forEach(g => {g[f].instanceMatrix.needsUpdate = v})}}});
   return {jm: S('jm'), rm: S('rm'), n, G};
 }
+/* en la portada: las figuras que usan casi todas las maquetas, de una en una */
+export function* calientaFiguras() {for (const [p, o] of [['pie', {sem: 0}], ['pie', {sem: 1, falda: true}], ['pie', {sem: 2}], ['skate', {sem: 1}], ['skate', {sem: 2, falda: true}], ...[0, 1, 2, 3].flatMap(k => [['paso', {sem: k, falda: false}], ['paso2', {sem: k, falda: false}], ['paso', {sem: k, falda: true}], ['paso2', {sem: k, falda: true}]])]) {hecha(p, o); yield}}
