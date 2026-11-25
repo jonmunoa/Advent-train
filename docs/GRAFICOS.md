@@ -39,8 +39,14 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 - 60 fps: montaje en trozos de 3–4 ms, subida por adelantado, envoltura premontada, sonido calculado en la portada.
 - Medidas: PC 59–60 fps (1600×900); móvil CPU ×4 47/55/58/59/56 fps. 89/89 pruebas.
 
+**v29 (25-11-2026).**
+- Móvil: calle, personas y maquetas con sombreadores propios y mucho menos que dibujar; sombras del sol en las maquetas; mugre en el tren; ritmo parejo en 90–240 Hz. Había un fallo: mirando un escaparate faltaba la fachada en una de cada tres tiendas.
+- Maquetas: valle horneado (bosques, río, caseríos con luz) en lugar del llano liso, nieve y sol menos teñidos, rocas talladas, laderas sin estirar, ventanillas con compartimentos y gente.
+- Personas: rubor, volumen en la cara, boca y pestañas, bolsillos que salían negros.
+- Tirones: montaje 589 → 355 ms por maqueta y solo con la cámara quieta; primera vez dibujada en la portada.
+- Medidas: PC 59–60 fps sin tirones de más de 60 ms; móvil CPU ×4 58–60 fps (antes 46–58). 89/89 pruebas.
+
 ## Lo que falta para acercarse más
 - Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
-- Atrezo de las escenas (buzón, chistera, balón…): materiales lisos.
 - Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.
 - Probar en un Android de verdad.
