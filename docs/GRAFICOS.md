@@ -46,6 +46,13 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 - Tirones: montaje 589 → 355 ms por maqueta y solo con la cámara quieta; primera vez dibujada en la portada.
 - Medidas: PC 59–60 fps sin tirones de más de 60 ms; móvil CPU ×4 58–60 fps (antes 46–58). 89/89 pruebas.
 
+**v30 (25-11-2026).**
+- Calle horneada de nuevo: los triángulos del borde de la acera se desplegaban con el faldón vertical y salían estirados (manchas y trozos brillantes); calzada con nieve a medias en lugar de rayas; bordillo nevado; bolardos con un capuchón.
+- Papá Noel: barba y bigote de mechones, gorro con la punta caída, ribetes y guantes claros.
+- Personas: las piernas de la madre y la cintura del pantalón no asoman; codos finos en móvil; nieve bien puesta sobre gorros y hombros.
+- Móvil: formato HDR con alternativa para los que no puedan dibujar en R11F, más fino si sobra gráfica y pasos propios para bajar carga.
+- Medidas: PC 59–60 fps; móvil CPU ×4 57–60 fps, ningún fotograma de más de 85 ms. 89/89 pruebas.
+
 ## Lo que falta para acercarse más
 - Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
 - Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.
