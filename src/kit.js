@@ -159,7 +159,7 @@ function bigWheelGeos(){const r=WB,L=[ringGeo(r*0.9,r*0.74,0.2),CY(r*0.2,r*0.2,0
   return {body:mergeGeometries(L.map(geoOnly),false),tire:geoOnly(ringGeo(r,r*0.9,0.26))}}
 function smallWheelGeos(){const r=WS;return {body:mergeGeometries([CY(r*0.88,r*0.88,0.16,20).rotateX(Math.PI/2),CY(r*0.25,r*0.25,0.28,12).rotateX(Math.PI/2)].map(geoOnly),false),tire:geoOnly(ringGeo(r,r*0.86,0.22,24))}}
 /* furgón: caja lacada, techo, bastidor, bogies, marco dorado del panel y escalerillas */
-function wagonGeos(){const N=LOWQ?8:14,lac=[uvCaja(BX(7.0,2.7,2.84).translate(0,2.9,0),.42)],blk=[roofGeo(7.4,3.1,0.32).translate(0,4.25,0),BX(7.3,0.32,2.3).translate(0,1.42,0)],gld=[],nie=[];
+function wagonGeos(marco=true){const N=LOWQ?8:14,lac=[uvCaja(BX(7.0,2.7,2.84).translate(0,2.9,0),.42)],blk=[roofGeo(7.4,3.1,0.32).translate(0,4.25,0),BX(7.3,0.32,2.3).translate(0,1.42,0)],gld=[],nie=[];
   // techo: pasarela de tablas, costillas y una capa de nieve que no llega al borde
   for(const z of[-.16,.16])blk.push(BX(6.9,.06,.27).translate(0,4.64,z));for(let k=0;k<7;k++){const x=-3.3+k*1.1;blk.push(roofGeo(.09,3.14,.34).translate(x,4.27,0))}
   nie.push(roofGeo(6.7,2.5,.24,.06).translate(0,4.4,0));for(const [x,z,r] of [[-2.6,.75,.5],[-.6,-.85,.62],[1.7,.8,.56],[2.9,-.6,.44]])nie.push(SPH(r,10,5).scale(1.6,.24,1).translate(x,4.46,z));
@@ -169,7 +169,7 @@ function wagonGeos(){const N=LOWQ?8:14,lac=[uvCaja(BX(7.0,2.7,2.84).translate(0,
   for(const x of[-3.78,3.78]){blk.push(BX(0.4,0.22,0.3).translate(x,1.42,0));for(const z of[-.8,.8])blk.push(CYX(.1,.34,8).translate(x*.985,1.46,z),CYX(.2,.06,N).translate(x*1.03,1.46,z))}for(const z of[-.95,.95]){blk.push(BX(2.4,.06,.06).translate(0,.98,z));for(const s of[-1,1])blk.push(BX(1.4,.06,.06).rotateZ(s*.3).translate(s*1.82,1.17,z))}
   // esquinas de hierro con remaches y puertas correderas asomando bajo el panel
   for(const x of[-3.47,3.47])for(const z of[-1.4,1.4]){blk.push(BX(.14,2.66,.14).translate(x,2.9,z));for(let k=0;k<6;k++)blk.push(SPH(.035,5,4).translate(x,1.75+k*.46,z+Math.sign(z)*.08))}for(const z of[-1.45,1.45])blk.push(BX(6.9,.09,.07).translate(0,1.66,z),BX(6.9,.09,.07).translate(0,4.22,z));
-  for(const sd of[-1,1]){const z=sd*(WHALF+0.03);gld.push(BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y+PANEL_H/2+0.045,z),BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y-PANEL_H/2-0.045,z),BX(0.09,PANEL_H+0.18,0.05).translate(-PANEL_W/2-0.045,PANEL_Y,z),BX(0.09,PANEL_H+0.18,0.05).translate(PANEL_W/2+0.045,PANEL_Y,z))}
+  if(marco)for(const sd of[-1,1]){const z=sd*(WHALF+0.03);gld.push(BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y+PANEL_H/2+0.045,z),BX(PANEL_W+0.2,0.09,0.05).translate(0,PANEL_Y-PANEL_H/2-0.045,z),BX(0.09,PANEL_H+0.18,0.05).translate(-PANEL_W/2-0.045,PANEL_Y,z),BX(0.09,PANEL_H+0.18,0.05).translate(PANEL_W/2+0.045,PANEL_Y,z))}
   for(const x of[-3.56,3.56]){for(const z of[0.55,1.05])gld.push(CY(.028,.028,2.6,6).translate(x,2.95,z));for(let k=0;k<7;k++)gld.push(CY(.024,.024,.5,6).rotateX(Math.PI/2).translate(x,1.8+k*0.38,0.8))}gld.push(TOR(.3,.035,16).rotateY(Math.PI/2).translate(-3.66,4.05,-.75));
   const mg=a=>mergeGeometries(a.map(geoOnly),false);return {lac:mg(lac),blk:mg(blk),gld:mg(gld),nie:mg(nie)}}
 function buildLoco(CB=TM.green,CR=TM.red){const L=[],g=new THREE.Group();
@@ -326,7 +326,7 @@ const adTex=cv=>{const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColo
 const logoURL=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#fbf3df';g.beginPath();g.arc(128,128,118,0,7);g.fill();g.fillStyle='#1d3a78';g.beginPath();g.arc(128,128,100,0,7);g.fill();
   g.fillStyle='#e0ad45';g.beginPath();for(let k=0;k<10;k++){const r=k%2?34:82,a=-Math.PI/2+k*Math.PI/5;g.lineTo(128+Math.cos(a)*r,128+Math.sin(a)*r)}g.closePath();g.fill();return c.toDataURL('image/png')})();
 
-export {gastado,THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoise,fbm,tick,texCache,canvasTex,pixTex,rep,dotTex,woodTex,plankTex,snowNrm,winTex,signTex,caneTex,WRAPS,phTex,blobTex,puffTex,coneTex,stoneTex,
+export {uvCaja,gastado,THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoise,fbm,tick,texCache,canvasTex,pixTex,rep,dotTex,woodTex,plankTex,snowNrm,winTex,signTex,caneTex,WRAPS,phTex,blobTex,puffTex,coneTex,stoneTex,
   M,HCOL,HMAT,box,cyl,o3,boxU,MD,flat,inst,obj,mergeMeshes,GAUGE,RT,WB,WS,WLEN,WHALF,WTOP,PANEL,PANEL_Y,PANEL_W,PANEL_H,TM,part,geoOnly,fuse,BX,CY,CYX,TOR,DOME,PLN,SPH,roofGeo,ringGeo,bigWheelGeos,smallWheelGeos,wagonGeos,buildLoco,buildTender,buildCaboose,
   buildTree,santaFig,personGeos,JACKETS,crowd,house,AD_W,AD_H,AD_BG,rrect,hostOf,drawAd,loadImg,adTex,logoURL,UPV,ZAX,ONE,QFLIP};
 /* bombilla encendida: el filamento arde en el centro y el cristal se apaga hacia el borde */

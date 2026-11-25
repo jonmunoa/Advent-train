@@ -5,15 +5,16 @@ import {THREE, mergeGeometries, LOWQ, MD, cutMat, geoOnly, vnoise, hash2, BX, CY
 import {RUIDO} from './esc-real.js';
 import {pieza3} from './esc-cara.js';
 
-export const MJ = cutMat(new THREE.MeshStandardMaterial({vertexColors: true, roughness: .6}));
-{const corta = MJ.onBeforeCompile; MJ.userData.solo = true; MJ.customProgramCacheKey = () => 'juguete'; MJ.onBeforeCompile = s => {
+/* corta: se aparta si tapa el coche que sigue la cámara (la carga de los vagones no) */
+function hazMJ(corte) {const MJ = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .6}); if (corte) cutMat(MJ); const corta = MJ.onBeforeCompile; MJ.userData.solo = true; MJ.customProgramCacheKey = () => 'juguete' + corte; MJ.onBeforeCompile = s => {
   corta(s); s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vKi;varying vec3 vPo,vNo;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvKi=uv.x;vPo=position;vNo=normal;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPo,vNo;varying float vKi;' + RUIDO).replace('#include <color_fragment>', `#include <color_fragment>
 float kj=floor(vKi+.5);{vec3 p=vPo;float n=nR(p*7.),m=nR(p*24.);
 if(kj==1.)diffuseColor.rgb*=.74+.36*nR(p*vec3(13.,34.,13.))+.16*n;else if(kj==2.)diffuseColor.rgb*=.84+.3*m;else if(kj==3.)diffuseColor.rgb*=.95+.09*n;else if(kj==4.)diffuseColor.rgb*=.72+.34*nR(vec3(p.x*3.,p.y*22.,p.z*22.))+.18*n;else if(kj==6.)diffuseColor.rgb*=.66+.4*n+.26*m;else if(kj>7.5){
 vec3 an=abs(vNo);vec2 q=an.y>.7?p.xz:an.x>an.z?p.zy:p.xy;vec2 f=fract(q*2.6+.25)-.5;float d=kj<8.5?smoothstep(.21,.17,length(f)):kj<9.5?smoothstep(.1,.2,abs(fract((q.x+q.y)*1.9)-.5)):kj<10.5?max(smoothstep(.05,.03,min(abs(f.x),abs(f.y)))*step(length(f),.24),smoothstep(.04,.02,min(abs(f.x+f.y),abs(f.x-f.y))*.7)*step(length(f),.16)):.55*max(smoothstep(.16,.12,abs(f.x)),smoothstep(.16,.12,abs(f.y)))+.45*smoothstep(.03,.01,min(abs(f.x-.32),abs(f.y-.32)));diffuseColor.rgb=mix(diffuseColor.rgb,kj>10.5?diffuseColor.rgb*.45+vec3(.02,.1,.04):vec3(.93,.86,.7),d);}}`)
     .replace('#include <roughnessmap_fragment>', 'float roughnessFactor=kj<.5?.34:kj<2.5?.95:kj<3.5?.86:kj<4.5?.62:kj<5.5?.3:kj<6.5?.9:kj<7.5?.42:.38;').replace('#include <metalnessmap_fragment>', 'float metalnessFactor=kj==5.?.85:0.;')
-}}
+}; return MJ}
+export const MJ = hazMJ(true), MJT = hazMJ(false);
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _c = new THREE.Color();
 /* tiñe una geometría: color (o función de x, y, z) y clase */

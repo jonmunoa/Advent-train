@@ -3,14 +3,10 @@
 import {THREE, RT, WB, TM, M, SPH, dotTex, PANEL, PANEL_Y, AD_W, AD_H, drawAd, loadImg, adTex, hostOf, ZAX, QFLIP, LOWQ} from './kit.js';
 import {TIPOS, vagon, ruedas, laca, LISA, ligera, ligeraG} from './esc-trenes.js';
 import {atM, kindAt, KT} from './esc-vias.js';
-import {QS} from './kit.js';
-import {VENDER} from './esc-marcas.js';
+import {VENTA} from './esc-marcas.js';
 
-/* si se ofrecen sitios para marcas (con ?marcas se puede probar) */
-export const VENTA = VENDER || QS.has('marcas');
+export {VENTA};
 
-const ADORNO = [['Juguetes', '#7a1020'], ['Caramelos', '#1c5a41'], ['Cartas', '#1d3a78'], ['Regalos', '#8a5a1c']], adornos = [];
-const adorno = i => {if (!adornos[i]) {const cv = document.createElement('canvas'); cv.width = AD_W / 2; cv.height = AD_H / 2; const g = cv.getContext('2d'); g.scale(.5, .5); const t = document.createElement('canvas'); t.width = AD_W; t.height = AD_H; drawAd(t, {text: ADORNO[i][0], bg: ADORNO[i][1]}); g.drawImage(t, 0, 0); adornos[i] = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.8, .8, .8)})} return adornos[i]};
 export const V = 6.2;   // unidades por segundo: despacio, para verlo pasar
 const m1 = new THREE.Matrix4(), m2 = new THREE.Matrix4(), q1 = new THREE.Quaternion(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), BLANCO = new THREE.Color(1, 1, 1);
 let freeM = null;
@@ -53,12 +49,12 @@ export class Tren {
   step(dt) {this.s = (this.s + V * dt) % this.T.L; this.w += V * dt; this.pose()}
   /* dónde sale el humo (null si no echa) */
   chimney(v) {const c = this.cars[0].userData.chimney; return c ? this.cars[0].localToWorld(v.copy(c)) : null}
-  /* marca en los dos costados del furgón i (0…): null deja el «Tu marca aquí» */
+  /* marca en los dos costados del vagón i (0…): sin marca, el costado va limpio (o «Tu marca aquí» si se venden) */
   async setAd(i, ad) {
     const W = this.wag[i]; if (!W) return; const tok = W.userData.tok = (W.userData.tok || 0) + 1, im = ad ? await loadImg(ad.img) : null; if (W.userData.tok !== tok) return;
     const old = this.ads[i]; if (old && old.mesh) {W.remove(old.mesh); if (old.ad) {old.mesh.material.map.dispose(); old.mesh.material.dispose()}}
-    let mat = VENTA ? freeMat() : adorno(i % 4); if (ad) {const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {...ad, im, host: ad.url ? hostOf(ad.url) : ''}); mat = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.86, .86, .86)})}
-    if (!ad && !VENTA && !W.userData.panel) {this.ads[i] = null; return}
-    const mesh = new THREE.Mesh(PANEL, mat); mesh.position.y = PANEL_Y; W.add(mesh); this.ads[i] = {ad: ad || null, mesh};
+    let mat = VENTA ? freeMat() : null; if (ad) {const cv = document.createElement('canvas'); cv.width = AD_W; cv.height = AD_H; drawAd(cv, {...ad, im, host: ad.url ? hostOf(ad.url) : ''}); mat = new THREE.MeshBasicMaterial({map: adTex(cv), toneMapped: false, color: new THREE.Color(.86, .86, .86)})}
+    if (!mat) {this.ads[i] = null; return}
+    const mesh = new THREE.Mesh(PANEL, mat); mesh.position.y = PANEL_Y; if (!VENTA) mesh.scale.z = 1.14; /* por delante de la puerta */ W.add(mesh); this.ads[i] = {ad: ad || null, mesh};
   }
 }
