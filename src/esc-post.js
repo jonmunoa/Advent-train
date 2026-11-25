@@ -10,7 +10,9 @@ const V2 = (a = 0, b = a) => new THREE.Vector2(a, b), V3 = () => new THREE.Vecto
 const sh = (uniforms, fragmentShader, o = {}) => new THREE.ShaderMaterial({uniforms, vertexShader: VS, fragmentShader, depthTest: false, depthWrite: false, toneMapped: false, ...o});
 const RT = (o = {}) => new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType, depthBuffer: false, ...o});
 /* en el móvil, color de alto rango en 32 bits por píxel (la mitad que medio flotante) */
-const compacto = t => {t.format = THREE.RGBFormat; t.internalFormat = 'R11F_G11F_B10F'; return t};
+let CABE = true; const compacto = t => {if (CABE) {t.format = THREE.RGBFormat; t.internalFormat = 'R11F_G11F_B10F'} return t};
+/* no todos los móviles pueden dibujar en ese formato con suavizado (algún iPhone, por ejemplo): esos se quedan con medio flotante */
+const puede = r => {try {const gl = r.getContext(); if (!r.extensions.has('EXT_color_buffer_float')) return false; const s = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.R11F_G11F_B10F, gl.SAMPLES); return !!s && Math.max(0, ...s) >= 4} catch (e) {return false}};
 const NL = 20;   // luces que encienden la niebla
 
 const LIN = 'uniform vec2 nf;float lin(float d){return nf.x*nf.y/(nf.y-d*(nf.y-nf.x));}';
@@ -19,7 +21,7 @@ const IGN = 'float ign(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.0671105
 export class Post {
   /* alto: con oclusión y desenfoques; si no (móvil), brillo, niebla y revelado */
   constructor(renderer, {alto = true} = {}) {
-    this.r = renderer; this.alto = alto; this.samples = 4; this.bloom = .5; this.sinAO = !alto; this.esc = 1; this.sinNiebla = false;
+    CABE = puede(renderer); this.r = renderer; this.alto = alto; this.samples = 4; this.bloom = .5; this.sinAO = !alto; this.esc = 1; this.sinNiebla = false;
     this.rt = new THREE.WebGLRenderTarget(4, 4, alto ? {type: THREE.HalfFloatType, samples: 4, resolveDepthBuffer: true, depthTexture: new THREE.DepthTexture(4, 4, THREE.UnsignedIntType)} : {type: THREE.HalfFloatType, samples: 4, depthBuffer: true, resolveDepthBuffer: false}); if (!alto) compacto(this.rt.texture);
     // se quita el multimuestreo ya dentro del dibujo (después de las sombras, que vuelven a enlazar el búfer) para no resolverlo a medias
     this.pinza = new THREE.Mesh(tri, new THREE.MeshBasicMaterial({colorWrite: false, depthWrite: false, depthTest: false})); this.pinza.frustumCulled = false; this.pinza.renderOrder = -1e4; this.pinza.onBeforeRender = () => {if (this.abierto) this.rt.samples = 0};
