@@ -3,11 +3,12 @@
 import {uvFoto} from './esc-real.js';
 import {THREE, mergeGeometries, geoOnly, LOWQ, cutMat} from './kit.js';
 import {conLuz} from './esc-luz.js';
+import {parchea} from './esc-acabado.js';
 
 const CUBO = {
   mate: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .92}), satin: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .42}), metal: new THREE.MeshStandardMaterial({vertexColors: true, roughness: .34, metalness: .72}), luz: new THREE.MeshBasicMaterial({vertexColors: true}),
 };
-for (const k in CUBO) cutMat(CUBO[k], .62, .82);   // lo que se cruza entre la cámara y el coche que se sigue no lo tapa
+for (const k in CUBO) {cutMat(CUBO[k], .62, .82); if (!LOWQ && k !== 'luz') parchea(CUBO[k], 'int acK=int(vAc.x+.5);float acN=vAc.y,acP=vAc.z;', 'vAp3=position;vAn3=normal;vAc=ac;', 'cubo', 'VAC')}   // lo que se cruza entre la cámara y el coche que se sigue no lo tapa
 export const CUBOS = CUBO;
 const liso = m => !m.map && !m.normalMap && !m.alphaMap && !m.vertexColors && !m.transparent && m.side === THREE.FrontSide && !m.userData.solo;
 export function cubo(m) {
@@ -18,11 +19,12 @@ export function cubo(m) {
 /* lista de [geometría, material] → mallas en «par» */
 export function juntar(list, par, o) {const it = juntarG(list, par, o); for (;;) {const r = it.next(); if (r.done) return r.value}}
 /* lo mismo repartido: cede cada pocas piezas */
-export function* juntarG(list, par, {sombra = true} = {}) {
+/* suelo(x, z): altura del suelo, para enterrar en nieve el pie de las cosas (solo en las maquetas) */
+export function* juntarG(list, par, {sombra = true, suelo = null} = {}) {
   const by = new Map(); let n = 0;
   for (let [g0, m] of list) {
     const nv = g0.attributes.position.count; if ((n += nv + 60) > 6000) {n = 0; yield} if (m.userData.fotoJ) g0 = uvFoto(g0, m.userData.fotoJ, m.userData.giro);
-    const k = cubo(m), vc = m.vertexColors && g0.attributes.color && (g0.index ? g0.toNonIndexed().attributes.color : g0.attributes.color), g = geoOnly(g0); if (vc) g.setAttribute('color', vc); if (k) {const n = g.attributes.position.count, a = new Float32Array(n * 3), {r, g: gg, b} = m.color; for (let i = 0; i < n; i++) {a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b} g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv')}
+    const k = cubo(m), vc = m.vertexColors && g0.attributes.color && (g0.index ? g0.toNonIndexed().attributes.color : g0.attributes.color), g = geoOnly(g0); if (vc) g.setAttribute('color', vc); if (k) {const n = g.attributes.position.count, a = new Float32Array(n * 3), {r, g: gg, b} = m.color; for (let i = 0; i < n; i++) {a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b} g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); const q = new Float32Array(n * 3), ac = m.userData.ac || 0, nv = suelo && k !== 'luz' ? m.userData.nv ?? .55 : 0, P = g.attributes.position.array; for (let i = 0; i < n; i++) {q[i * 3] = ac; q[i * 3 + 1] = nv; q[i * 3 + 2] = nv ? P[i * 3 + 1] - suelo(P[i * 3], P[i * 3 + 2]) : 99} g.setAttribute('ac', new THREE.BufferAttribute(q, 3))}
     const key = k ? CUBO[k] : m; if (!by.has(key)) by.set(key, []); by.get(key).push(g);
   }
   const out = []; for (const [m, gs] of by) {yield; const me = new THREE.Mesh(mergeGeometries(gs, false), m); me.castShadow = sombra && m !== CUBO.luz && !m.isMeshBasicMaterial; me.receiveShadow = sombra && me.castShadow; me.matrixAutoUpdate = false; me.updateMatrix(); me.userData.fijo = true; par.add(me); out.push(me)}
