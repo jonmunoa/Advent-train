@@ -5,7 +5,7 @@ import {THREE, LOWQ} from './kit.js';
 import {BW, BD} from './esc-vias.js';
 import {ULZ} from './esc-luz.js';
 
-const W = 1024, H = 512, SOL = new THREE.Vector3(-82, 64, 78).normalize();
+const W = 1024, H = 512, FW = 2048, FH = 1024, SOL = new THREE.Vector3(-82, 64, 78).normalize();
 const mapa = (w, h) => {const d = new THREE.DepthTexture(w, h, THREE.UnsignedShortType); d.compareFunction = THREE.LessEqualCompare; d.minFilter = d.magFilter = THREE.LinearFilter; const t = new THREE.WebGLRenderTarget(w, h, {format: THREE.RedFormat, type: THREE.UnsignedByteType, depthTexture: d, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false}); t.scissorTest = true; return t};
 let fijo = null, movil = null, mal = false; const dueño = [null, null, null, null], esc = new THREE.Scene(), cam = new THREE.Camera(); esc.matrixWorldAutoUpdate = false; cam.matrixAutoUpdate = cam.matrixWorldAutoUpdate = false;
 const ciego = o => new THREE.MeshBasicMaterial({colorWrite: false, side: THREE.DoubleSide, fog: false, ...o}), LISO = ciego({}), INST = ciego({}), CALADO = new Map();
@@ -23,13 +23,13 @@ function pinta(renderer, rt, x, y, w, h, grupos, m) {
 }
 /* al arrancar: las dos texturas, vacías (sin ellas los sombreadores no tendrían de dónde leer) */
 export function preparaSombras(renderer, tilt) {
-  if (!LOWQ) return; fijo = mapa(W * 2, H * 2); movil = mapa(W, H); base(tilt); const r0 = renderer.getRenderTarget(); for (const t of [fijo, movil]) {t.scissorTest = false; renderer.setRenderTarget(t); renderer.clear(true, true, false); t.scissorTest = true} renderer.setRenderTarget(r0); ULZ.shT.value = fijo.depthTexture; ULZ.shD.value = movil.depthTexture;
+  if (!LOWQ) return; fijo = mapa(FW * 2, FH * 2); movil = mapa(W, H); base(tilt); const r0 = renderer.getRenderTarget(); for (const t of [fijo, movil]) {t.scissorTest = false; renderer.setRenderTarget(t); renderer.clear(true, true, false); t.scissorTest = true} renderer.setRenderTarget(r0); ULZ.shT.value = fijo.depthTexture; ULZ.shD.value = movil.depthTexture;
 }
 /* antes de dibujar: L son las maquetas a la vista; m, la del tren que se mira */
 let turno = 0;
 export function sombras(renderer, L, m) {
   if (!LOWQ || mal || !fijo) return; try {
-    for (const q of L) {const t = q.i % 4; if (dueño[t] === q) continue; dueño[t] = q; q.g.updateMatrixWorld(true); pinta(renderer, fijo, t % 2 * W, (t >> 1) * H, W, H, reparte(q.g, [q.tren.g, ...(q.mas || []).map(x => x.g), q.caja, q.domo, q.frente].filter(Boolean)), q); ULZ.shK.value.setComponent(t, 1); break}
+    for (const q of L) {const t = q.i % 4; if (dueño[t] === q) continue; dueño[t] = q; q.g.updateMatrixWorld(true); pinta(renderer, fijo, t % 2 * FW, (t >> 1) * FH, FW, FH, reparte(q.g, [q.tren.g, ...(q.mas || []).map(x => x.g), q.caja, q.domo, q.frente].filter(Boolean)), q); ULZ.shK.value.setComponent(t, 1); break}
     if (m && (turno++ & 1)) {const l = m.somT ||= [m.tren, ...(m.mas || [])].flatMap(t => reparte(t.g, [])); pinta(renderer, movil, 0, 0, W, H, l, m); ULZ.shDc.value = m.i % 8} else if (!m) ULZ.shDc.value = -9;
   } catch (e) {mal = true; ULZ.shK.value.set(0, 0, 0, 0); ULZ.shDc.value = -9}
 }

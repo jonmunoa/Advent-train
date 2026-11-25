@@ -1,6 +1,6 @@
 /* El revelado. Las escenas se dibujan una vez en un búfer de alto rango con antialiasing y después, en pasadas pequeñas:
    oclusión ambiental (GTAO a media resolución), luz dispersa en la niebla (a un cuarto), desenfoque de cámara y de miniatura,
-   brillo sin umbral, exposición automática y el pase final (escalado con nitidez, AgX, etalonaje, grano). */
+   brillo sin umbral, exposición automática, revelado (AgX, etalonaje) y, al tamaño de la pantalla, escalado bicúbico con nitidez y grano. */
 import {THREE} from './kit.js';
 
 const VS = 'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}';
@@ -58,18 +58,15 @@ uniform sampler2D m;uniform vec2 pr;uniform vec4 L[NL];uniform vec3 C[NL];unifor
     this.esp = sh({m: {value: null}, p: {value: V2()}, R: {value: 9}}, 'uniform sampler2D m;uniform vec2 p;uniform float R;varying vec2 v;void main(){vec4 c0=texture2D(m,v);float cs=abs(c0.a),tot=1.,ce=0.;vec3 c=c0.rgb;float a=0.;for(int i=1;i<=40;i++){float r=pow(float(i)/40.,.62)*R;a+=2.39996;vec4 s=texture2D(m,v+vec2(cos(a),sin(a))*r*p);float ss=abs(s.a);if(s.a>c0.a)ss=min(ss,cs*2.);float k=smoothstep(r-.9,r+.9,ss);c+=mix(c/tot,s.rgb,k);tot+=1.;ce+=k*step(s.a,-.5);}gl_FragColor=vec4(c/tot,clamp(ce/40.*2.6,0.,1.));}');
     /* exposición automática: se acerca poco a poco a la luminancia media de la imagen */
     this.exU = {m: {value: null}, a: {value: null}, k: {value: .05}}; this.expo = sh(this.exU, 'uniform sampler2D m,a;uniform float k;varying vec2 v;void main(){float s=0.,w=0.;for(int y=0;y<6;y++)for(int x=0;x<8;x++){vec2 q=(vec2(float(x),float(y))+.5)/vec2(8.,6.);vec3 c=texture2D(m,q).rgb;float g=exp(-dot(q-.5,q-.5)*5.);s+=g*log(dot(c,vec3(.2126,.7152,.0722))+.004);w+=g;}float n=s/w,o=texture2D(a,vec2(.5)).r;gl_FragColor=vec4(k>.99?n:mix(o,n,k),0.,0.,1.);}');
-    const u = this.u = {bp: {value: V2()}, bo: {value: null}, dk: {value: 0}, ...Z, m: {value: null}, b: {value: null}, d: {value: null}, bk: {value: .06}, tilt: {value: 0}, foc: {value: .5}, t: {value: 0}, cut: {value: 0}, frio: {value: .5}, ao: {value: null}, ak: {value: 0}, ap: {value: V2()}, ni: {value: null}, nk: {value: 0}, np: {value: V2()}, ea: {value: null}, ev: {value: 1}, rs: {value: V2()}, ni2: {value: .35}, toneMappingExposure: {value: 1}};
-    this.fin = sh(u, FO + `uniform sampler2D m,b,d,bo,ao,ni,ea;uniform vec2 bp,ap,np,rs;uniform float bk,tilt,foc,t,cut,frio,dk,ak,nk,ev,ni2;varying vec2 v;
-float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+    const u = this.u = {bp: {value: V2()}, bo: {value: null}, dk: {value: 0}, ...Z, m: {value: null}, b: {value: null}, d: {value: null}, bk: {value: .06}, tilt: {value: 0}, foc: {value: .5}, cut: {value: 0}, frio: {value: .5}, ao: {value: null}, ak: {value: 0}, ap: {value: V2()}, ni: {value: null}, nk: {value: 0}, ea: {value: null}, ev: {value: 1}, toneMappingExposure: {value: 1}};
+    this.fin = sh(u, FO + `uniform sampler2D m,b,d,bo,ao,ni,ea;uniform vec2 bp,ap;uniform float bk,tilt,foc,cut,frio,dk,ak,nk,ev;varying vec2 v;
 float lu(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
-/* nitidez que no marca halos (idea de CAS): se afila según el contraste de los vecinos */
-vec3 nitida(vec2 q){vec2 p=1./rs;vec3 c=texture2D(m,q).rgb;if(ni2<.01)return c;vec3 a=texture2D(m,q+vec2(0.,p.y)).rgb,e=texture2D(m,q-vec2(0.,p.y)).rgb,f=texture2D(m,q+vec2(p.x,0.)).rgb,g=texture2D(m,q-vec2(p.x,0.)).rgb;float lc=lu(c)/(1.+lu(c)),la=lu(a)/(1.+lu(a)),le=lu(e)/(1.+lu(e)),lf=lu(f)/(1.+lu(f)),lg=lu(g)/(1.+lu(g));float mi=min(lc,min(min(la,le),min(lf,lg))),ma=max(lc,max(max(la,le),max(lf,lg)));float k=sqrt(clamp(min(mi,1.-ma)/max(ma,1e-3),0.,1.))*ni2*.2;return max((c-(a+e+f+g)*k)/(1.-4.*k),0.);}
 /* media resolución subida sin cruzar bordes: pesa cada vecino por lo parecida que es su profundidad */
 float oclusion(float dz){vec2 q=v/ap-.5,i=floor(q),f=q-i;float s=0.,w=0.;for(int k=0;k<4;k++){vec2 o=vec2(float(k%2),float(k/2)),c=texture2D(ao,(i+o+.5)*ap).rg;float g=(o.x>.5?f.x:1.-f.x)*(o.y>.5?f.y:1.-f.y)/(.002+abs(c.g-dz)/dz);s+=c.r*g;w+=g;}return s/max(w,1e-5);}
 vec3 agx(vec3 c){const mat3 A=mat3(.842479062253094,.0423282422610123,.0423756549057051,.0784335999999992,.878468636469772,.0784336,.0792237451477643,.0791661274605434,.879142973793104);const mat3 B=mat3(1.19687900512017,-.0528968517574562,-.0529716355144438,-.0980208811401368,1.15190312990417,-.0980434501171241,-.0990297440797205,-.0989611768448433,1.15107367264116);c=A*max(c,1e-10);c=clamp((log2(c)+12.47393)/16.5,0.,1.);vec3 x2=c*c,x4=x2*x2;c=15.5*x4*x2-40.14*x4*c+31.96*x4-6.868*x2*c+.4298*x2+.1191*c-.00232;
 /* toque de revelado: algo más de contraste y de color que el AgX base */
-float l=lu(c);c=pow(max(c,0.),vec3(1.24));l=lu(c);c=l+1.16*(c-l);c=B*c;return clamp(c,0.,1.);}
-void main(){vec2 q=v-.5;float r2=dot(q,q);vec3 c=nitida(v);
+float l=lu(c);c=pow(max(c,0.),vec3(1.33))*1.035;l=lu(c);c=l+1.15*(c-l);c=B*c;return clamp(c,0.,1.);}
+void main(){vec2 q=v-.5;float r2=dot(q,q);vec3 c=texture2D(m,v).rgb;
 #ifdef ALTO
 float zd=texture2D(z,v).r,dz=lin(zd);if(ak>.01){float a=oclusion(dz);a=mix(1.,a,ak*smoothstep(3.,.7,lu(c)));c*=a/(a*(1.-.35*clamp(c/(c+.5),0.,1.))+.35*clamp(c/(c+.5),0.,1.));c*=1.;}
 if(dk>.5){vec2 o=bp;vec4 k=.25*(texture2D(bo,v+o)+texture2D(bo,v-o)+texture2D(bo,v+vec2(o.x,-o.y))+texture2D(bo,v+vec2(-o.x,o.y)));float kz=smoothstep(.15,1.3,abs(coc(zd)));c=mix(c,k.rgb,max(kz,k.a));}
@@ -80,12 +77,21 @@ c=mix(c,texture2D(b,v).rgb,bk);
 float eA=texture2D(ea,vec2(.5)).r;c*=ev*clamp(exp2((-1.95-eA*1.442)*.28),.62,1.5);
 c*=mix(.62,1.,smoothstep(.75,.12,r2*1.25));float l=lu(c);c=mix(c,c*vec3(.93,.985,1.1),smoothstep(.16,0.,l)*frio);c*=1.-cut;
 c=agx(c);c=pow(c,vec3(1.));c=mix(vec3(lu(c)),c,1.02);
-float g=(h(v*977.+fract(t))+h(v*531.+fract(t*1.7))-1.);c+=g*.022*(1.-.6*lu(c));
 gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
+    /* último paso: de la resolución de la escena a la de la pantalla con un bicúbico de cinco lecturas, afilado sin pasarse del contraste de
+       alrededor (ni halos ni dientes) y grano fino al tamaño de los píxeles de verdad */
+    this.ldr = new THREE.WebGLRenderTarget(4, 4, {depthBuffer: false}); this.fu = {m: {value: null}, rs: {value: V2()}, ni: {value: .9}, t: {value: 0}, gr: {value: .016}};
+    this.sube = sh(this.fu, IGN + `uniform sampler2D m;uniform vec2 rs;uniform float ni,t,gr;varying vec2 v;float lu(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+void main(){vec2 P=v*rs,c=floor(P-.5)+.5,f=P-c,w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f),w=w1+w2,a=(c-1.)/rs,b=(c+2.)/rs,d=(c+w2/w)/rs;
+vec3 N=texture2D(m,vec2(d.x,a.y)).rgb,S=texture2D(m,vec2(d.x,b.y)).rgb,E=texture2D(m,vec2(a.x,d.y)).rgb,O=texture2D(m,vec2(b.x,d.y)).rgb,M=texture2D(m,d).rgb;
+vec3 q=(N*w.x*w0.y+S*w.x*w3.y+E*w0.x*w.y+O*w3.x*w.y+M*w.x*w.y)/(w.x*w0.y+w.x*w3.y+w0.x*w.y+w3.x*w.y+w.x*w.y);
+vec3 mi=min(M,min(min(N,S),min(E,O))),ma=max(M,max(max(N,S),max(E,O)));float l0=lu(mi),l1=lu(ma),k=sqrt(clamp(min(l0+.06,1.04-l1)/max(l1,.05),0.,1.))*ni;
+q=clamp(q+(q-(N+S+E+O)*.25)*k,mi,ma);
+float g=ign(gl_FragCoord.xy+floor(t*24.)*vec2(5.6,3.1))-ign(gl_FragCoord.yx+floor(t*24.)*vec2(2.3,7.7)+17.);gl_FragColor=vec4(q+g*gr*(1.-.6*lu(q)),1.);}`);
   }
   /* w, h: lo que se ve en pantalla; la escena se dibuja a «esc» veces ese tamaño */
   size(w, h) {
-    this.w = w; this.h = h; const W = Math.max(2, Math.round(w * this.esc)), H = Math.max(2, Math.round(h * this.esc)); this.rt.setSize(W, H); const s = (t, k) => t.setSize(Math.max(2, Math.round(W / k)), Math.max(2, Math.round(H / k))); s(this.half, 2); if (this.alto) {s(this.cocR, 2); s(this.boke, 2); s(this.dof, 4); s(this.dof2, 4); s(this.ln, 2); s(this.aoA, 2); s(this.aoB, 2)} s(this.nie, 4); this.b.forEach((t, i) => s(t, 4 << i));
+    this.w = w; this.h = h; const W = Math.max(2, Math.round(w * this.esc)), H = Math.max(2, Math.round(h * this.esc)); this.rt.setSize(W, H); this.ldr.setSize(W, H); const s = (t, k) => t.setSize(Math.max(2, Math.round(W / k)), Math.max(2, Math.round(H / k))); s(this.half, 2); if (this.alto) {s(this.cocR, 2); s(this.boke, 2); s(this.dof, 4); s(this.dof2, 4); s(this.ln, 2); s(this.aoA, 2); s(this.aoB, 2)} s(this.nie, 4); this.b.forEach((t, i) => s(t, 4 << i));
   }
   msaa(n) {if (this.samples === n) return; this.samples = n; this.rt.dispose(); this.rt.samples = n}
   paso(mat, src, dst, uni) {mat.uniforms.m.value = src ? src.texture || src : null; if (uni) for (const k in uni) mat.uniforms[k].value = uni[k]; mesh.material = mat; this.r.setRenderTarget(dst); this.r.render(mesh, cam)}
@@ -100,7 +106,7 @@ gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
     list.forEach((s, i) => {this.abierto = i < list.length - 1; if (this.abierto && this.pinza.parent !== s) s.add(this.pinza); r.render(s, camera); rt.samples = this.samples; this.abierto = false});
   }
   render(list, camera) {
-    this.mide(true); this.escenas(list, camera); const {rt, half, b, u} = this, Z = this.zu, R = 9 * rt.height / 900, E = camera.projectionMatrix.elements; u.rs.value.set(rt.width, rt.height); this.pr.value.set(1 / E[0], 1 / E[5]); Z.z.value = rt.depthTexture; Z.nf.value.set(camera.near, camera.far);
+    this.mide(true); this.escenas(list, camera); const {rt, half, b, u} = this, Z = this.zu, R = 9 * rt.height / 900, E = camera.projectionMatrix.elements; this.pr.value.set(1 / E[0], 1 / E[5]); Z.z.value = rt.depthTexture; Z.nf.value.set(camera.near, camera.far);
     const ao = this.alto && !this.sinAO, ni = !this.sinNiebla && this.nU.n.value > 0 && this.alto;
     if (this.alto) this.paso(this.lin, null, this.ln);
     if (ao) {this.aoU.px.value.copy(this.px(this.ln)); this.aoU.kp.value = E[5] * this.ln.height * .5; this.paso(this.gtao, this.ln, this.aoA); this.paso(this.bil, this.aoA, this.aoB, {p: new THREE.Vector2(1 / this.ln.width, 0)}); this.paso(this.bil, this.aoB, this.aoA, {p: new THREE.Vector2(0, 1 / this.ln.height)}); u.ao.value = this.aoA.texture; u.ap.value.copy(this.px(this.ln))} u.ak.value = ao ? this.aoK ?? 1 : 0;
@@ -113,6 +119,6 @@ gl_FragColor=vec4(c,1.);}`, {defines: alto ? {ALTO: 1} : {}});
     // exposición
     {const a = this.ex[this.exi], c = this.ex[this.exi ^= 1]; this.exU.a.value = a.texture; this.exU.k.value = this.exN ? .035 : 1; this.exN = 1; this.paso(this.expo, b[3], c); u.ea.value = c.texture}
     this.r.autoClear = false; for (let i = b.length - 1; i > 0; i--) this.paso(this.up, b[i], b[i - 1], {p: this.px(b[i]), k: .86});
-    u.b.value = b[0].texture; u.d.value = this.dof.texture; u.bk.value = Math.min(.14, this.bloom * .1) / 2.2; this.paso(this.fin, rt, null); this.mide(false);
+    u.b.value = b[0].texture; u.d.value = this.dof.texture; u.bk.value = Math.min(.14, this.bloom * .1) / 2.2; this.paso(this.fin, rt, this.ldr); this.fu.rs.value.set(this.ldr.width, this.ldr.height); this.paso(this.sube, this.ldr, null); this.mide(false);
   }
 }

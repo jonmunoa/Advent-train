@@ -45,7 +45,7 @@ export function hacePortal() {
   const q = new THREE.Mesh(g, new THREE.ShaderMaterial({uniforms: pU, transparent: true, depthWrite: true, vertexShader: 'varying vec3 vW;varying vec2 q;void main(){q=position.xy;vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}', fragmentShader: FS}));
   q.renderOrder = 1; q.position.y = (VY0 + VY1) / 2; q.visible = false; q.frustumCulled = true; return q;
 }
-export function tamañoPortal(W, H) {const q = LOWQ ? .6 : .8; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0))}
+export function tamañoPortal(W, H) {const q = LOWQ ? .6 * Math.min(1, innerWidth * 1.5 / W) : .8; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0))}
 const D = new THREE.Vector3(), F = new THREE.Frustum(), PM = new THREE.Matrix4(), BB = new THREE.Box3();
 /* si algo del cristal entra en el plano y no se mira de canto o de espaldas */
 export function seVePortal(q, camera) {const c = camera.position, x = q.position.x; camera.updateMatrixWorld(); F.setFromProjectionMatrix(PM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); BB.min.set(x - W2 - 14, VY0 - 12, -2.4); BB.max.set(x + W2 + 14, VY1 + 12, -2); if (!F.intersectsBox(BB)) return false; const dx = Math.max(0, Math.abs(c.x - x) - W2 - 14); return -2.2 - c.z > .045 * Math.hypot(dx, c.z + 2.2)}

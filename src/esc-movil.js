@@ -37,7 +37,7 @@ void main(){vec3 lm=texture2D(tE,vL).rgb,Lm=pow(texture2D(tL,vL).rgb,vec3(2.4))*
 if(vC.x==0){ // pintura, hierro y cristal lisos
 al=pow(vT.rgb,vec3(2.2))*som;float ru=vT.a>.5?(vT.a-.502)*2.008:vT.a*2.008,me=step(.5,vT.a);if(me<.5)ru=max(ru,.3);float nv=clamp(dot(Nn,V),0.,1.);vec3 F0=mix(vec3(.04),al,me),F=F0+(max(vec3(1.-ru),F0)-F0)*pow(1.-nv,5.);vec3 rf=refl(reflect(-V,Nn),ru+.15);sp=max(mix(vec3(dot(rf,vec3(.33))),rf,.4)-.08,0.)*F*oc*envK*.4;vec3 D=normalize(texture2D(tDir,vL).xyz*2.-1.),H=normalize(D+V);float nh=clamp(dot(Nn,H),0.,1.),a2=ru*ru*ru*ru,d=nh*nh*(a2-1.)+1.;sp+=min(irr*F0*(a2/(3.14159*d*d))*clamp(dot(Nn,D),0.,1.)*lm.b*.12,vec3(1.1));al*=1.-me;}
 else if(vC.x==1){al=vec3(.80,.82,.86)*.965;}
-else{int c=vC.x-2;vec4 A=texture(tC,vec3(vB,float(c&31)),vC.y==1?.7:0.);vec3 col=cp[c].rgb;
+else{int c=vC.x-2;vec4 A=texture(tC,vec3(vB,float(c&31)),vC.y==1?.3:-.5);vec3 col=cp[c].rgb;
 if(vC.y==1){ // acera y calzada: adoquín, nieve y agua
 vec4 As=texture(tC,vec3(vB,float(c&31)),2.);float h=As.a,n1=nB(vPo*.045),n2=As.r,n3=As.g,sn=smoothstep(.40,.62,vT.a*1.12+(.5-h)*.62+(n2-.5)*.22+(n3-.5)*.1),ag=smoothstep(.12,.42,vT.g*.6+(.5-h)*.8+(n1-.44)*1.5)*(1.-sn);vec3 ca=A.rgb*col*(vT.r*2.);ca*=mix(1.,.5,ag*.8+.2*(1.-sn));vec3 nv=vec3(.78,.80,.85)*(.9+.12*n1)*(.95+.08*n3);nv=mix(nv,nv*vec3(.72,.70,.69),smoothstep(.2,.9,vT.g)*.55*n2);al=mix(ca,nv,sn);float dV=distance(cameraPosition,vPo),ru=min(1.,mix(mix(.34,.07,ag),mix(.78,.46,vT.g*.7),sn)+dV*.00022);
 vec3 N2=Nn;{vec2 dh=vec2(dFdx(h),dFdy(h));vec3 sx=dFdx(vPo),sy=dFdy(vPo),r1=cross(sy,Nn),r2=cross(Nn,sx);float dt=dot(sx,r1);vec3 g=sign(dt)*(dh.x*r1+dh.y*r2);N2=normalize(abs(dt)*Nn-g*(1.15*(1.-sn)*smoothstep(.06,.34,ru))*smoothstep(900.,60.,dV));}

@@ -1,13 +1,13 @@
 /* Juguetes y figuras de las maquetas, hechos aquí (sin modelos de nadie): muñeco de nieve, cascanueces, galletas, regalos, trineos,
    banco, copos y el reno, que se esculpe sin conexión (m/gente/juguetes.glb). Cada pieza es una sola malla con color por vértice; la
    «clase» del material va en uv.x (0 laca, 1 pelo, 2 fieltro, 3 nieve, 4 madera, 5 metal, 6 galleta, 7 glaseado, 8–11 papel). */
-import {THREE, mergeGeometries, LOWQ, MD, cutMat, geoOnly, vnoise, hash2, BX, CY, CYX, TOR, SPH, PLN, rng, lerp} from './kit.js';
+import {THREE, mergeGeometries, LOWQ, MD, cutMat, geoOnly, vnoise, hash2, BX, CY, CYX, TOR, SPH, PLN, rng, lerp, T3R} from './kit.js';
 import {RUIDO} from './esc-real.js';
 import {pieza3} from './esc-cara.js';
 
 /* corta: se aparta si tapa el coche que sigue la cámara (la carga de los vagones no) */
 function hazMJ(corte) {const MJ = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .6}); if (corte) cutMat(MJ); const corta = MJ.onBeforeCompile; MJ.userData.solo = true; MJ.customProgramCacheKey = () => 'juguete' + corte; MJ.onBeforeCompile = s => {
-  corta(s); s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vKi;varying vec3 vPo,vNo;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvKi=uv.x;vPo=position;vNo=normal;');
+  corta(s); if (LOWQ) s.uniforms.t3R = T3R; s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vKi;varying vec3 vPo,vNo;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvKi=uv.x;vPo=position;vNo=normal;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPo,vNo;varying float vKi;' + RUIDO).replace('#include <color_fragment>', `#include <color_fragment>
 float kj=floor(vKi+.5);{vec3 p=vPo;float n=nR(p*7.),m=nR(p*24.);
 if(kj==1.)diffuseColor.rgb*=.74+.36*nR(p*vec3(13.,34.,13.))+.16*n;else if(kj==2.)diffuseColor.rgb*=.84+.3*m;else if(kj==3.)diffuseColor.rgb*=.95+.09*n;else if(kj==4.)diffuseColor.rgb*=.72+.34*nR(vec3(p.x*3.,p.y*22.,p.z*22.))+.18*n;else if(kj==6.)diffuseColor.rgb*=.66+.4*n+.26*m;else if(kj>7.5){
