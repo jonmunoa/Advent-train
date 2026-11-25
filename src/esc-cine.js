@@ -10,7 +10,7 @@ const ALTO = (r, h) => h || clamp(r * 1.7, 2.6, 11);                 // altura q
 
 export class Cine {
   constructor() {this.p = [0, 0, 0]; this.l = [0, 0, 0]; this.fov = 36; this.vistos = []; this.pl = null; this.t = 0; this.tipo = ''; this.num = 0}
-  empieza(M, {aspecto = 1.7, delante = false} = {}) {this.M = M; this.T = M.T; this.as = aspecto; this.vistos = []; this.ult = null; this.elige(delante); this.corte = false; this.tT = 0}
+  empieza(M, {aspecto = 1.7, delante = false} = {}) {this.tk = M.taken.filter(q => ALTO(q[2], q[3]) > 2.65); this.M = M; this.T = M.T; this.as = aspecto; this.vistos = []; this.ult = null; this.elige(delante); this.corte = false; this.tT = 0}
   /* punto de la vía a la distancia s, desplazado lat hacia un lado y up hacia arriba; el rumbo se promedia para que no dé tirones */
   en(s, lat = 0, up = 0, suave = 0) {
     const T = this.T, q = atM(T, mod(s, T.L)); let a = q.a, x = q.x, y = q.y, z = q.z;
@@ -47,13 +47,13 @@ export class Cine {
   /* se libra de meterse bajo el suelo */
   alza(c) {const g = this.suelo(c[0], c[2]) + 1.1; return c[1] < g ? [c[0], g, c[2]] : c}
   tapada(c, o) {const dx = o[0] - c[0], dy = o[1] - c[1], dz = o[2] - c[2], D = Math.hypot(dx, dz) || 1; for (let j = 1; j < 14; j++) {const u = j / 14, x = c[0] + dx * u, y = c[1] + dy * u, z = c[2] + dz * u; if (Math.abs(x) < BW && Math.abs(z) < BD && y < this.M.gy(x, z) + .35) return true; if (this.viaducto(x, y, z, 1.9) && Math.hypot(o[0] - x, o[2] - z) > 5) return true}
-    for (const [x, z, r, h] of this.M.taken) {const u = clamp(((x - c[0]) * dx + (z - c[2]) * dz) / (D * D), 0, 1); if (u < .03 || u > .93) continue; if (Math.hypot(c[0] + dx * u - x, c[2] + dz * u - z) < r * .75 && c[1] + dy * u < this.M.gy(x, z) + ALTO(r, h) * .8) return true} return false}
+    for (const [x, z, r, h] of this.tk) {const u = clamp(((x - c[0]) * dx + (z - c[2]) * dz) / (D * D), 0, 1); if (u < .03 || u > .93) continue; if (Math.hypot(c[0] + dx * u - x, c[2] + dz * u - z) < r * .75 && c[1] + dy * u < this.M.gy(x, z) + ALTO(r, h) * .8) return true} return false}
   nota(p, delante) {
     const K = 9, s0 = this.s(); let ve = 0, mal = 0, ant = null, ini = 0; for (let i = 0; i < K; i++) {
       const t = p.dur * i / (K - 1), c = this.alza(p.cam(t)), o = p.obj(t), tun = this.enTunel(s0 + V * t + (p.suj || -3)); if (Math.abs(c[0]) > BW + 30 || c[2] < -BD + 1.5 || c[2] > BD + 40) return -9;
       const d = Math.hypot(o[0] - c[0], o[1] - c[1], o[2] - c[2]); if (d < 5 || d > 150) mal += .5; if (ant && !p.fijo && Math.hypot(c[0] - ant[0], c[1] - ant[1], c[2] - ant[2]) > V * 2.4 * p.dur / (K - 1) + 1.5) mal += 1; ant = c;
       if (Math.abs(c[0]) < BW && Math.abs(c[2]) < BD) {const v = this.M.m.near(c[0], c[2], 8); if (v && v.d < 3.2 && c[1] < this.suelo(c[0], c[2]) + 11) mal += .9; if (this.viaducto(c[0], c[1], c[2], 3.4)) mal += 1.2}
-      for (const [x, z, r, h] of this.M.taken) {const D = Math.hypot(c[0] - x, c[2] - z); if (D > r + 5 || c[1] > this.M.gy(x, z) + ALTO(r, h) + 1) continue; if (D < r + .9) {mal += .8; break} if (((x - c[0]) * (o[0] - c[0]) + (z - c[2]) * (o[2] - c[2])) / D / d > .8) {mal += .45; break}}
+      for (const [x, z, r, h] of this.tk) {const D = Math.hypot(c[0] - x, c[2] - z); if (D > r + 5 || c[1] > this.M.gy(x, z) + ALTO(r, h) + 1) continue; if (D < r + .9) {mal += .8; break} if (((x - c[0]) * (o[0] - c[0]) + (z - c[2]) * (o[2] - c[2])) / D / d > .8) {mal += .45; break}}
       const b = (p.boca && tun) || ((p.libre || !tun) && !this.tapada(c, o)); if (b) ve++; if (i < 2 && b) ini++;
     }
     let n = 4.4 * ve / K - 3 * mal / K + p.bono + Math.random() * .75 + (ini === 2 ? .5 : -1.2) - (!p.boca && !p.libre && this.enTunel(s0 + (p.suj || -3)) ? 3 : 0); const a = this.vistos; if (a[0] === p.tipo) n -= 2.6; if (a[1] === p.tipo) n -= 1.1; if (a[2] === p.tipo) n -= .4;
