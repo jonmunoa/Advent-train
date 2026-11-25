@@ -1,7 +1,7 @@
 /* Cámara de cine: graba el tren desde fuera y va cambiando de plano sola (travelín a su lado, por delante, grúa, teleobjetivo,
    a pie de vía, la boca de un túnel…). Trabaja en coordenadas de la maqueta y sin DOM.
    En cada corte se prueban muchos planos: se simula por dónde irá el tren mientras dure y se queda el que mejor lo ve. */
-import {lerp, clamp, sstep} from './kit.js';
+import {lerp, clamp, sstep, LOWQ} from './kit.js';
 import {atM, kindAt, KT, KB, BW, BD} from './esc-vias.js';
 import {V} from './esc-tren.js';
 
@@ -59,7 +59,7 @@ export class Cine {
     let n = 4.4 * ve / K - 3 * mal / K + p.bono + Math.random() * .75 + (ini === 2 ? .5 : -1.2) - (!p.boca && !p.libre && this.enTunel(s0 + (p.suj || -3)) ? 3 : 0); const a = this.vistos; if (a[0] === p.tipo) n -= 2.6; if (a[1] === p.tipo) n -= 1.1; if (a[2] === p.tipo) n -= .4;
     const c0 = this.alza(p.cam(0)), o0 = p.obj(0), dir = Math.atan2(o0[2] - c0[2], o0[0] - c0[0]); if (this.ult !== null && this.ult !== undefined) {let da = Math.abs(dir - this.ult) % 6.283; if (da > Math.PI) da = 6.283 - da; if (da < .5) n -= 1.3} if (delante) {n += c0[2] > o0[2] + 4 ? 1.6 : -2; if (p.tipo === 'cola' || p.tipo === 'dron') n -= 2; if (p.dur < 4.5) n -= 2; if (p.tipo === 'lado' || p.tipo === 'grua') n += .5} return n;
   }
-  elige(delante) {let best = null, bn = -1e9; for (const p of this.planos()) {const n = this.nota(p, delante); if (n > bn) {bn = n; best = p}} this.pl = best; this.tipo = best.tipo; this.num++; this.vistos.unshift(best.tipo); if (this.vistos.length > 4) this.vistos.pop(); this.t = 0; this.mal = 0; this.corte = true; this.pone(0)}
+  elige(delante) {let best = null, bn = -1e9, L = this.planos(); if (LOWQ) {if (delante) L = L.filter(p => p.dur >= 4.5 && p.tipo !== 'cola' && p.tipo !== 'dron'); if (L.length > 15) {for (let i = L.length - 1; i > 0; i--) {const j = Math.floor(Math.random() * (i + 1)); [L[i], L[j]] = [L[j], L[i]]} L.length = 15}} for (const p of L) {const n = this.nota(p, delante); if (n > bn) {bn = n; best = p}} this.pl = best; this.tipo = best.tipo; this.num++; this.vistos.unshift(best.tipo); if (this.vistos.length > 4) this.vistos.pop(); this.t = 0; this.mal = 0; this.corte = true; this.pone(0)}
   pone(dt) {const p = this.pl, t = Math.min(this.t, p.dur), c = this.alza(p.cam(t)), o = p.obj(t), n = dt === 0 ? 1 : 1 - Math.exp(-7 * dt), m = dt === 0 ? 1 : 1 - Math.exp(-9 * dt); const w = this.tT || 0, hx = Math.sin(w * .83) * .05 + Math.sin(w * 1.9) * .02, hy = Math.sin(w * 1.07 + 1) * .04; for (let i = 0; i < 3; i++) {this.p[i] = lerp(this.p[i], c[i], n); this.l[i] = lerp(this.l[i], o[i], m)} this.pv = [this.p[0] + hx, this.p[1] + hy, this.p[2]]; this.fov = p.fov(t)}
   /* un fotograma: deja p, l y fov; corte = este fotograma empieza otro plano */
   paso(dt, aspecto) {

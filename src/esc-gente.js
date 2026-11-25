@@ -84,7 +84,7 @@ class Costura {
       const NP = this.f.simple ? 1 : NPELO; for (let k = 0; k <= NP; k++) {const u = k / NP, h = g.clone(), q = h.attributes.position, nn = h.attributes.normal; for (let i = 0; i < n; i++) q.setXYZ(i, q.getX(i) + nn.getX(i) * p.l * u, q.getY(i) + nn.getY(i) * p.l * u - p.l * p.cae * u * u, q.getZ(i) + nn.getZ(i) * p.l * u); h.setAttribute('capa', new THREE.BufferAttribute(new Float32Array(n).fill(u), 1)); out.push(h)}
     } return mergeGeometries(out, false);
   }
-  cose() {const f = this.f, mk = (g, m) => {const s = new THREE.SkinnedMesh(g, m); s.frustumCulled = false; f.g.add(s); s.bind(f.esq, new THREE.Matrix4()); return s}; f.malla = mk(this.une(this.P), paño); if (this.F.length) f.forro = mk(this.une(this.F, true), pelon)}
+  cose() {const f = this.f, mk = (g, m) => {const s = new THREE.SkinnedMesh(g, m); s.frustumCulled = false; s.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, .8, 0), 2); f.g.add(s); s.bind(f.esq, new THREE.Matrix4()); return s}; f.malla = mk(this.une(this.P), paño); if (this.F.length) f.forro = mk(this.une(this.F, true), pelon)}
 }
 /* color de una pieza esculpida a partir de sus máscaras */
 const tinte = (g, fn) => {const k = g.attributes.mk; return (x, y, z, o, i) => fn(k.getX(i), k.getY(i), o, x, y, z)};
