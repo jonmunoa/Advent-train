@@ -4,7 +4,7 @@ import {THREE, CUT} from './kit.js';
 import {ULZ, LUZ_GLSL, LUZ_VERT, SOL_GLSL} from './esc-luz.js';
 import {ACABADO_GLSL} from './esc-acabado.js';
 
-const P = 512, MAXC = 24; let nCapas = 0; const capaDe = new Map(), cola = [];
+const P = 512, MAXC = 30; let nCapas = 0; const capaDe = new Map(), cola = [];
 const tFotos = new THREE.DataArrayTexture(null, P, P, MAXC); tFotos.format = THREE.RGBAFormat; tFotos.type = THREE.UnsignedByteType; tFotos.colorSpace = THREE.SRGBColorSpace; tFotos.wrapS = tFotos.wrapT = THREE.RepeatWrapping; tFotos.magFilter = THREE.LinearFilter; tFotos.minFilter = THREE.LinearMipmapLinearFilter; tFotos.generateMipmaps = true; tFotos.anisotropy = 2; tFotos.source.dataReady = false; tFotos.needsUpdate = true;
 /* nieve que se posa: umbrales de cada tipo */
 const NV = [new THREE.Vector4(2, 3, 0, 0)], nvDe = new Map();
@@ -59,7 +59,7 @@ function capa(t) {const k = t.source.uuid; if (capaDe.has(k)) return capaDe.get(
 const POR = /^(cut|nieve|gas|juguete|onBeforeCompile)/;
 function apto(m) {
   if (!m || m.transparent || m.alphaTest || m.side !== THREE.FrontSide || m.userData.vivo || m.isShaderMaterial) return false; const b = m.isMeshBasicMaterial; if (!b && !m.isMeshStandardMaterial) return false; if (!POR.test(String(m.customProgramCacheKey()).trim())) return false;
-  if (!b && m.emissive && m.emissive.getHex() && m.emissiveIntensity > .3 && m.emissive.r + m.emissive.g + m.emissive.b > .3) return false; if (m.map) {const im = m.map.source.data; if (m.map.wrapS === THREE.MirroredRepeatWrapping) return false; if (im && im.width > P) return false; if (m.map.repeat.x !== 1 || m.map.repeat.y !== 1 || m.map.offset.x || m.map.offset.y || m.map.rotation) return false} return true;
+  if (!b && m.emissive && m.emissive.getHex() && m.emissiveIntensity > .3 && m.emissive.r + m.emissive.g + m.emissive.b > .3) return false; if (m.map) {if (b && !m.userData.comun) return false; const im = m.map.source.data; if (m.map.wrapS === THREE.MirroredRepeatWrapping) return false; if (im && im.width > P) return false; if (m.map.repeat.x !== 1 || m.map.repeat.y !== 1 || m.map.offset.x || m.map.offset.y || m.map.rotation || capa(m.map) < 0) return false} return true;
 }
 const cc = new THREE.Color(), ID = new THREE.Matrix4();
 /* añade a una geometría el color por vértice y los datos del material (capa, marcas, rugosidad, nieve) */
