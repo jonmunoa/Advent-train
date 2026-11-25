@@ -85,7 +85,7 @@ function cristales() {
   portal = new THREE.Group(); const w = VX * 2, h = VY1 - VY0, q = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateY(Math.PI), new THREE.ShaderMaterial({uniforms: pU, vertexShader: 'varying vec2 u;void main(){u=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: 'uniform sampler2D m;uniform vec2 r;varying vec2 u;void main(){vec3 c=texture2D(m,gl_FragCoord.xy/r).rgb;vec2 d=abs(u-.5)*2.;float f=smoothstep(.72,1.02,max(d.x,d.y));c=mix(c*1.12,vec3(.72,.82,1.),f*.4);gl_FragColor=vec4(c,1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}'})); portal.add(q);
   const L = [], W = new THREE.MeshStandardMaterial({color: 0x5e1420, roughness: .45}), G = new THREE.MeshStandardMaterial({color: 0xd9a441, metalness: .75, roughness: .32}); for (const sd of [-1, 1]) {L.push([BX(9, h + 18, 8).translate(sd * (VX + 4.5), 0, 0), W], [BX(2, h, 2).translate(sd * (VX - .6), 0, -3.4), G], [BX(w + 18, 9, 8).translate(0, sd * (h / 2 + 4.5), 0), W], [BX(w, 2, 2).translate(0, sd * (h / 2 - .6), -3.4), G])} L.push([BX(w, 1.6, 3).translate(0, h / 2 - 13, -1.5), W]); for (let x = -50; x <= 50; x += 25) L.push([BX(1.2, 13, 2.4).translate(x, h / 2 - 6.5, -1.5), W]); juntar(L, portal, {sombra: false}); portal.position.y = (VY0 + VY1) / 2; portal.visible = false; dentro.add(portal);
 }
-let alI = 0; function aliento(f, dir) {const s = alientos[alI = (alI + 1) % alientos.length]; f.head.getWorldPosition(s.position); s.position.x += dir.x * 7; s.position.z += dir.z * 7; s.position.y += 3; s.userData = {l: 1, x: dir.x * 9, z: dir.z * 9}}
+let alI = 0; function aliento(f, dir) {const s = alientos[alI = (alI + 1) % alientos.length]; f.head.getWorldPosition(s.position); s.position.x += dir.x * 7; s.position.z += dir.z * 7; s.position.y += 3; const v = 8 + (f.sp || 0) * .95; s.userData = {l: 1, x: dir.x * v, z: dir.z * v}}   /* lleva la velocidad de quien anda: si no, lo adelantaba y se veía salir por la nuca */
 
 /* ================= el paseo ================= */
 /* estado: inicio → paseo → llega → mira → sale → paseo…, y «dentro» de un escaparate. n: escaparate (cualquier entero; la calle da la vuelta) */
@@ -142,7 +142,7 @@ function paseo(dt, t) {
 const cam = {p: V3(), l: V3(), fov: 48}; let FAST = false, SUAVE = false;
 /* detrás del niño: a su altura, mirando calle adelante; arrastrar gira alrededor y la rueda acerca hasta su hombro */
 function detras(t, P, L, lejos = 0) {
-  const pt = portrait(), M = madre.g.position, N = nino.g.position, z = E.zs, cx = lerp(N.x, M.x, .2), cz = lerp(N.z, M.z, .06), a = (E.dir > 0 ? 0 : Math.PI) + E.az + (E.dir > 0 ? .1 : -.1) * (1 - Math.min(1, Math.abs(E.az) * 2)), back = lerp(pt ? 116 : 98, 44, z) + lejos, h = lerp(56, 54, z) + lejos * .26, fx = Math.cos(a), fz = -Math.sin(a), bob = Math.abs(Math.sin(madre.ph)) * .7 * Math.min(1, E.vel / 30);
+  const pt = portrait(), M = madre.g.position, N = nino.g.position, z = E.zs, cx = lerp(N.x, M.x, .2), cz = lerp(N.z, M.z, pt ? .34 : .12), a = (E.dir > 0 ? 0 : Math.PI) + E.az + (E.dir > 0 ? .1 : -.1) * (1 - Math.min(1, Math.abs(E.az) * 2)), back = lerp(pt ? 116 : 98, 44, z) + lejos, h = lerp(56, 54, z) + lejos * .26, fx = Math.cos(a), fz = -Math.sin(a), bob = Math.abs(Math.sin(madre.ph)) * .7 * Math.min(1, E.vel / 30);
   P.set(cx - fx * back, h + E.el * back * .8 + bob, Math.max(15, cz - fz * back)); L.set(cx + fx * 130, lerp(59, 58, z) - E.el * 50 + (pt ? 8 : 0) + lejos * .08, cz + fz * 130);
 }
 function camObjetivo(t, P, L) {
