@@ -144,8 +144,11 @@ function part(L,g,m,x=0,y=0,z=0,rx=0,ry=0,rz=0){_m.compose(_p.set(x,y,z),_q.setF
 function geoOnly(g){g=g.index?g.toNonIndexed():g;for(const k of Object.keys(g.attributes))if(!['position','normal','uv'].includes(k))g.deleteAttribute(k);if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g}
 function fuse(L,par){const by=new Map();for(const [g,m] of L){if(!by.has(m))by.set(m,[]);by.get(m).push(geoOnly(g))}
   const out=[];by.forEach((gs,m)=>{const me=new THREE.Mesh(mergeGeometries(gs,false),m);me.castShadow=true;me.receiveShadow=true;if(par){par.add(me);me.userData.fijo=true}out.push(me)});return out}
-const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d),CY=(rt,rb,h,n=20)=>new THREE.CylinderGeometry(rt,rb,h,n),CYX=(r,l,n=20)=>new THREE.CylinderGeometry(r,r,l,n).rotateZ(Math.PI/2),
-  TOR=(r,t,n=28)=>new THREE.TorusGeometry(r,t,8,n),DOME=r=>new THREE.SphereGeometry(r,18,8,0,Math.PI*2,0,Math.PI/2),PLN=(w,h)=>new THREE.PlaneGeometry(w,h),SPH=(r,a=12,b=9)=>new THREE.SphereGeometry(r,a,b);
+// las formas básicas se hacen una vez por medida y luego se copian (las cajas, escalando una de lado 1)
+const copiaG=g=>{const q=new THREE.BufferGeometry();q.type=g.type;q.parameters=g.parameters;q.index=g.index;for(const k in g.attributes){const a=g.attributes[k];q.attributes[k]=new THREE.BufferAttribute(a.array.slice(),a.itemSize)}return q},HECHAS=new Map(),una=(t,f)=>(...a)=>{const k=t+a.join();let g=HECHAS.get(k);if(!g){if(HECHAS.size>1500)HECHAS.clear();HECHAS.set(k,g=f(...a))}return copiaG(g)};
+const BX1=new THREE.BoxGeometry(1,1,1),BX=(w,h,d)=>{const q=copiaG(BX1),p=q.attributes.position.array;for(let i=0;i<72;i+=3){p[i]*=w;p[i+1]*=h;p[i+2]*=d}q.parameters={width:w,height:h,depth:d,widthSegments:1,heightSegments:1,depthSegments:1};return q};
+const CY=una('c',(rt,rb,h,n=20)=>new THREE.CylinderGeometry(rt,rb,h,n)),CYX=una('x',(r,l,n=20)=>new THREE.CylinderGeometry(r,r,l,n).rotateZ(Math.PI/2)),
+  TOR=una('t',(r,t,n=28)=>new THREE.TorusGeometry(r,t,8,n)),DOME=una('d',r=>new THREE.SphereGeometry(r,18,8,0,Math.PI*2,0,Math.PI/2)),PLN=una('p',(w,h)=>new THREE.PlaneGeometry(w,h)),SPH=una('s',(r,a=12,b=9)=>new THREE.SphereGeometry(r,a,b));
 /* techo curvo con grosor, a lo largo de X */
 function roofGeo(len,w,rise,th=0.14){const s=new THREE.Shape(),r=(w*w/4+rise*rise)/(2*rise),a=Math.asin(w/2/r);s.moveTo(-w/2,0);s.absarc(0,rise-r,r,Math.PI/2+a,Math.PI/2-a,true);s.lineTo(w/2,-th);s.absarc(0,rise-r-th,r,Math.PI/2-a,Math.PI/2+a,false);s.closePath();
   const g=new THREE.ExtrudeGeometry(s,{depth:len,bevelEnabled:false,curveSegments:14});g.translate(0,0,-len/2);g.rotateY(Math.PI/2);return g}
@@ -347,3 +350,25 @@ void main(){vec2 q=gl_PointCoord*2.-1.;float r=dot(q,q);if(r>1.)discard;float nv
 
 /* manchas y huellas pegadas al suelo: se acercan un poco a la cámara sin moverse de sitio en pantalla, para que no las corten los bultos de la nieve */
 export const pegada=(m,d=3)=>{m.onBeforeCompile=s=>{s.vertexShader=s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\nmvPosition.xyz*=1.-'+d.toFixed(1)+'/max(length(mvPosition.xyz),'+(d*3).toFixed(1)+');gl_Position=projectionMatrix*mvPosition;')};m.customProgramCacheKey=()=>'peg'+d;return m};
+
+/* ---------- geometría deprisa ----------
+   Las maquetas se montan a base de miles de piezas pequeñas: estas tres operaciones de three van elemento a elemento y se llevaban la mitad
+   del tiempo. Aquí recorren los números directamente; lo raro (atributos entrelazados, morphs, tangentes) sigue por el camino de siempre. */
+{
+  const B = THREE.BufferGeometry.prototype, m0 = B.applyMatrix4, v0 = B.computeVertexNormals, i0 = B.toNonIndexed, llano = a => !a || (a.isBufferAttribute && !a.isInterleavedBufferAttribute && !a.normalized && a.array instanceof Float32Array), NM = new THREE.Matrix3();
+  B.applyMatrix4 = function (M) {
+    const p = this.attributes.position, n = this.attributes.normal, e = M.elements; if (!p || !llano(p) || !llano(n) || this.attributes.tangent || e[3] || e[7] || e[11] || e[15] !== 1) return m0.call(this, M);
+    const a = p.array, [x0, x1, x2, , y0, y1, y2, , z0, z1, z2, , t0, t1, t2] = e; for (let i = 0, l = a.length; i < l; i += 3) {const x = a[i], y = a[i + 1], z = a[i + 2]; a[i] = x0 * x + y0 * y + z0 * z + t0; a[i + 1] = x1 * x + y1 * y + z1 * z + t1; a[i + 2] = x2 * x + y2 * y + z2 * z + t2} p.needsUpdate = true;
+    if (n) {const b = n.array, [a0, a1, a2, b0, b1, b2, c0, c1, c2] = NM.getNormalMatrix(M).elements; for (let i = 0, l = b.length; i < l; i += 3) {const x = b[i], y = b[i + 1], z = b[i + 2], u = a0 * x + b0 * y + c0 * z, v = a1 * x + b1 * y + c1 * z, w = a2 * x + b2 * y + c2 * z, q = 1 / (Math.sqrt(u * u + v * v + w * w) || 1); b[i] = u * q; b[i + 1] = v * q; b[i + 2] = w * q} n.needsUpdate = true}
+    if (this.boundingBox !== null) this.computeBoundingBox(); if (this.boundingSphere !== null) this.computeBoundingSphere(); return this;
+  };
+  B.computeVertexNormals = function () {
+    const p = this.attributes.position; if (!p || !llano(p) || !llano(this.attributes.normal)) return v0.call(this); let n = this.attributes.normal; if (!n) this.setAttribute('normal', n = new THREE.BufferAttribute(new Float32Array(p.count * 3), 3)); const a = p.array, b = n.array, ix = this.index && this.index.array, N = ix ? ix.length : p.count; b.fill(0);
+    for (let i = 0; i < N; i += 3) {const A = (ix ? ix[i] : i) * 3, C = (ix ? ix[i + 1] : i + 1) * 3, D = (ix ? ix[i + 2] : i + 2) * 3, ux = a[D] - a[C], uy = a[D + 1] - a[C + 1], uz = a[D + 2] - a[C + 2], vx = a[A] - a[C], vy = a[A + 1] - a[C + 1], vz = a[A + 2] - a[C + 2], nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; b[A] += nx; b[A + 1] += ny; b[A + 2] += nz; b[C] += nx; b[C + 1] += ny; b[C + 2] += nz; b[D] += nx; b[D + 1] += ny; b[D + 2] += nz}
+    for (let i = 0, l = b.length; i < l; i += 3) {const x = b[i], y = b[i + 1], z = b[i + 2], q = 1 / (Math.sqrt(x * x + y * y + z * z) || 1); b[i] = x * q; b[i + 1] = y * q; b[i + 2] = z * q} n.needsUpdate = true;
+  };
+  B.toNonIndexed = function () {
+    if (!this.index || this.groups.length > 1) return i0.call(this); for (const k in this.morphAttributes) if (this.morphAttributes[k]) return i0.call(this); for (const k in this.attributes) if (this.attributes[k].isInterleavedBufferAttribute) return i0.call(this);
+    const ix = this.index.array, N = ix.length, g = new THREE.BufferGeometry(); for (const k in this.attributes) {const q = this.attributes[k], w = q.itemSize, a = q.array, b = new a.constructor(N * w); if (w === 3) for (let i = 0, o = 0; i < N; i++) {const j = ix[i] * 3; b[o++] = a[j]; b[o++] = a[j + 1]; b[o++] = a[j + 2]} else if (w === 2) for (let i = 0, o = 0; i < N; i++) {const j = ix[i] * 2; b[o++] = a[j]; b[o++] = a[j + 1]} else for (let i = 0, o = 0; i < N; i++) for (let c = 0, j = ix[i] * w; c < w; c++) b[o++] = a[j + c]; g.setAttribute(k, new THREE.BufferAttribute(b, w, q.normalized))} return g;
+  };
+}

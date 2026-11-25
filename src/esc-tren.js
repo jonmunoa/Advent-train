@@ -25,7 +25,7 @@ export class Tren {
   *haz(par, T, {tipo = 'americana', body = 0x0e4a31, trim = 0xb3121f, cols = ['#8f1d24', '#16492f', '#1f3a6b', '#e6d8b8'], vagones = null, wagons = 0} = {}) {
     this.T = T; this.s = 0; this.w = 0; this.g = new THREE.Group(); par.add(this.g); this.ads = []; this.wag = []; this.tipo = tipo; const D = this.def = TIPOS[tipo] || TIPOS.americana; this.clase = D.clase; this.nombre = D.nombre;
     const cb = laca(body), cr = laca(trim), mat = {cue: cb, tri: cr, cre: laca(0xf0e6d2), lac: TM.lac, lisa: LISA};
-    yield; this.cars = D.loco({cb, cr, ...mat}); if (LOWQ) this.cars.forEach(ligeraG); this.maq = this.cars.length; let L = vagones || D.v; if (wagons && !vagones) L = Array.from({length: wagons}, (_, k) => D.v[k % D.v.length]);
+    yield; this.cars = D.loco({cb, cr, ...mat}); if (LOWQ) for (const c of this.cars) {yield; ligeraG(c)} this.maq = this.cars.length; let L = vagones || D.v; if (wagons && !vagones) L = Array.from({length: wagons}, (_, k) => D.v[k % D.v.length]);
     // vagones: los iguales comparten mallas instanciadas
     yield; const grupos = new Map(), pon = (nom, k) => {const V = vagon(nom); if (V.grupo) {const g = V.grupo({cb, cr, ...mat}); if (LOWQ) ligeraG(g); this.cars.push(g); return g} const W = new THREE.Group(); W.userData = {len: V.len, top: V.top, wheels: V.wheels, sesgo: V.sesgo || 0, ci: this.cars.length, panel: !!V.panel}; this.cars.push(W); if (!grupos.has(nom)) grupos.set(nom, {V, W: [], c: []}); const G = grupos.get(nom); G.W.push(W); G.c.push(new THREE.Color(cols[k % cols.length])); return W};
     yield; for (const n of new Set(L)) {vagon(n); yield} L.forEach((n, k) => this.wag.push(pon(n, k))); this.wag.forEach((W, k) => {W.userData.ci = this.maq + k}); if (D.cola) pon(D.cola, L.length);
