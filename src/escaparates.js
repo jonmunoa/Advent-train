@@ -84,7 +84,7 @@ function cristales() {
   alientos = [0, 1, 2, 3, 4, 5].map(() => {const s = new THREE.Sprite(new THREE.SpriteMaterial({map: puffTex, transparent: true, depthWrite: false, opacity: 0, color: 0xdfe8ff, fog: false})); s.userData = {l: 0}; dentro.add(s); return s});
   portal = hacePortal(); dentro.add(portal);
 }
-let alI = 0; function aliento(f, dir) {const s = alientos[alI = (alI + 1) % alientos.length]; f.head.getWorldPosition(s.position); s.position.x += dir.x * 7; s.position.z += dir.z * 7; s.position.y += 3; const v = 8 + (f.sp || 0) * .95; s.userData = {l: 1, x: dir.x * v, z: dir.z * v}}   /* lleva la velocidad de quien anda: si no, lo adelantaba y se veía salir por la nuca */
+let alI = 0; function aliento(f, dir) {const s = alientos[alI = (alI + 1) % alientos.length]; f.head.getWorldPosition(s.position); s.position.x += dir.x * 11; s.position.z += dir.z * 11; s.position.y += 3; const v = 8 + (f.sp || 0) * .95; s.userData = {l: 1, x: dir.x * v, z: dir.z * v}}   /* lleva la velocidad de quien anda: si no, lo adelantaba y se veía salir por la nuca */
 
 /* ================= el paseo ================= */
 /* estado: inicio → paseo → llega → mira → sale → paseo…, y «dentro» de un escaparate. n: escaparate (cualquier entero; la calle da la vuelta) */
