@@ -17,7 +17,7 @@ export function viste(id, C, s) {
   const D = medidas(C), B = cuerpo(C), out = [], yE = C.ojos.E[1], cr = craneo(C), abs = [], negro = [255, 255, 255, 255];
   const pone = (grupo, m) => {m.nombre = grupo; out.push(m); return m};
   /* ---- abrigo ---- */
-  const A = abrigo(C, B, D, {...s.abrigo(D)}), hem = s.abrigo(D).y1, pT = pesoTronco(D, hem); pone('abrigo', A.malla('abrigo', pT, null, {canto: .01}));
+  const A = abrigo(C, B, D, {...s.abrigo(D)}), hem = D.bajo = s.abrigo(D).y1, pT = pesoTronco(D, hem); pone('abrigo', A.malla('abrigo', pT, null, {canto: .01}));
   const M = [0, 1].map(i => {const t = manga(D, i, s.manga); pone('abrigo', t.malla('abrigo', pesoManga(D, i), null)); return t});
   /* tapeta delantera y solapa de la costura */
   const ang = th => ((-th / (2 * PI)) % 1 + 1) % 1, bDe = y => {let lo = 0, hi = 1; for (let k = 0; k < 24; k++) {const m = (lo + hi) / 2; A.en(ang(0), m).p[1] > y ? lo = m : hi = m} return lo};
