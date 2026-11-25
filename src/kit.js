@@ -328,3 +328,19 @@ export {gastado,THREE,CUT,cutMat,mergeGeometries,rng,sstep,lerp,clamp,hash2,vnoi
   buildTree,santaFig,personGeos,JACKETS,crowd,house,AD_W,AD_H,AD_BG,rrect,hostOf,drawAd,loadImg,adTex,logoURL,UPV,ZAX,ONE,QFLIP};
 /* bombilla encendida: el filamento arde en el centro y el cristal se apaga hacia el borde */
 export const bombilla = (m, k = 1) => {m.onBeforeCompile = s => {s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vNb,vVb;').replace('#include <project_vertex>', '#include <project_vertex>\nvec3 nbO=normal;\n#ifdef USE_INSTANCING\nnbO=mat3(instanceMatrix)*nbO;\n#endif\nvNb=normalMatrix*nbO;vVb=-mvPosition.xyz;'); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vNb,vVb;').replace('#include <opaque_fragment>', `{float nv=clamp(dot(normalize(vNb),normalize(vVb)),0.,1.);outgoingLight*=mix(.34,1.25,pow(nv,1.6))+${(1.4 * k).toFixed(2)}*pow(nv,18.);outgoingLight+=dot(outgoingLight,vec3(.33))*.25*pow(nv,10.);}\n#include <opaque_fragment>`)}; m.customProgramCacheKey = () => 'bomb' + k; m.userData.solo = true; return m};
+/* píxeles por unidad a distancia 1 (lo pone la cámara en cada fotograma) */
+export const BOMB_KPX = {value: 900};
+/* bombillas lejanas (o en el móvil): un punto redondo con el filamento en el centro en vez de una esfera; pon(i, x, y, z, color) */
+export function bombillasP(n, {tam = .95, niebla = true} = {}) {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), c = new Float32Array(n * 3); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('instC', new THREE.BufferAttribute(c, 3));
+  const m = new THREE.ShaderMaterial({fog: niebla, uniforms: {color: {value: new THREE.Color(1, 1, 1)}, tam: {value: tam}, kpx: BOMB_KPX, fogColor: {value: new THREE.Color()}, fogNear: {value: 1}, fogFar: {value: 2}}, vertexShader: `uniform float tam,kpx;uniform vec3 color;attribute vec3 instC;varying vec3 vC;
+#include <fog_pars_vertex>
+void main(){vec4 mvPosition=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mvPosition;float s=2.2*tam*length(modelMatrix[0].xyz)*kpx/max(1.,-mvPosition.z),q=clamp(s,1.7,64.);gl_PointSize=q;vC=color*instC*min(1.,s*s/(q*q));
+#include <fog_vertex>
+}`, fragmentShader: `varying vec3 vC;
+#include <fog_pars_fragment>
+void main(){vec2 q=gl_PointCoord*2.-1.;float r=dot(q,q);if(r>1.)discard;float nv=sqrt(1.-r);gl_FragColor=vec4(vC*(mix(.34,1.25,nv*sqrt(nv))+1.4*pow(nv,18.)),1.);
+#include <fog_fragment>
+}`});
+  m.userData.solo = true; const q = new THREE.Points(g, m); q.frustumCulled = false; q.pon = (i, x, y, z, col) => {p.set([x, y, z], i * 3); c.set([col.r, col.g, col.b], i * 3)}; return q;
+}

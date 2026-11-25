@@ -9,7 +9,7 @@ const PM = {}, T = new THREE.TextureLoader(), TX = {}; let cargador = null;
 const tx = (f, srgb) => TX[f] ||= (() => {const t = T.load('m/gente2/' + f); t.flipY = false; t.anisotropy = LOWQ ? 2 : 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t})();
 /* aRatos: convierte una pieza cada vez, para no parar la imagen */
 export async function cargaPersonas(ids, aRatos = false) {
-  cargador ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder); await Promise.all(ids.map(async id => {if (PM[id]) return; const g = await cargador.loadAsync(`m/gente2/${id}.glb`), o = {m: {}, x: g.scene.userData.D ? g.scene.userData : g.userData}; g.scene.updateMatrixWorld(true); const L = []; g.scene.traverse(m => {if (m.isMesh) L.push(m)}); for (const m of L) {o.m[m.name] = plana(m); if (aRatos) await new Promise(r => setTimeout(r, 12))} PM[id] = o}));
+  cargador ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder); await Promise.all(ids.map(async id => {if (PM[id]) return; const g = await cargador.loadAsync(`m/gente2/${id}${LOWQ && !id.endsWith('_l') ? '_m' : ''}.glb`), o = {m: {}, x: g.scene.userData.D ? g.scene.userData : g.userData}; g.scene.updateMatrixWorld(true); const L = []; g.scene.traverse(m => {if (m.isMesh) L.push(m)}); for (const m of L) {o.m[m.name] = plana(m); if (aRatos) await new Promise(r => setTimeout(r, 12))} PM[id] = o}));
 }
 export const persona = id => PM[id];
 export const trozo = (id, n) => PM[id] && PM[id].m[n];
@@ -65,12 +65,65 @@ export class CaraP {
     for (const m of this.mallas) {const d = m.morphTargetDictionary, q = m.morphTargetInfluences; if (d) for (const n in d) q[d[n]] = this.w[n] || 0}
   }
 }
+/* ---------- versiones ligeras (móvil y gente lejana): un sombreador propio, sin las luces de three ---------- */
+/* luz común a todas: la del escaparate más cercano (punto), el relleno de las escenas (dirección) y el ambiente */
+export const LUZP = {pl: {value: new THREE.Vector3()}, plc: {value: new THREE.Color(0, 0, 0)}, rd: {value: new THREE.Vector3(0, 1, 0)}, rdc: {value: new THREE.Color(0, 0, 0)}, am: {value: new THREE.Color(.07, .075, .09)}};
+const VS = (extra = '', proj = '#include <project_vertex>') => `varying vec2 vTu;varying vec3 vN,vV,vW;${extra}
+#include <common>
+#include <morphtarget_pars_vertex>
+#include <skinning_pars_vertex>
+#include <fog_pars_vertex>
+void main(){vTu=uv;
+#ifdef CONCOL
+vCo=color;
+#endif
+#include <beginnormal_vertex>
+#include <morphnormal_vertex>
+#include <skinbase_vertex>
+#include <skinnormal_vertex>
+#include <defaultnormal_vertex>
+vN=transformedNormal;
+#include <begin_vertex>
+#include <morphtarget_vertex>
+#include <skinning_vertex>
+${proj}
+vV=-mvPosition.xyz;vW=(modelMatrix*vec4(transformed,1.)).xyz;
+#include <fog_vertex>
+}`, FS = `varying vec2 vTu;varying vec3 vN,vV,vW;uniform vec3 pl,plc,rd,rdc,am;
+#include <common>
+#include <fog_pars_fragment>
+${RUIDO}${SONDA_G}
+vec3 luzN(vec3 n,float en){vec3 w=normalize((vec4(n,0.)*viewMatrix).xyz),d=pl-vW;float l=length(d);return luzSonda(n)+am*(.75+.25*w.y)+plc*clamp((dot(w,d/l)+en)/(1.+en),0.,1.)/pow(max(l,1.),1.3)+rdc*clamp((dot(w,rd)+en)/(1.+en),0.,1.);}`;
+const FOGU = {fogColor: {value: new THREE.Color()}, fogNear: {value: 1}, fogFar: {value: 2}}, FIN = `
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+#include <fog_fragment>
+}`;
+function ropaM(U, cols, raya) {
+  const m = new THREE.ShaderMaterial({fog: true, side: THREE.DoubleSide, defines: {CONCOL: 1}, vertexColors: true, uniforms: {...U, ...LUZP, ...FOGU, cols: {value: cols}, cR: {value: new THREE.Color(raya)}}, vertexShader: VS('varying vec4 vCo;'), fragmentShader: FS + `varying vec4 vCo;uniform vec3 cols[10],cR;
+void main(){int id=int(vCo.r*255.+.5)/16;vec3 c=vCo.g>.5?cR:cols[id];float ao=vCo.a,w=max(fwidth(vTu.x),fwidth(vTu.y));vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;
+if(id==2){float k=1.-smoothstep(.22,.62,w*150.);vec2 q=vTu*vec2(150.,118.);float x=fract(q.x)-.5,f=fract(q.y+abs(x)*1.15),lz=1.-pow(abs(f-.5)*2.,2.),hb=sqrt(max(0.,1.-pow((abs(x)-.25)/.25,2.)));c*=.55+.5*mix(.46,hb*(.45+.55*lz),k);}
+else if(id==3){float k=1.-smoothstep(.22,.62,w*62.),x=fract(vTu.x*62.)-.5;c*=.55+.5*mix(.62,sqrt(max(0.,1.-pow(abs(x)*2.2,2.))),k);}
+else if(id<2||id==4||id==9){float k=1.-smoothstep(.3,1.,w*420.);c*=.84+.2*mix(.5,nQ(vTu*vec2(520.,300.)),k)+.12*nQ(vTu*23.);}
+vec3 irr=luzN(n,.1)*mix(.36,1.,ao),o=c*mix(.38,1.,ao)*irr*.31831;if(id<5||id==9){float rm=pow(1.-clamp(dot(normalize(vV),n),0.,1.),2.6);o+=(c*.9+.01)*rm*luzSonda(normalize(n+vec3(0.,0.,-.6)))*.2*ao;}else if(id>=5){vec3 V=normalize(vV),w2=(viewMatrix*vec4(normalize(pl-vW),0.)).xyz;float sp=pow(max(dot(n,normalize(V+w2)),0.),id==6?40.:22.);o+=(id==6?c:vec3(.05))*sp*irr*(id==6?1.4:.6);}
+gl_FragColor=vec4(o,1.);` + FIN}); m.userData.solo = true; return m;
+}
+function pielM(U, id, tinte) {
+  const m = new THREE.ShaderMaterial({fog: true, defines: {CONCOL: 1}, vertexColors: true, uniforms: {...U, ...LUZP, ...FOGU, map: {value: tx(id + '_piel_d.webp', true)}, ti: {value: new THREE.Color(tinte || 0xffffff)}, uVid: VIDRIO}, vertexShader: VS('varying vec4 vCo;uniform float uVid;varying float vAp;', 'vec4 wPv=modelMatrix*vec4(transformed,1.);float pen=max(0.,uVid-wPv.z);vAp=clamp(pen*.9,0.,1.);wPv.z=max(wPv.z,uVid);vec4 mvPosition=viewMatrix*wPv;gl_Position=projectionMatrix*mvPosition;'), fragmentShader: FS + `varying vec4 vCo;varying float vAp;uniform sampler2D map;uniform vec3 ti;
+void main(){vec3 b=texture2D(map,vTu).rgb*ti;float l=dot(b,vec3(.3,.6,.1));b=mix(vec3(l),b,1.3)*vec3(.92,.84,.8);b=mix(b,vec3(.86,.78,.72),vAp*.6);float ao=vCo.a;b*=mix(vec3(.74,.62,.58),vec3(1.),smoothstep(0.,.8,ao));vec3 n=normalize(vN),V=normalize(vV);
+vec3 i0=luzN(n,.12),i1=luzN(n,.55);vec3 irr=vec3(mix(i0.r,i1.r,.5),mix(i0.g,i1.g,.22),mix(i0.b,i1.b,.14))*mix(.46,1.,ao);vec3 o=b*irr*.31831;o+=b*vec3(.34,.12,.07)*luzSonda(normalize(n*.4+vec3(0.,0.,.3)))*.16*ao;
+vec3 L=(viewMatrix*vec4(normalize(pl-vW),0.)).xyz,H=normalize(V+L);float nh=max(dot(n,H),0.),F=.028+.3*pow(1.-max(dot(n,V),0.),5.);o+=irr*F*(pow(nh,18.)*.55+pow(nh,60.)*.35)*ao;gl_FragColor=vec4(o,1.);` + FIN}); m.userData.solo = true; return m;
+}
+function peloM(U, id, c) {
+  const m = new THREE.ShaderMaterial({fog: true, side: THREE.DoubleSide, defines: {CONCOL: 1}, vertexColors: true, uniforms: {...U, ...LUZP, ...FOGU, map: {value: tx(id + '_pelo.webp', true)}, c0: {value: new THREE.Color(c)}}, vertexShader: VS('varying vec4 vCo;'), fragmentShader: FS + `varying vec4 vCo;uniform sampler2D map;uniform vec3 c0;
+void main(){vec4 t=texture2D(map,vTu);if(t.a<.36)discard;float lp=dot(t.rgb,vec3(.33))*2.1,ao=vCo.a,he=nQ(vTu*vec2(300.,9.));vec3 c=c0*(.28+.95*lp)*(.75+.5*he)*mix(.3,1.,ao),n=normalize(vN);if(!gl_FrontFacing)n=-n;vec3 irr=luzN(n,.2)*mix(.35,1.,ao),o=c*irr*.31831,V=normalize(vV),dw=(viewMatrix*vec4(0.,-1.,0.,0.)).xyz,Tg=normalize(dw-n*dot(dw,n)+n*(he-.5)*.5),L=(viewMatrix*vec4(normalize(pl-vW+vec3(0.,60.,0.)),0.)).xyz;float th=dot(Tg,normalize(L+V)),ks=sqrt(max(0.,1.-th*th));o+=(c*1.6+.012)*(pow(ks,70.)*.3+pow(ks,14.)*.07)*ao*luzSonda(L);gl_FragColor=vec4(o,1.);` + FIN}); m.userData.solo = true; return m;
+}
 /* monta la persona sobre una figura ya con esqueleto: devuelve sus mallas */
 export function monta(f, id0, R) {
   const id = id0.replace('_l', '');
-  const P = PM[id0], U = f.U = {shS: {value: [0, 1, 2, 3].map(() => new THREE.Vector3())}, shK: {value: .5}, frio: {value: 0}}, M = P.m, out = [], hay = n => M[n], mk = (n, mat, o = {}) => {if (!hay(n)) return null; const s = new THREE.SkinnedMesh(M[n], mat); s.frustumCulled = false; s.name = n; f.g.add(s); s.bind(f.esq, new THREE.Matrix4()); if (M[n].userData.morphs) {s.morphTargetDictionary = M[n].userData.morphs; s.morphTargetInfluences = new Array(M[n].morphAttributes.position.length).fill(0)} if (o.sombra !== false && !LOWQ) {s.castShadow = s.receiveShadow = true} if (o.orden) s.renderOrder = o.orden; out.push(s); return s};
-  const caras = [mk('piel', piel(U, id, R.tez)), mk('pestanas', plano(U, {map: tx(id + '_pestanas.webp', true), color: id === 'nino' ? 0x3a281c : 0x1a100a, alphaTest: id === 'nino' ? .5 : .3, alphaToCoverage: !LOWQ, side: THREE.DoubleSide, roughness: .8}), {sombra: false}), mk('cejas', plano(U, {map: tx(id + '_cejas.webp', true), color: R.ceja ?? 0x6a4a30, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: .8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}), {sombra: false, orden: 1}), mk('dientes', plano(U, {color: 0xd8d0c4, roughness: .28}), {sombra: false}), mk('lengua', plano(U, {color: 0x8a3a3a, roughness: .4}), {sombra: false})].filter(Boolean);
-  mk('pelo', pelo(U, id, R.pelo)); const C = c => new THREE.Color(c);
+  const P = PM[id0], U = f.U = {shS: {value: [0, 1, 2, 3].map(() => new THREE.Vector3())}, shK: {value: .5}, frio: {value: 0}}, M = P.m, out = [], hay = n => M[n], lig = !!M.ropa, mk = (n, mat, o = {}) => {if (!hay(n)) return null; if (typeof mat === 'function') mat = mat(); const s = new THREE.SkinnedMesh(M[n], mat); s.frustumCulled = false; s.name = n; f.g.add(s); s.bind(f.esq, new THREE.Matrix4()); if (M[n].userData.morphs) {s.morphTargetDictionary = M[n].userData.morphs; s.morphTargetInfluences = new Array(M[n].morphAttributes.position.length).fill(0)} if (o.sombra !== false && !LOWQ) {s.castShadow = s.receiveShadow = true} if (o.orden) s.renderOrder = o.orden; out.push(s); return s};
+  const caras = [mk('piel', () => lig ? pielM(U, id, R.tez) : piel(U, id, R.tez)), mk('pestanas', plano(U, {map: tx(id + '_pestanas.webp', true), color: id === 'nino' ? 0x3a281c : 0x1a100a, alphaTest: id === 'nino' ? .5 : .3, alphaToCoverage: !LOWQ, side: THREE.DoubleSide, roughness: .8}), {sombra: false}), mk('cejas', plano(U, {map: tx(id + '_cejas.webp', true), color: R.ceja ?? 0x6a4a30, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: .8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}), {sombra: false, orden: 1}), mk('dientes', plano(U, {color: 0xd8d0c4, roughness: .28}), {sombra: false}), mk('lengua', plano(U, {color: 0x8a3a3a, roughness: .4}), {sombra: false})].filter(Boolean);
+  mk('pelo', () => lig ? peloM(U, id, R.pelo) : pelo(U, id, R.pelo)); const C = c => new THREE.Color(c); if (lig) mk('ropa', () => ropaM(U, [R.abrigo, R.pant ?? 0x2a2c36, R.bufanda || R.abrigo, R.gorroC ?? 0xa81c2a, R.boina || R.abrigo, 0x3a2415, 0xb98a3a, 0x241610, 0x8a5a2c, 0xf2ece2].map(C), R.bufanda2 || R.bufanda || 0xffffff));
   mk('abrigo', tela(U, R.abrigo)); mk('pantalon', tela(U, R.pant, {tipo: 'pana'})); if (R.barba) mk('pelaje', tela(U, 0xf2ece2, {tipo: 'pana'})); if (R.bufanda) mk('bufanda', tela(U, R.bufanda || R.abrigo, {tipo: 'punto', raya: R.bufanda2})); mk('gorro', tela(U, R.gorroC ?? 0xa81c2a, {tipo: 'canale'})); mk('boina', tela(U, R.boina || R.abrigo)); mk('cuero', tela(U, 0x3a2415, {tipo: 'cuero'})); mk('metal', plano(U, {color: 0xb98a3a, metalness: .9, roughness: .34})); mk('boton', plano(U, {color: 0x241610, roughness: .35})); mk('madera', plano(U, {color: 0x8a5a2c, roughness: .6})); 
   f.mallasP = out; if (id0 === id) {f.ca = new CaraP(id, caras, U, R.ojos || P.x.iris); f.head.add(f.ca.g)} return out;
 }

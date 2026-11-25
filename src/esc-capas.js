@@ -1,0 +1,7 @@
+/* Las capas de m/ph2/capas.webp (la textura única de la calle en el móvil): [fichero, es un objeto con su propia uv] */
+export const CAPAS = [['brick_wall_006_d'], ['white_sandstone_blocks_02_d'], ['stone_block_wall_d'], ['painted_plaster_wall_d'], ['sandstone_blocks_08_d'], ['roof_slates_03_d'], ['pavement_03_d'], ['cobblestone_square_d'], ['snow_02_n'], ['p_painted_wooden_bench_d', 1], ['p_wine_barrel_01_d', 1], ['p_wooden_crate_01_d', 1], ['p_wicker_basket_01_d', 1], ['p_standing_chalkboard_01_d', 1], ['p_planter_box_01_d', 1], ['p_metal_trash_can_d', 1], ['p_covered_car_d', 1], ['p_water_manhole_cover_d', 1]];
+const q = n => CAPAS.findIndex(c => c[0] === n);
+/* qué capa, qué color y cuántas repeticiones por unidad lleva cada material del bloque */
+export const MATS = {ladrillo: [q('brick_wall_006_d'), [.9, .82, .8], 1 / 135], sillar: [q('white_sandstone_blocks_02_d'), [.92, .9, .88], 1 / 90], sillar2: [q('stone_block_wall_d'), [1.5, 1.45, 1.4], 1 / 92], revoco: [q('painted_plaster_wall_d'), [.95, .86, .72], 1 / 90], piedra: [q('sandstone_blocks_08_d'), [.88, .86, .82], 1 / 160], granito: [q('stone_block_wall_d'), [1.9, 1.95, 2.05], 1 / 60], pizarra: [q('roof_slates_03_d'), [1, 1, 1], 1 / 135], acera: [q('pavement_03_d'), [.8, .8, .82], 1 / 90, 'suelo'], calzada: [q('cobblestone_square_d'), [.75, .76, .8], 1 / 64, 'suelo']};
+CAPAS.forEach(([f, p], i) => {if (p) MATS['prop:' + f.slice(2, -2)] = [i, [1, 1, 1], 1, 'prop']});
+export const NIEVE_N = q('snow_02_n');
