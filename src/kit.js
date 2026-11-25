@@ -143,7 +143,7 @@ const _m=new THREE.Matrix4(),_m2=new THREE.Matrix4(),_q=new THREE.Quaternion(),_
 function part(L,g,m,x=0,y=0,z=0,rx=0,ry=0,rz=0){_m.compose(_p.set(x,y,z),_q.setFromEuler(_e.set(rx,ry,rz)),ONE);g.applyMatrix4(_m);L.push([g,m]);return g}
 function geoOnly(g){g=g.index?g.toNonIndexed():g;for(const k of Object.keys(g.attributes))if(!['position','normal','uv'].includes(k))g.deleteAttribute(k);if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g}
 function fuse(L,par){const by=new Map();for(const [g,m] of L){if(!by.has(m))by.set(m,[]);by.get(m).push(geoOnly(g))}
-  const out=[];by.forEach((gs,m)=>{const me=new THREE.Mesh(mergeGeometries(gs,false),m);me.castShadow=true;me.receiveShadow=true;if(par)par.add(me);out.push(me)});return out}
+  const out=[];by.forEach((gs,m)=>{const me=new THREE.Mesh(mergeGeometries(gs,false),m);me.castShadow=true;me.receiveShadow=true;if(par){par.add(me);me.userData.fijo=true}out.push(me)});return out}
 const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d),CY=(rt,rb,h,n=20)=>new THREE.CylinderGeometry(rt,rb,h,n),CYX=(r,l,n=20)=>new THREE.CylinderGeometry(r,r,l,n).rotateZ(Math.PI/2),
   TOR=(r,t,n=28)=>new THREE.TorusGeometry(r,t,8,n),DOME=r=>new THREE.SphereGeometry(r,18,8,0,Math.PI*2,0,Math.PI/2),PLN=(w,h)=>new THREE.PlaneGeometry(w,h),SPH=(r,a=12,b=9)=>new THREE.SphereGeometry(r,a,b);
 /* techo curvo con grosor, a lo largo de X */
@@ -276,7 +276,7 @@ function personGeos(pose){const J=[],R=[],SG=LOWQ?5:9,SB=LOWQ?3:4,col=(g,c)=>{co
   const j=mergeGeometries(J,false),r=mergeGeometries(R,false);if(sit){j.translate(0,-0.92,0);r.translate(0,-0.92,0)}return {j,r}}
 const JACKETS=[0xc8182c,0x1f6fd6,0x1f8a52,0xf0b93c,0x7d4f72,0xe8e2d4,0xff7a2e,0x2a2f3a];
 function crowd(pose,n,par){const g=personGeos(pose),jm=new THREE.InstancedMesh(g.j,M.person,n),rm=new THREE.InstancedMesh(g.r,M.personV,n);for(let i=0;i<n;i++)jm.setColorAt(i,new THREE.Color(JACKETS[(i*3+pose.length)%JACKETS.length]));jm.instanceColor.needsUpdate=true;
-  [jm,rm].forEach(m=>{m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;par.add(m)});return {jm,rm,n}}
+  jm.userData.con=[rm];[jm,rm].forEach(m=>{m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;par.add(m)});return {jm,rm,n}}
 
 /* ---------- casas ---------- */
 function house(r,bm){

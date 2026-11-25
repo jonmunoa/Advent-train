@@ -9,6 +9,8 @@ const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), mesh = new THREE.M
 const V2 = (a = 0, b = a) => new THREE.Vector2(a, b), V3 = () => new THREE.Vector3(), V4 = () => new THREE.Vector4();
 const sh = (uniforms, fragmentShader, o = {}) => new THREE.ShaderMaterial({uniforms, vertexShader: VS, fragmentShader, depthTest: false, depthWrite: false, toneMapped: false, ...o});
 const RT = (o = {}) => new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType, depthBuffer: false, ...o});
+/* en el móvil, color de alto rango en 32 bits por píxel (la mitad que medio flotante) */
+const compacto = t => {t.format = THREE.RGBFormat; t.internalFormat = 'R11F_G11F_B10F'; return t};
 const NL = 20;   // luces que encienden la niebla
 
 const LIN = 'uniform vec2 nf;float lin(float d){return nf.x*nf.y/(nf.y-d*(nf.y-nf.x));}';
@@ -18,12 +20,12 @@ export class Post {
   /* alto: con oclusión y desenfoques; si no (móvil), brillo, niebla y revelado */
   constructor(renderer, {alto = true} = {}) {
     this.r = renderer; this.alto = alto; this.samples = 4; this.bloom = .5; this.sinAO = !alto; this.esc = 1; this.sinNiebla = false;
-    this.rt = new THREE.WebGLRenderTarget(4, 4, {type: THREE.HalfFloatType, samples: 4, resolveDepthBuffer: true, depthTexture: new THREE.DepthTexture(4, 4, THREE.UnsignedIntType)});
+    this.rt = new THREE.WebGLRenderTarget(4, 4, alto ? {type: THREE.HalfFloatType, samples: 4, resolveDepthBuffer: true, depthTexture: new THREE.DepthTexture(4, 4, THREE.UnsignedIntType)} : {type: THREE.HalfFloatType, samples: 4, depthBuffer: true, resolveDepthBuffer: false}); if (!alto) compacto(this.rt.texture);
     // se quita el multimuestreo ya dentro del dibujo (después de las sombras, que vuelven a enlazar el búfer) para no resolverlo a medias
     this.pinza = new THREE.Mesh(tri, new THREE.MeshBasicMaterial({colorWrite: false, depthWrite: false, depthTest: false})); this.pinza.frustumCulled = false; this.pinza.renderOrder = -1e4; this.pinza.onBeforeRender = () => {if (this.abierto) this.rt.samples = 0};
     // reloj de la gráfica: cuánto tarda cada fotograma de verdad (para ajustar la resolución)
     const gl = renderer.getContext(), tq = gl.getExtension('EXT_disjoint_timer_query_webgl2'); this.tq = tq && {gl, e: tq, cola: [], ms: 0, n: 0};
-    this.foco = {a: 0, d: 100}; this.cocR = RT(); this.boke = RT(); this.half = RT({generateMipmaps: alto, minFilter: alto ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter}); this.dof = RT(); this.dof2 = RT(); this.b = [0, 1, 2, 3, 4, 5].map(() => RT());
+    this.foco = {a: 0, d: 100}; this.cocR = RT(); this.boke = RT(); this.half = RT({generateMipmaps: alto, minFilter: alto ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter}); if (!alto) compacto(this.half.texture); this.dof = RT(); this.dof2 = RT(); this.b = (alto ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map(() => RT()); if (!alto) this.b.forEach(t => compacto(t.texture));
     this.ln = RT({type: THREE.FloatType, format: THREE.RedFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.aoA = RT({format: THREE.RGFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.aoB = RT({format: THREE.RGFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter}); this.nie = RT(); this.ex = [0, 1].map(() => RT({type: THREE.HalfFloatType, format: THREE.RGBAFormat})); this.exi = 0; this.ex.forEach(t => t.setSize(1, 1));
     const Z = this.zu = {z: {value: null}, nf: {value: V2(2, 2600)}, fo: {value: new THREE.Vector3(100, 0, 9)}}, P = this.pr = {value: V2(1, 1)};
     /* reducción de 13 muestras (Jimenez): sin parpadeos en las bombillas */

@@ -9,7 +9,7 @@ export const PN = s => {s.vertexShader = s.vertexShader.replace('#include <commo
 /* la nieve se posa en lo que mira hacia arriba */
 export function nevar(m, {de = .58, a = .84, k = 1, tinta = '.84,.885,.96', ru = 1} = {}) {
   const f = m.onBeforeCompile; m.onBeforeCompile = s => {f && f.call(m, s); PN(s); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPo,vNo;float nvz;' + RUIDO).replace('#include <color_fragment>', `#include <color_fragment>\nnvz=smoothstep(${de.toFixed(3)},${a.toFixed(3)},normalize(vNo).y+(nR(vPo*${(1.9 * ru).toFixed(3)})-.5)*.3)*${k.toFixed(2)};diffuseColor.rgb=mix(diffuseColor.rgb,vec3(${tinta})*(.94+.1*nR(vPo*${(5 * ru).toFixed(3)})),nvz);`).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.84,nvz);').replace('#include <normal_fragment_maps>', '#include <normal_fragment_begin_copia>').replace('#include <normal_fragment_begin_copia>', 'vec3 nLisa=normal;\n#include <normal_fragment_maps>\nnormal=normalize(mix(normal,nLisa,nvz*.75));')};
-  m.customProgramCacheKey = () => 'nieve' + de + a + k + ru; return m;
+  m.customProgramCacheKey = () => 'nieve' + de + a + k + ru; m.userData.nieve = [de, a, k]; return m;
 }
 /* material con foto: userData.foto son las repeticiones por unidad; uvFoto reparte la textura sin estirarla */
 export const foto = (slug, {color = 0xffffff, esc = 4, rug = .88, nor = 1, tinte = false} = {}) => {const m = new THREE.MeshStandardMaterial({color, map: phTex(slug + '_diff', 1, 1, true), roughness: rug, vertexColors: tinte}); if (!LOWQ) {m.normalMap = phTex(slug + '_nor', 1); m.normalScale = V2(nor)} m.userData.foto = 1 / esc; return m};

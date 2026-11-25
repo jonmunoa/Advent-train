@@ -9,6 +9,7 @@ import {juntar, juntarG} from './esc-geo.js';
 import {nevada} from './esc-calle.js';
 import {paisajeMat, BASE3} from './esc-cielo.js';
 import {horneaLuz} from './esc-luz.js';
+import {compacta} from './esc-ligero.js';
 import {R, VENT, uvFoto, terrenoMat, abetos, rocas, montones, via as viaReal, HIELO, casa as casaReal, farol, losa, hierbas, telegrafo, catenaria, cerca} from './esc-real.js';
 
 const C = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, roughness: .6, ...o}), glow = (r, g, b) => new THREE.MeshBasicMaterial({color: new THREE.Color(r, g, b)});
@@ -52,7 +53,7 @@ export class Mundo {
   }
   /* los pasos de montaje por separado: se pueden repartir entre fotogramas */
   pasos() {
-    return [() => this.terreno(), () => this.via(), () => this.puentes(), () => this.bocas(), () => this[this.m.id](), () => this.bosque(), () => this.escenario(), () => this.cerrar(), () => this.ponTren()];
+    return [() => this.terreno(), () => this.via(), () => this.puentes(), () => this.bocas(), () => this[this.m.id](), () => this.bosque(), () => this.escenario(), () => this.cerrar(), () => this.ponTren(), ...(LOWQ ? [() => compacta(this.g)] : [])];
   }
   *ponTren() {this.tren = new Tren(this.g, this.T, {...this.cfg, trozos: true}); yield* this.tren.it; this.tren.s = this.T.L * .1; if (this.trenes) {this.mas = []; for (let k = 1; k < this.trenes; k++) {const c = CFG[k], t = new Tren(this.g, this.T, {...c, wagons: 3, tipo: ['', 'grande', 'diesel'][k], trozos: true}); yield* t.it; t.s = this.T.L * (.1 + k / this.trenes); this.mas.push(t)}}}
   /* ---------- terreno, hielo y canto ---------- */
