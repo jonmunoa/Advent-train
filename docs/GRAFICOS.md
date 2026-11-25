@@ -53,6 +53,16 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 - Móvil: formato HDR con alternativa para los que no puedan dibujar en R11F, más fino si sobra gráfica y pasos propios para bajar carga.
 - Medidas: PC 59–60 fps; móvil CPU ×4 57–60 fps, ningún fotograma de más de 85 ms. 89/89 pruebas.
 
+**v31 (25-11-2026).** El niño de la mano (brazo, balanceo y encuadre); nieve al pie de los escaparates; vaho que no atraviesa la cabeza.
+
+**v32 (25-11-2026).**
+- Caras: la cara ocupaba unos 150 px de la textura de 1024; ahora se lleva dos tercios, con poros, oclusión por rayos, manchas, pecas y brillo por zonas (dos lóbulos con la luz de las sondas). Mechones sueltos, pelo en dos pasadas, pestañas mezcladas, iris más hondos, rasgos y gestos retocados, pelo nuevo de los mayores. Día 24: el brazo por la espalda y la mano en el cristal.
+- Cámara: un dedo gira, dos mueven; inercia, topes blandos y sin meterse en lomas ni edificios. Ante el escaparate gira de verdad.
+- La calle desde dentro: cristal con escarcha y calle desenfocada por profundidad. Antes, con la resolución dinámica, la imagen salía descolocada.
+- Circuitos: acabados y nieve en todo lo liso, figuras nuevas, pista de esquí (surcos, polvo, salida y meta, cursillo, pisanieves), vida alrededor de las casas y 16 días rehechos pieza a pieza. Menos bruma. Furgones sin carteles, con puerta corredera.
+- Arreglos: huecos de las ruedas y los botones (arco de 6,283), gente hundida en el hielo, carga recortada al seguir su vagón, fotos perdidas en el móvil al pasar de 24 texturas.
+- Medidas: PC 59–60 fps; móvil CPU ×4 55–60 (en la v31, 57–60): baja unos segundos al montar la vecina. 89/89 pruebas.
+
 ## Lo que falta para acercarse más
 - Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
 - Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.
