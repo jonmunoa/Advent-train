@@ -5,9 +5,17 @@
   "buildCommand": "node scripts/build.mjs",
   "outputDirectory": "dist",
   "redirects": [
-    {"source": "/escaparates.html", "destination": "/", "permanent": true}
+    {"source": "/escaparates.html", "destination": "/", "permanent": true},
+    {"source": "/pruebas/", "destination": "/pruebas", "permanent": false}
+  ],
+  "rewrites": [
+    {"source": "/pruebas", "destination": "/index.html"}
   ],
   "headers": [
+    {
+      "source": "/pruebas",
+      "headers": [{"key": "X-Robots-Tag", "value": "noindex, nofollow"}, {"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}]
+    },
     {
       "source": "/m/(.*)",
       "headers": [{"key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400"}]

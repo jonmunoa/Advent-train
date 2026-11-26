@@ -445,16 +445,30 @@ async def main():
         t3 = await tp2.evaluate('[__esc.st,__esc.n]')
         await tp2.close()
         check('modo pruebas: los 24 abiertos, y desde la lista se entra en cualquier circuito o escena', t1 == [24, 0] and n24 == [True, 24] and t2 == ['dentro', 16] and t3 == ['escena', 12], str([t1, n24, t2, t3]))
-        pp = await ctx.new_page()
-        await pp.goto(f'http://127.0.0.1:{PORT}/escaparates.html?publico&todos&dia=9#todos', wait_until='commit')
-        await pp.wait_for_function('window.__esc&&__esc.listo', timeout=90000)
-        r = await pp.evaluate("(async()=>{const h=await import('./src/esc-historia.js'),e=h.estado();return {p:__esc.pruebas,c:__esc.cal,e,pv:getComputedStyle(pv).display,it:getComputedStyle(iTodos).display}})()")
-        await pp.evaluate('__esc.empezar();__esc.step(6)')
-        r['st'] = await pp.evaluate('__esc.st')
-        if SHOTS:
-            await pp.screenshot(path=str(OUT / 'esc-11-publico.png'))
-        await pp.close()
+        # la web publicada, simulada en otro dominio: en la portada manda el reloj; /pruebas abre el modo pruebas
+        WEB = 'https://tren-navidad.example'
+        async def publicada(route):
+            u = route.request.url[len(WEB):].split('?')[0].split('#')[0]
+            f = ROOT / ('escaparates.html' if u in ('/', '/pruebas') else u.lstrip('/'))
+            await (route.fulfill(path=str(f)) if f.is_file() else route.fulfill(status=404, body=''))
+        R = {}
+        for k, dir_ in (('portada', '/?todos&dia=9#todos'), ('pruebas', '/pruebas?dia=9')):
+            pp = await ctx.new_page()
+            await route_local_three(pp)
+            await pp.route(WEB + '/**', publicada)
+            await pp.goto(WEB + dir_, wait_until='commit')
+            await pp.wait_for_function('window.__esc&&__esc.listo', timeout=90000)
+            R[k] = await pp.evaluate("(async()=>{const h=await import('./src/esc-historia.js'),e=h.estado();return {p:__esc.pruebas,c:__esc.cal,e,it:getComputedStyle(iTodos).display,u:__esc.enlace()}})()")
+            await pp.evaluate('__esc.empezar();__esc.step(6)')
+            R[k]['st'] = await pp.evaluate('__esc.st')
+            R[k]['pv'] = await pp.evaluate('getComputedStyle(pv).display')
+            if SHOTS:
+                await pp.screenshot(path=str(OUT / f'esc-11-{k}.png'))
+            await pp.close()
+        r = R['portada']
         check('en la web publicada no hay modo pruebas: manda el reloj aunque se pida ?todos o ?dia', r['p'] is False and r['c']['abiertos'] == r['e']['abiertos'] and not r['c'].get('previa') and not r['c'].get('todos') and r['pv'] == 'none' and r['it'] == 'none' and r['st'] in ('paseo', 'llega', 'mira', 'escena'), str(r))
+        r = R['pruebas']
+        check('…salvo en su dirección propia, /pruebas, que abre la vista previa y al compartir manda la portada', r['p'] is True and r['c'].get('previa') == 9 and r['it'] == 'block' and r['pv'] == 'flex' and r['u'] == WEB + '/', str(r))
         check('hay un tren distinto en cada escaparate (el 24 repite el del 1)', tr['n'] == 24 and tr['d'] == 23 and tr['t'] == 23, str(tr['d']))
         check('todos los trenes se montan, con sus vagones, y solo echan humo los de vapor', all(v[0] >= 4 and v[1] >= 2 and v[2] < 130 and v[3] == 0 and v[4] for v in tr['o'].values()), str(tr['o']))
         check('el 24 los vagones van lisos y los demás días llevan marca', await pg.evaluate('!__esc.mundo(23).tren.ads.length') and await pg.evaluate('__esc.mundo(6).tren.ads.length===4&&__esc.mundo(17).tren.ads.length===4'))
