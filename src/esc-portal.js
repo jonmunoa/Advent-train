@@ -26,10 +26,10 @@ void main(){
   vec2 b=abs(q-vec2(0.,-${BJ.toFixed(1)}))-vec2(${W2.toFixed(1)},${(H2 + 0).toFixed(1)}+${BJ.toFixed(1)});float sd=length(max(b,0.))+min(max(b.x,b.y),0.);
   vec4 f=texture2D(fr,q/vec2(${(2 * W2 + 14).toFixed(1)},${(2 * H2 + 14).toFixed(1)})+.5);float n=f.g;
   float a=1.-smoothstep(-9.,${(MX * .62).toFixed(1)},sd+(n-.5)*34.);a*=gz*k;if(a<.015)discard;
-  float z0=mz(s),c0=coc(z0),R=c0*.021;                                      // lo que se desenfoca este punto, en alto de pantalla
+  float z0=mz(s),c0=coc(z0),R=c0*.0085;                                      // lo que se desenfoca este punto, en alto de pantalla
   vec3 ac=vec3(0.);float w=0.;vec2 as=vec2(r.y/r.x,1.);
   float es=smoothstep(-24.,6.,sd+(n-.5)*30.);R=max(R,es*.024);float lod=log2(max(1.,R*r.y*px/float(${TAPS})*${LOWQ ? '4.2' : '4.6'}));
-  for(int i=0;i<${TAPS};i++){float t=(float(i)+.5)/float(${TAPS}),rr=sqrt(t);float an=float(i)*2.39996;vec2 u=s+vec2(cos(an),sin(an))*rr*R*as;float ci=max(coc(mz(u)),es)*.021;float wi=smoothstep(0.,.0035,ci-rr*R+.0035)+.0004;vec3 c=textureLod(m,u,lod).rgb;c=min(c,vec3(9.));wi*=1.+.6*dot(c,vec3(.3333));ac+=c*wi;w+=wi;}
+  for(int i=0;i<${TAPS};i++){float t=(float(i)+.5)/float(${TAPS}),rr=sqrt(t);float an=float(i)*2.39996;vec2 u=s+vec2(cos(an),sin(an))*rr*R*as;float ci=max(coc(mz(u))*.0085,es*.024);float wi=smoothstep(0.,.0035,ci-rr*R+.0035)+.0004;vec3 c=textureLod(m,u,lod).rgb;c=min(c,vec3(9.));wi*=1.+.6*dot(c,vec3(.3333));ac+=c*wi;w+=wi;}
   vec3 c=ac/w;
   // escarcha: flores de hielo y un velo en los bordes; por abajo, el vaho
   float borde=smoothstep(-20.,8.,sd+(n-.5)*22.),flor=f.r*smoothstep(-46.,-4.,sd+(n-.5)*8.),vaho=smoothstep(-${(H2 * .55).toFixed(1)},-${H2.toFixed(1)},q.y)*.12*(.5+n);
@@ -45,7 +45,7 @@ export function hacePortal() {
   const q = new THREE.Mesh(g, new THREE.ShaderMaterial({uniforms: pU, transparent: true, depthWrite: true, vertexShader: 'varying vec3 vW;varying vec2 q;void main(){q=position.xy;vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}', fragmentShader: FS}));
   q.renderOrder = 1; q.position.y = (VY0 + VY1) / 2; q.visible = false; q.frustumCulled = true; return q;
 }
-export function tamañoPortal(W, H) {const q = LOWQ ? .6 * Math.min(1, innerWidth * 1.5 / W) : .8; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0))}
+export function tamañoPortal(W, H) {const q = LOWQ ? .75 * Math.min(1, innerWidth * 1.6 / W) : .9; portalRT.setSize(Math.max(2, W * q | 0), Math.max(2, H * q | 0))}
 const D = new THREE.Vector3(), F = new THREE.Frustum(), PM = new THREE.Matrix4(), BB = new THREE.Box3();
 /* si algo del cristal entra en el plano y no se mira de canto o de espaldas */
 export function seVePortal(q, camera) {const c = camera.position, x = q.position.x; camera.updateMatrixWorld(); F.setFromProjectionMatrix(PM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); BB.min.set(x - W2 - 14, VY0 - 12, -2.4); BB.max.set(x + W2 + 14, VY1 + 12, -2); if (!F.intersectsBox(BB)) return false; const dx = Math.max(0, Math.abs(c.x - x) - W2 - 14); return -2.2 - c.z > .045 * Math.hypot(dx, c.z + 2.2)}

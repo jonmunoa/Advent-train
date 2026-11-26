@@ -84,11 +84,17 @@ const HAZ = {
     // collar con cascabeles
     const c = TOR(.205, .042, seg(24)); pieza(L, c, 0xa8141f, 2, .5, 1.13, 0, 0, Math.PI / 2, 0, [1, 1.12, 1]); L[L.length - 1].applyMatrix4(new THREE.Matrix4().makeTranslation(-.5, -1.13, 0)); L[L.length - 1].applyMatrix4(new THREE.Matrix4().makeRotationZ(-.75)); L[L.length - 1].applyMatrix4(new THREE.Matrix4().makeTranslation(.52, 1.14, 0)); for (let k = 0; k < 7; k++) {const t = -2.2 + k * .733, y = -Math.cos(t) * .24, z = Math.sin(t) * .22; pieza(L, SPH(.048, 8, 6), 0xe8b64a, 5, .52 + Math.sin(.75) * y * 1.0 + .02, 1.14 + Math.cos(.75) * y, z)} const m = coser(L); m.rotateY(-Math.PI / 2); m.scale(1.4, 1.4, 1.4); return [m];
   },
+  /* caballito de tiovivo lacado: v elige el pelo y la silla */
+  caballo(v) {
+    const g0 = pieza3('juguetes', 'caballo'); if (!g0) return null; const g = g0.clone(), q = g.attributes.mk, n = q.count, a = new Float32Array(n * 3), u = new Float32Array(n * 2), PEL = [0xf3ede2, 0xdcd8d2, 0x8a4a22, 0x221e22][v], SIL = [0xb3121f, 0x1d3a78, 0x1c6b45, 0x7a2a6a][v], C = new THREE.Color(PEL), S = new THREE.Color(SIL), O = new THREE.Color(0xe0ad45), N = new THREE.Color(0x141012), o = new THREE.Color();
+    for (let i = 0; i < n; i++) {const m = q.getW(i), oc = .45 + .55 * q.getX(i); if (m > .6) {o.copy(O).multiplyScalar(.6 + .4 * q.getX(i)); u[i * 2] = 5} else if (m > .4) {o.copy(N); u[i * 2] = 0} else if (m > .15) {o.copy(S).multiplyScalar(oc); u[i * 2] = 0} else {o.copy(C).multiplyScalar(oc * (v === 1 ? 1 - .35 * q.getY(i) : 1)); u[i * 2] = 0} a.set([o.r, o.g, o.b], i * 3)}
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.setAttribute('uv', new THREE.BufferAttribute(u, 2)); for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k); const m = coser([g.index ? g.toNonIndexed() : g]); m.rotateY(-Math.PI / 2); return [m];
+  },
 };
 /* deja cada juguete en MD, listo para flat(), inst() y obj() */
 export function haceJuguetes() {
   const pon = (k, L) => {if (!L) return; const g = coser(L); g.computeBoundingBox(); const b = g.boundingBox; g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); MD[k] = {flat: {geo: g, mat: MJ, h: b.max.y - b.min.y, w: Math.max(b.max.x - b.min.x, b.max.z - b.min.z)}}};
-  pon('snowman', HAZ.snowman()); pon('nut', HAZ.nut()); pon('ginger', HAZ.galleta(false)); pon('ginger2', HAZ.galleta(true)); pon('presA', HAZ.regalo(1.5, 1.4, 1.5, 0xb3121f, 8, 0xe8b64a)); pon('presB', HAZ.redondo(.85, 1.25, 0x1c5a41, 0, 0xd0202f)); pon('presC', HAZ.regalo(1.25, 1.9, 1.25, 0x1d3a78, 10, 0xe6e9f0)); pon('presD', HAZ.regalo(1.7, 1.1, 1.4, 0xb02030, 11, 0x1c5a41)); pon('sled', HAZ.sled()); pon('sleigh', HAZ.sleigh()); pon('bench', HAZ.bench()); pon('flakeA', HAZ.flake(0)); pon('flakeB', HAZ.flake(1)); pon('deer', HAZ.deer());
+  pon('snowman', HAZ.snowman()); pon('nut', HAZ.nut()); pon('ginger', HAZ.galleta(false)); pon('ginger2', HAZ.galleta(true)); pon('presA', HAZ.regalo(1.5, 1.4, 1.5, 0xb3121f, 8, 0xe8b64a)); pon('presB', HAZ.redondo(.85, 1.25, 0x1c5a41, 0, 0xd0202f)); pon('presC', HAZ.regalo(1.25, 1.9, 1.25, 0x1d3a78, 10, 0xe6e9f0)); pon('presD', HAZ.regalo(1.7, 1.1, 1.4, 0xb02030, 11, 0x1c5a41)); pon('sled', HAZ.sled()); pon('sleigh', HAZ.sleigh()); pon('bench', HAZ.bench()); pon('flakeA', HAZ.flake(0)); pon('flakeB', HAZ.flake(1)); pon('deer', HAZ.deer()); for (let v = 0; v < 4; v++) pon('caballo' + v, HAZ.caballo(v));
 }
 /* copia de un juguete a una altura dada, para llevarlo de carga */
 export const juguete = (k, h) => {const f = MD[k].flat, g = f.geo.clone(), s = h / f.h; g.scale(s, s, s); return g};

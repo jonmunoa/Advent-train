@@ -14,8 +14,9 @@ function tronco(R, n = N + (LOWQ ? 3 : 5)) {const P = [], I = [], U = []; R.forE
 /* quiebra el tronco hacia delante desde la cadera */
 const inclina = (g, a, y0 = .9) => g.translate(0, -y0, 0).rotateZ(-a).translate(0, y0, 0);
 
-/* postura: 'pie', 'paso' (andando), 'paso2', 'ski', 'cuña' (esquí, aprendiz), 'skate', 'sit', 'alza' (brazo en alto), 'nino'; falda: abrigo largo */
+/* postura: 'pie', 'paso' (andando), 'paso2', 'ski', 'cuña' (esquí, aprendiz), 'skate', 'skate2' (la otra zancada), 'sit', 'alza' (brazo en alto), 'nino'; falda: abrigo largo */
 export function figura(pose, {falda = false, casco = false, sem = 0} = {}) {
+  const espejo = pose === 'skate2'; if (espejo) pose = 'skate';
   const J = [], R = [], r = rng(7 + sem), sk = pose === 'ski' || pose === 'cuña', cu = pose === 'cuña', sit = pose === 'sit', pt = pose === 'skate', inc = pose === 'ski' ? .55 : cu ? .28 : pt ? .3 : sit ? .02 : pose.startsWith('paso') ? .06 : 0, po = (g, c) => R.push(pinta(g, c)), pant = falda ? 0x2b2a30 : [0x2a3140, 0x3a3038, 0x26322c][sem % 3], bota = sk ? 0x22242c : 0x3a281c, guante = [0x2a2a30, 0x7a1420, 0xe8e2d4][sem % 3], piel = 0xeebf9d, pelo = [0x4a2e1c, 0x2a1c14, 0x9a6a34, 0x6a4a30][sem % 4], lana = [0xf2efe8, 0xd9c9a4, 0xb8202e, 0x2a5aa8][sem % 4];
   const X = (y, x = 0) => x + (y > .9 ? Math.sin(inc) * (y - .9) : 0), Y = y => y > .9 ? .9 + Math.cos(inc) * (y - .9) : y, T = (x, y, z) => {const c = Math.cos(inc), s = Math.sin(inc), d = y - .9; return d > 0 ? V(x * c + d * s, .9 + d * c - x * s, z) : V(x, y, z)};
   // piernas: cadera, rodilla, tobillo
@@ -39,8 +40,25 @@ export function figura(pose, {falda = false, casco = false, sem = 0} = {}) {
   if (!casco) pon(SPH(.16, N, 7).scale(.96, 1.08, .98), pelo, -.035, .012, 0); if (falda) {pon(SPH(.13, N, 6).scale(.8, 1.2, 1.1), pelo, -.09, -.09, 0)}
   if (casco) {const g = new THREE.SphereGeometry(.185, N + 4, LOWQ ? 5 : 8, 0, 6.2832, 0, 1.75).scale(1.06, 1.12, 1).rotateZ(.1 - inc * .3).translate(c0.x - .01, c0.y + .045, 0); J.push(geoOnly(g)); pon(SPH(.1, N, 5).scale(.45, .5, 1.32), 0x14161c, .125, .05, 0); pon(SPH(.09, N, 5).scale(.45, .42, 1.2), 0xd98a2a, .138, .05, 0); pon(TOR(.172, .018, N + 4).rotateX(Math.PI / 2).rotateZ(-.1), 0x14161c, -.005, .055, 0)}
   else {J.push(geoOnly(new THREE.SphereGeometry(.178, N + 4, LOWQ ? 4 : 7, 0, 6.2832, 0, 1.55).scale(1, 1.18, .95).rotateZ(.14 - inc * .3).translate(c0.x - .015, c0.y + .075, 0))); pon(TOR(.163, .038, N + 4).rotateX(Math.PI / 2).rotateZ(.14), lana, -.008, .08, 0); pon(SPH(.062, 7, 6), lana, -.04, .3, 0)}
-  const j = mergeGeometries(J, false), q = mergeGeometries(R, false); if (sit) {j.translate(0, -.92, 0); q.translate(0, -.92, 0)} return {j, r: q};
+  const j = mergeGeometries(J, false), q = mergeGeometries(R, false); if (sit) {j.translate(0, -.92, 0); q.translate(0, -.92, 0)} if (espejo) [j, q].forEach(voltea); return {j, r: q};
 }
+/* de un lado al otro (z → −z) sin que las caras queden del revés */
+function voltea(g) {g.scale(1, 1, -1); if (g.index) {const a = g.index.array; for (let i = 0; i < a.length; i += 3) {const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t}} else for (const k in g.attributes) {const at = g.attributes[k], w = at.itemSize, A = at.array; for (let i = 0; i + 2 < at.count; i += 3) for (let c = 0; c < w; c++) {const t = A[(i + 1) * w + c]; A[(i + 1) * w + c] = A[(i + 2) * w + c]; A[(i + 2) * w + c] = t}}}
+/* el reflejo de un grupo en el hielo: las mismas instancias, volteadas bajo el plano y a la profundidad del hielo (lo que tapa el hielo lo tapa) */
+const REFL = (color) => new THREE.ShaderMaterial({transparent: true, depthWrite: false, vertexColors: color, uniforms: {yH: {value: 0}, luz: {value: new THREE.Color(.7, .76, .9)}}, vertexShader: `uniform float yH;varying vec3 vC;varying float vF;void main(){vec4 p=vec4(position,1.);
+#ifdef USE_INSTANCING
+p=instanceMatrix*p;
+#endif
+float h=max(p.y-yH,0.);vec4 m=projectionMatrix*modelViewMatrix*vec4(p.x,yH-h,p.z,1.),q=projectionMatrix*modelViewMatrix*vec4(p.x,yH+.02,p.z,1.);gl_Position=m;gl_Position.z=q.z/q.w*m.w;vF=exp(-h*1.1);
+#if defined(USE_INSTANCING_COLOR)
+vC=instanceColor;
+#elif defined(USE_COLOR)
+vC=color;
+#else
+vC=vec3(.5);
+#endif
+}`, fragmentShader: 'uniform vec3 luz;varying vec3 vC;varying float vF;void main(){gl_FragColor=vec4(vC*luz,.6*vF);}'});
+export function reflejo(c, par, yH) {const L = []; for (const g of c.G || [c]) for (const [k, col] of [['jm', false], ['rm', true]]) {const o = g[k], m = new THREE.InstancedMesh(o.geometry, REFL(col), o.count); m.instanceMatrix = o.instanceMatrix; if (o.instanceColor) m.instanceColor = o.instanceColor; m.material.uniforms.yH.value = yH; m.frustumCulled = false; m.renderOrder = 2; m.userData.sinSombra = true; par.add(m); L.push(m)} return L}
 const HECHAS = new Map(), hecha = (p, o) => {const k = p + JSON.stringify(o); if (!HECHAS.has(k)) HECHAS.set(k, figura(p, o)); return HECHAS.get(k)};
 /* n personas en una postura; devuelve pon(i, matriz) */
 export function grupo(pose, n, par, o = {}, cols = JACKETS) {
@@ -49,8 +67,8 @@ export function grupo(pose, n, par, o = {}, cols = JACKETS) {
 }
 /* como crowd() de kit.js (mismo uso), repartida en un par de figuras distintas para que no sean todas iguales */
 export function crowd(pose, n, par) {
-  const V2 = pose === 'pie' ? [{sem: 0}, {sem: 1, falda: true}, {sem: 2}] : pose === 'skate' ? [{sem: 1}, {sem: 2, falda: true}] : pose === 'ski' ? [{sem: 0, casco: true}, {sem: 1, casco: true}] : [{sem: 3}], k = Math.min(V2.length, Math.max(1, Math.ceil(n / 3))), G = V2.slice(0, k).map((o, a) => grupo(pose, Math.ceil((n - a) / k), par, o)), S = f => ({setMatrixAt(i, m) {G[i % k][f].setMatrixAt(i / k | 0, m)}, instanceMatrix: {set needsUpdate(v) {G.forEach(g => {g[f].instanceMatrix.needsUpdate = v})}}});
+  const V2 = pose === 'pie' ? [{sem: 0}, {sem: 1, falda: true}, {sem: 2}] : pose === 'skate' || pose === 'skate2' ? [{sem: 1}, {sem: 2, falda: true}] : pose === 'ski' ? [{sem: 0, casco: true}, {sem: 1, casco: true}] : [{sem: 3}], k = Math.min(V2.length, Math.max(1, Math.ceil(n / 3))), G = V2.slice(0, k).map((o, a) => grupo(pose, Math.ceil((n - a) / k), par, o)), S = f => ({setMatrixAt(i, m) {G[i % k][f].setMatrixAt(i / k | 0, m)}, instanceMatrix: {set needsUpdate(v) {G.forEach(g => {g[f].instanceMatrix.needsUpdate = v})}}});
   return {jm: S('jm'), rm: S('rm'), n, G};
 }
 /* en la portada: las figuras que usan casi todas las maquetas, de una en una */
-export function* calientaFiguras() {for (const [p, o] of [['pie', {sem: 0}], ['pie', {sem: 1, falda: true}], ['pie', {sem: 2}], ['skate', {sem: 1}], ['skate', {sem: 2, falda: true}], ...[0, 1, 2, 3].flatMap(k => [['paso', {sem: k, falda: false}], ['paso2', {sem: k, falda: false}], ['paso', {sem: k, falda: true}], ['paso2', {sem: k, falda: true}]])]) {hecha(p, o); yield}}
+export function* calientaFiguras() {for (const [p, o] of [['pie', {sem: 0}], ['pie', {sem: 1, falda: true}], ['pie', {sem: 2}], ['skate', {sem: 1}], ['skate', {sem: 2, falda: true}], ['skate2', {sem: 1}], ['skate2', {sem: 2, falda: true}], ...[0, 1, 2, 3].flatMap(k => [['paso', {sem: k, falda: false}], ['paso2', {sem: k, falda: false}], ['paso', {sem: k, falda: true}], ['paso2', {sem: k, falda: true}]])]) {hecha(p, o); yield}}

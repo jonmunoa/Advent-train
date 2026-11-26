@@ -70,6 +70,8 @@ Descargas autorizadas por Jon (CC0): MakeHuman system assets, skins01, skins02, 
 - El niño, sin los mechones sueltos que parecían rayas en la sien.
 - 89/89 pruebas.
 
+**v35 (26-11-2026).** Probado en un emulador de Android: el ajuste automático, sin cronómetro de gráfica, confundía la carga con una gráfica lenta y dejaba el lienzo a 1,1× para siempre (y en el PC de Jon, 0,72× con cuatro recortes yendo a 68 fps). Ahora mide solo fotogramas limpios, prueba y deshace, y todo lo quitado vuelve. Caballitos en el tiovivo (antes renos que iban hacia atrás), gente en la noria, patinadores con zancada, parejas, aprendiz y reflejo, rayas en el hielo, pana en la pista de esquí, calle desde dentro menos desenfocada y adoquines con grano de cerca.
+
 ## Lo que falta para acercarse más
 - Manos (siguen esculpidas) y poses: algún codo y la pierna al agacharse asoman.
 - Interiores de «cuartos» vistos de cerca: son dibujos en perspectiva, no geometría.

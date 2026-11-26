@@ -6,6 +6,7 @@ import {TEX_TERR} from './esc-real.js';
 import {ULZ} from './esc-luz.js';
 import {preparaSombras, sombras, olvida} from './esc-sombra.js';
 import {LDEN, sube1, subeTodas, compacta} from './esc-ligero.js';
+import {Ritmo} from './esc-ritmo.js';
 import {nivela, espera, enciende, todas} from './esc-nivel.js';
 import {TIPOS, TREN_DE} from './esc-trenes.js';
 import {haceJuguetes} from './esc-juguetes.js';
@@ -49,7 +50,7 @@ const renderer = new THREE.WebGLRenderer({canvas, antialias: false, powerPrefere
 /* el lienzo va a los píxeles de la pantalla (con un tope de 3,2 millones en el móvil y 5 en ordenador) y la escena, a una parte (post.esc, en ESCS):
    el último paso la sube con nitidez */
 const MAXPR = (d => Math.max(1, Math.min(d, coarse ? 3 : 2, Math.sqrt((coarse ? 3.2e6 : 5e6) / Math.max(1, innerWidth * innerHeight)))))(devicePixelRatio || 1); let dynPR = MAXPR, nativo = null;
-const ESCS = []; function escalones() {ESCS.length = 0; const hi = Math.min(1, (coarse ? 2.75 : 2) / dynPR), lo = Math.min(hi, (coarse ? 1.05 : .72) / dynPR); for (let e = hi; e > lo * 1.03; e /= 1.1) ESCS.push(e); ESCS.push(lo)} escalones();
+const ESCS = []; function escalones() {ESCS.length = 0; const hi = Math.min(1, (coarse ? 2.75 : 2) / dynPR), lo = Math.min(hi, (coarse ? 1.2 : .72) / dynPR); for (let e = hi; e > lo * 1.03; e /= 1.1) ESCS.push(e); ESCS.push(lo)} escalones();
 const escDe = pr => {let k = 0; while (k < ESCS.length - 1 && ESCS[k] * dynPR > pr + .02) k++; return k}; let escN = escDe(coarse ? 1.8 : 1.5);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.shadowMap.enabled = !LOWQ; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = true; renderer.autoClear = false; renderer.debug.checkShaderErrors = DEBUG;
 const calle = new THREE.Scene(), dentro = new THREE.Scene(); calle.fog = new THREE.Fog(new THREE.Color(.040, .037, .043), 220, 1700); dentro.fog = new THREE.Fog('#b9c6e0', 5000, 6000); renderer.setClearColor('#07080c', 1);
@@ -481,7 +482,7 @@ function empezar() {if (E.st !== 'inicio' || !listo) return; au(); $('intro').cl
 $('go').onclick = empezar;
 
 /* ================= bucle ================= */
-let last = performance.now(), listo = false, tG = 0, fA = 0, fN = 0, lastAdj = 0, lento = 0, alT = 0, HOLD = false; const dbg = DEBUG || location.hash === '#medir' ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0, dM = 0, dG = 0, gpuN = ''; if (dbg) try {const gl = renderer.getContext(), x = gl.getExtension('WEBGL_debug_renderer_info'); gpuN = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 60)} catch (e) {}
+let last = performance.now(), listo = false, tG = 0, alT = 0, HOLD = false; const dbg = DEBUG || location.hash === '#medir' ? Object.assign(document.body.appendChild(document.createElement('div')), {id: 'dbg'}) : null; if (dbg) renderer.info.autoReset = false; let dN = 0, dT = 0, dM = 0, dG = 0, gpuN = ''; if (dbg) try {const gl = renderer.getContext(), x = gl.getExtension('WEBGL_debug_renderer_info'); gpuN = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 60)} catch (e) {}
 function paso(dt) {tG += dt; paseo(dt, tG); camara(dt, tG); colocar(dt, tG); alT += dt; if (alT > 1.7) {alT = 0; const f = alI % 2 ? madre : nino; if (E.st !== 'dentro' && !E.hoy && (E.st !== 'mira' || f === madre)) aliento(f, {x: Math.cos(f.yaw), z: -Math.sin(f.yaw)})}}
 /* pantallas de 120 o 144 Hz: se dibuja un refresco de cada dos (60 o 72 por segundo, siempre al mismo ritmo) en vez de ir a trompicones. Las de
    90 Hz van a 90 si el móvil puede y, si no, a 45 fijos */
@@ -493,20 +494,23 @@ let calT = 0; function loop(now) {requestAnimationFrame(loop); if (now - last < 
   adapta(raw, now)}
 /* 60 por segundo: se mide lo que tarda la gráfica y se ajusta a cuánta resolución se dibuja la escena (el pase final la sube con nitidez).
    Si ni al mínimo llega, se quita lo caro por orden; en un móvil que no puede, se fija a 30 para que al menos vaya parejo */
-let TOPE30 = false, quita = 0, subeT = 0, techo = 0; /* con muchos píxeles por punto bastan dos muestras por píxel */
+let TOPE30 = false; /* con muchos píxeles por punto bastan dos muestras por píxel */
 const muestras = () => {if (!MSFIJO) post.msaa(LOWQ && post.esc * dynPR > 1.85 ? 2 : 4)};
 function ponEsc(v) {post.esc = v; muestras(); post.size(post.w, post.h)}
-function escalon(k) {k = clamp(k, 0, ESCS.length - 1); if (k === escN && post.esc === ESCS[k]) return; escN = k; ponEsc(ESCS[k])}
-function ponPR(v) {const pr = ESCS[escN] * dynPR; dynPR = Math.min(dynPR, v); escalones(); escN = escDe(pr); post.esc = ESCS[escN]; resize()}
-const QUITA = LOWQ ? [() => {MSFIJO = true; post.msaa(2)}, () => {SOLQ.tren = false}, () => ponPR(1.6), () => ponPR(1.1), () => {TOPE30 = true}] : [() => {MSFIJO = true; post.msaa(2)}, () => {UB.ssr = false}, () => {foco.shadow.mapSize.set(1024, 1024); if (foco.shadow.map) {foco.shadow.map.dispose(); foco.shadow.map = null}}, () => {post.sinFoco = true}, () => {post.sinAO = true}, () => {foco.castShadow = vent.castShadow = false; renderer.shadowMap.enabled = false}, () => {if (coarse) TOPE30 = true}];
-let fT = 99, rap = 0, rapNo = false;   // en ordenador, si a la gráfica le sobra, se dibuja a lo que dé la pantalla
+const MS2 = [() => {MSFIJO = true; post.msaa(2)}, () => {MSFIJO = false; muestras()}], P30 = [() => {TOPE30 = true; tope30T = performance.now()}, () => {TOPE30 = false}]; let tope30T = 0;
+/* lo que se quita cuando ni al mínimo llega, y cómo se devuelve */
+const QUITA = LOWQ ? [[() => {SOLQ.tren = false}, () => {SOLQ.tren = true}], MS2, P30] : [MS2, [() => {UB.ssr = false}, () => {UB.ssr = true}], [() => {foco.shadow.mapSize.set(1024, 1024); if (foco.shadow.map) {foco.shadow.map.dispose(); foco.shadow.map = null}}, () => {}], [() => {post.sinFoco = true}, () => {post.sinFoco = false}], [() => {post.sinAO = true}, () => {post.sinAO = false}], [() => {foco.castShadow = vent.castShadow = false; renderer.shadowMap.enabled = false}, () => {foco.castShadow = vent.castShadow = true; renderer.shadowMap.enabled = true}], ...(coarse ? [P30] : [])];
+const marcha = new Ritmo({n: ESCS.length, ini: escN, quitas: QUITA.length, holgura: coarse ? 9.2 : 10.8}); let quita = 0, estA = '', estT = 0, fT = 99, rap = 0, rapNo = false;   // en ordenador, si a la gráfica le sobra, se dibuja a lo que dé la pantalla
+function aplica() {if (marcha.k !== escN) {escN = marcha.k; ponEsc(ESCS[escN])} while (quita < marcha.q) QUITA[quita++][0](); while (quita > marcha.q) QUITA[--quita][1]()}
 function adapta(raw, now) {
-  if (window.__noAdapt || document.hidden || raw > .2) return; fA += raw; fT = Math.min(fT, Math.max(raw * 1000, UMB)); if (++fN < 45 || now - lastAdj < 900) return; const z = UMB > 12 ? 1.3 : clamp(fT / 16.4, .4, 1); fT = 99; const a = fA / fN * 1000 / z, t = post.tq, g = t && t.n > 8 ? t.ms / t.n / z : 0; if (!coarse && !LOWQ && g) {const real = g * z; if (UMB === 10.5 && !rapNo && escN === 0 && real < 4.2 && (fA / fN) < .0172) {if (++rap > 2) UMB = 5.9} else if (UMB < 10 && real > 6.2) {UMB = 10.5; rapNo = true} else rap = 0} fA = fN = 0; lastAdj = now; if (t) {t.ms = 0; t.n = 0} if (TOPE30) return;
-  const mal = g ? g > 13.6 || (a > 18.6 && g > 10.5) : a > 18.6, bien = g ? g < 8.2 && a < 17.6 : a < 17.2, tocando = E.st === 'dentro' && vista.ocio < 700, dentroPC = UMB < 10;
-  /* bajar, lo que haga falta de una vez; subir, de escalón en escalón y nunca en mitad de un gesto */
-  if (mal) {lento++; subeT = 0; if (escN < ESCS.length - 1) {if (now - ultS < 2600) techo = Math.max(techo, escN + 1); escalon(escN + (g > 19 || (!g && a > 24) ? 3 : g > 16 || (!g && a > 21) ? 2 : 1))} else if (lento > 2 && quita < QUITA.length) {QUITA[quita++](); lento = 0}} else {lento = 0; if (bien && !tocando && escN > techo && !(dentroPC && g > 4.6) && ++subeT > (g ? 2 : 6)) {subeT = 0; ultS = now; escalon(escN - 1)}}
+  if (window.__noAdapt || document.hidden) return; const e = E.st + E.n + (E.st === 'dentro' ? vista.cine : ''); if (e !== estA) {estA = e; estT = now; marcha.olvida(); aplica(); const t = post.tq; if (t) {t.ms = 0; t.n = 0}}
+  if (TOPE30 && now - tope30T > 20000) {marcha.q = Math.max(0, marcha.q - 1); aplica(); marcha.olvida()}
+  /* solo cuentan los fotogramas en los que no se está cargando, montando ni subiendo nada: si no, la carga parece una gráfica lenta */
+  const limpio = listo && E.st !== 'inicio' && raw < .12 && now - estT > 1400 && !obra && !prisa && !SUBE.length && !TEXS.length; marcha.foto(raw * 1000, limpio, now); if (limpio) fT = Math.min(fT, Math.max(raw * 1000, UMB)); if (!marcha.lista) return;
+  const z = UMB > 12 ? 1.3 : clamp(fT / 16.4, .4, 1), t = post.tq, g = t && t.n > 8 ? t.ms / t.n : 0; fT = 99; if (t) {t.ms = 0; t.n = 0}
+  if (!coarse && !LOWQ && g) {if (UMB === 10.5 && !rapNo && escN === 0 && g < 4.2 && marcha.D.reduce((a, b) => a + b, 0) / marcha.D.length < 17.2) {if (++rap > 2) UMB = 5.9} else if (UMB < 10 && g > 6.2) {UMB = 10.5; rapNo = true} else rap = 0}
+  if (marcha.cierra(now, {g, z, tocando: E.st === 'dentro' && vista.ocio < 700, tope: TOPE30 || (UMB < 10 && g > 4.6)})) aplica();
 }
-let ultS = -1e9;   // si al subir se atragantó enseguida, ese es el techo
 const prog = (p, t) => {$('lBar').style.transform = `scaleX(${p})`; if (t) $('go').textContent = t};
 /* móvil: materiales con barniz pasados a estándar */
 const LIGERO = new WeakMap();

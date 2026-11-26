@@ -4,6 +4,7 @@ import {strict as assert} from 'node:assert';
 import {MAPS, mapaOf, atM, BW, BD, KG, KT, KB, pondE, pisteD} from '../src/esc-vias.js';
 import {marcasEsc, pedirTexto, sitioDe, FACH, ESC, VAGONES} from '../src/esc-eco.js';
 import {TIENDA, enlaceTienda, MARCADOR, AVISO} from '../src/esc-tienda.js';
+import {Ritmo} from '../src/esc-ritmo.js';
 import {N, DIAS, estado, previa, pedido, falta, tope} from '../src/esc-historia.js';
 import {readFileSync} from 'node:fs';
 import {MARCAS, PRECIO_ROTULO, PRECIO_VAGON, VENDER} from '../src/esc-marcas.js';
@@ -54,4 +55,12 @@ ok('cada tienda vende algo menos el 24, y los enlaces son de Amazon con el códi
   assert.equal(TIENDA.length, N); assert.equal(TIENDA[23], null); for (const q of TIENDA.slice(0, 23)) {assert.ok(q.titulo && q.titulo.length <= 34, q.titulo); assert.ok(q.texto.length <= 70, q.texto); assert.ok(q.busqueda); assert.ok(!/€|\d+,\d\d/.test(q.titulo + q.texto), 'sin precios'); assert.ok(q.asin === '' || /^[A-Z0-9]{10}$/.test(q.asin), q.titulo)}
   const q = TIENDA[0]; assert.ok(!enlaceTienda(q, MARCADOR).includes('tag=')); assert.ok(!enlaceTienda(q, 'x"><script>').includes('tag=')); assert.ok(enlaceTienda(q, 'jon-21').startsWith('https://www.amazon.es/s?k=') && enlaceTienda(q, 'jon-21').endsWith('&tag=jon-21')); assert.equal(enlaceTienda({...q, asin: 'B0ABCDEFGH'}, 'jon-21'), 'https://www.amazon.es/dp/B0ABCDEFGH?tag=jon-21'); assert.equal(enlaceTienda(null, 'jon-21'), ''); assert.ok(AVISO.includes('Afiliado de Amazon')); assert.equal(VENDER, false);
 });
+/* un móvil de mentira: lo que tardan su gráfica (según el escalón) y su procesador, a 60 Hz */
+const movil = ({gpu, cpu = 4, seg = 60, n = 10, ini = 5, crono = false, tiron = null}) => {const R = new Ritmo({n, ini, quitas: 3}); let now = 0, cambios = 0; while (now < seg * 1000) {const g = gpu * Math.pow(1.1, -2 * R.k), t = Math.max(g, cpu), dt = tiron && tiron(now) ? 70 : t < 16 ? 16.7 : t < 33 ? (now / 16.7 | 0) % 10 < (t - 16) / 1.67 ? 33.3 : 16.7 : 50; now += dt; R.foto(dt, true, now); if (R.lista && R.cierra(now, {g: crono ? g : 0})) cambios++} return {k: R.k, q: R.q, cambios}};
+ok('el ritmo: si sobra gráfica, se dibuja a lo más fino, con cronómetro o sin él', () => {for (const crono of [true, false]) {const r = movil({gpu: 5, crono}); assert.equal(r.k, 0, JSON.stringify(r)); assert.equal(r.q, 0)}});
+ok('el ritmo: si la gráfica no llega, baja hasta que llega', () => {for (const crono of [true, false]) {const r = movil({gpu: 34, crono, seg: 90}); assert.ok(r.k >= 3 && r.k <= 8, JSON.stringify(r)); assert.ok(r.cambios < 24, JSON.stringify(r))}});
+ok('el ritmo: si lo lento es el procesador, no se emborrona la imagen', () => {const r = movil({gpu: 6, cpu: 24, seg: 120}); assert.ok(r.k <= 1 && r.q === 0, JSON.stringify(r))});
+ok('el ritmo: con gráfica y procesador justos, no se pasa de resolución', () => {const r = movil({gpu: 30, cpu: 20, seg: 180}); assert.ok(r.k >= 2 && r.cambios < 45, JSON.stringify(r))});
+ok('el ritmo: en un ordenador a 9,8 ms de gráfica vuelve a lo más fino y devuelve lo quitado', () => {const R = new Ritmo({n: 6, ini: 4, quitas: 4, holgura: 10.8}); R.q = 4; let now = 0; for (let w = 0; w < 60; w++) {const g = 6.7 * Math.pow(1.1, -2 * R.k) * (1 + R.q * .1); for (let i = 0; i < 45; i++) {now += 16.7; R.foto(16.7, true, now)} R.cierra(now, {g})} assert.equal(R.k, 0); assert.equal(R.q, 0)});
+ok('el ritmo: los tirones de la carga se olvidan y vuelve a lo más fino', () => {const r = movil({gpu: 5, seg: 90, tiron: n => n < 8000 && (n / 70 | 0) % 2 === 0}); assert.equal(r.k, 0, JSON.stringify(r)); assert.equal(r.q, 0)});
 console.log(fails ? `\n${fails} fallos` : '\nTodo OK'); process.exit(fails ? 1 : 0);
