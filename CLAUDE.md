@@ -221,9 +221,9 @@ Enfoque actual (23–24 de noviembre de 2026, a petición de Jon). **Los usuario
 
 ## Pendientes conocidos
 
-- Los escaparates leen el mismo `ADVX_TAG`. Faltan los valores reales en Vercel: `ADVX_TAG` (en local, `config.js` usa el marcador `TU-TAG-21` y se ve el aviso de enlace de ejemplo) y `ADVX_SITE_URL`.
+- Los escaparates leen el mismo `ADVX_TAG`. Falta ponerlo en Vercel: hasta entonces sale el marcador `TU-TAG-21` y el aviso de enlace de ejemplo. `SITE_URL` ya sale solo de `VERCEL_PROJECT_PRODUCTION_URL`.
 - Faltan los ASIN de `src/products.js`: sin ellos los enlaces son búsquedas de Amazon.
-- Despliegue preparado (Vercel), pero aún no hecho.
+- Desplegado en Vercel (26 de noviembre de 2026): https://tren-navidad.vercel.app/, conectado a GitHub (cada push a `main` despliega). La raíz sirve todavía el juego de carreras (`index.html`); los escaparates están en `/escaparates.html`, que no lleva etiquetas Open Graph (al compartirlo no sale imagen). En el emulador Android (Chrome, red del PC): primera carga 31 s y con caché 17 s; los módulos llegan en cadena (sin `modulepreload`).
 - La clasificación global está preparada (Supabase: `supabase/`), pero falta crear el proyecto y poner `SUPABASE_URL`/`SUPABASE_KEY` (README → «Clasificación global»). Sin ellos, `Board` guarda en `localStorage`.
 - La validación antitrampas (`validateRun` en `sim.js`) acota la física, pero no puede impedir un bot que conduzca de verdad.
 - Las campanas son 4 mallas cada una (sin instanciar): en órbita, el día 13 llega a ~290 draw calls. Si en Android cuesta, instanciarlas es lo primero.
