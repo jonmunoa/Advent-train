@@ -25,6 +25,7 @@ PORT = 8765
 SHOTS = '--shots' in sys.argv
 GPU = '--gpu' in sys.argv
 DIST = '--dist' in sys.argv
+PAG = 'adviento.html' if DIST else 'index.html'   # en dist/ la portada es La calle de los trenes y las carreras van en adviento.html
 CFG_TAG = __import__('re').search(r"TAG: '([^']*)'", open(os.path.join(ROOT, 'config.js'), encoding='utf-8').read()).group(1)
 TAG = os.environ.get('ADVX_TAG', CFG_TAG) if DIST else CFG_TAG
 
@@ -156,7 +157,7 @@ async def main():
         pg.on('pageerror', lambda e: errors.append(f'pageerror: {e}'))
         pg.on('response', lambda r: errors.append(f'HTTP {r.status} {r.url}') if r.status >= 400 and 'favicon' not in r.url else None)
         await route_local_three(pg)
-        await pg.goto(f'http://127.0.0.1:{PORT}/index.html')
+        await pg.goto(f'http://127.0.0.1:{PORT}/{PAG}')
         await pg.wait_for_timeout(1500)
         if SHOTS:
             OUT.mkdir(exist_ok=True)
@@ -270,7 +271,7 @@ async def main():
         p5.on('pageerror', lambda e: errors.append(f'pageerror (días): {e}'))
         await route_local_three(p5)
         await p5.add_init_script("try{localStorage.setItem('advx-dev','1')}catch(e){}")
-        await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-13', wait_until='domcontentloaded', timeout=120000)
+        await p5.goto(f'http://127.0.0.1:{PORT}/{PAG}#dia-13', wait_until='domcontentloaded', timeout=120000)
         await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         check('el billete del día 13 explica las agujas', 'Agujas' in await p5.evaluate("document.getElementById('pMod').textContent"))
         await p5.evaluate("document.getElementById('bGo').click()")
@@ -280,7 +281,7 @@ async def main():
         check('con la aguja cambiada el tren va por el atajo y termina', sc['mode'] == 'end' and sc['route'] == 1 and sc['flags'] & 2, str(sc))
         check('el texto de compartir dice que fue por el atajo', '🔀' in sc['share'])
         await p5.goto('about:blank')
-        await p5.goto(f'http://127.0.0.1:{PORT}/index.html#dia-14', wait_until='domcontentloaded', timeout=120000)
+        await p5.goto(f'http://127.0.0.1:{PORT}/{PAG}#dia-14', wait_until='domcontentloaded', timeout=120000)
         await p5.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         await p5.evaluate("document.getElementById('bGo').click()")
         await p5.wait_for_timeout(200)
@@ -299,7 +300,7 @@ async def main():
         await route_local_three(p6)
         await p6.clock.set_fixed_time('2026-12-08T10:00:00+01:00')
         await p6.add_init_script("try{for(let d=1;d<=12;d++)localStorage.setItem('advx-stars-'+d,'7');localStorage.setItem('advx-racha',JSON.stringify([5,6,7,8]))}catch(e){}")
-        await p6.goto(f'http://127.0.0.1:{PORT}/index.html', wait_until='domcontentloaded', timeout=120000)
+        await p6.goto(f'http://127.0.0.1:{PORT}/{PAG}', wait_until='domcontentloaded', timeout=120000)
         await p6.wait_for_timeout(1500)
         stats = await p6.evaluate("document.getElementById('hStats').textContent")
         check('el calendario muestra estrellas y racha', '36/72' in stats and 'Racha de 4' in stats, stats)
@@ -314,7 +315,7 @@ async def main():
         p3 = await ctx.new_page()
         p3.on('pageerror', lambda e: errors.append(f'pageerror (supabase): {e}'))
         await route_local_three(p3)
-        await p3.goto(f'http://127.0.0.1:{PORT}/index.html?liga=fam123&n=Familia#dia-1', wait_until='domcontentloaded', timeout=120000)
+        await p3.goto(f'http://127.0.0.1:{PORT}/{PAG}?liga=fam123&n=Familia#dia-1', wait_until='domcontentloaded', timeout=120000)
         await p3.wait_for_function("document.getElementById('pre').classList.contains('on')", polling=500, timeout=180000)
         await p3.wait_for_function("document.querySelector('#pLB [data-beat]')", polling=500, timeout=15000)
         check('el billete carga la clasificación compartida con «Bátelo»', 'Leire' in await p3.evaluate("document.getElementById('pLB').textContent"))
