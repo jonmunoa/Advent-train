@@ -36,9 +36,9 @@ El **silbato** acelera el tren unos segundos. Si cierras la página, al volver r
 
 La partida se guarda en `localStorage` (`advx-idle`). La economía está en `src/idle-eco.js`, y `node tests/idle-balance.mjs` simula a un jugador para ver el ritmo.
 
-## El tren del escaparate (`escaparates.html`)
+## La calle de los trenes (`escaparates.html`)
 
-`http://localhost:5173/escaparates.html` es el enfoque actual: un **calendario de Adviento** sin servidor ni base de datos (el nombre es provisional). Un niño pasea de la mano de su madre por una calle nevada de **24 escaparates, uno por día**, con un circuito de tren distinto en cada uno.
+`http://localhost:5173/escaparates.html` es el enfoque actual: un **calendario de Adviento** sin servidor ni base de datos. Un niño pasea de la mano de su madre por una calle nevada de **24 escaparates, uno por día**, con un circuito de tren distinto en cada uno.
 
 - **Cada día a las 18:00 se enciende uno.** Los que faltan están tapados con papel de embalar y su fecha; el de mañana tiene un agujero para asomarse. Los ya encendidos se quedan abiertos hasta el 10 de enero: puedes volver a cualquiera, entrar en su circuito y repetir su escena. El botón del calendario (o la tecla L) te lleva directo al que elijas.
 - **Un momento cada día**: en cada escaparate, una escena sin palabras de 6–15 segundos que se entiende sola (la nariz en el cristal, una bola de nieve, la foto que sale mal…). El 24 se cierra con el niño ya mayor. Están en `src/esc-escenas.js`.
@@ -118,7 +118,7 @@ Cómo funciona: el navegador lee `runs` directamente (solo columnas públicas) y
 
 La web sigue siendo estática. `scripts/build.mjs` solo copia los archivos a `dist/` y genera `dist/config.js` con las variables de entorno. `vercel.json` ya lo configura todo: build, carpeta de salida y caché de `m/` una semana.
 
-Publicada en https://tren-navidad.vercel.app/. Al desplegar, la portada es **el tren del escaparate** (`escaparates.html` se copia como `index.html`, y `/escaparates.html` redirige a `/`) y el juego de carreras pasa a `/adviento.html`. En local todo sigue con sus nombres de siempre.
+Publicada en https://tren-navidad.vercel.app/. Al desplegar, la portada es **La calle de los trenes** (`escaparates.html` se copia como `index.html`, y `/escaparates.html` redirige a `/`) y el juego de carreras pasa a `/adviento.html`. En local todo sigue con sus nombres de siempre.
 
 1. En [vercel.com](https://vercel.com), *Add New → Project* e importa `jonmunoa/Advent-train` (framework: *Other*; el resto lo lee de `vercel.json`).
 2. *Settings → Environment Variables* (Production y Preview):

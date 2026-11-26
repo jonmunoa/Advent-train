@@ -10,7 +10,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'), out = join(root, 'dist');
 const KEEP = ['index.html', 'idle.html', 'tren.html', 'escaparates.html', 'favicon.svg', 'og.jpg', 'og-escaparates.jpg', 'src', 'm'];
-// La portada es el tren del escaparate; el juego de carreras pasa a adviento.html (vercel.json manda /escaparates.html a /)
+// La portada es La calle de los trenes (escaparates.html); el juego de carreras pasa a adviento.html (vercel.json manda /escaparates.html a /)
 const PAGES = {'escaparates.html': 'index.html', 'index.html': 'adviento.html'};
 const env = process.env;
 

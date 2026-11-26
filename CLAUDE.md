@@ -48,7 +48,7 @@ src/tren-map.js            maqueta alpina sin DOM: relieve (H0), etapas de vía 
 src/tren-eco.js            calendario (qué trae cada día), agujas, marcas y partida, sin DOM ni red
 src/tren-marcas.js         lo que Jon edita a mano: contacto, precios y qué marca va en qué vagón y qué días
 src/tren.css               estilos propios del tren de Navidad (se carga tras idle.css)
-escaparates.html, src/escaparates.js   «el tren del escaparate» (nombre provisional): calendario, calle, paseo, cámara, HUD y marcas
+escaparates.html, src/escaparates.js   «La calle de los trenes»: calendario, calle, paseo, cámara, HUD y marcas
 src/esc-historia.js        calendario sin DOM: qué se enciende cada día y a qué hora, nombre de cada momento y vista previa
 src/esc-escenas.js         los momentos: una escena corta por día (generadores)
 src/esc-vias.js            los 24 circuitos sin DOM: relieve, vía con altura, túneles, puentes y suelo
@@ -165,7 +165,10 @@ Quinta vuelta (23 de noviembre de 2026): **sin servidor y sin base de datos**, p
 
 Antialiasing (idle y tren): MSAA ×4 en el `EffectComposer` también en el móvil y resolución entre 1× y 2× (nunca por debajo de 1×). Si va justo, `adapt` baja hasta 1,25×, luego quita sombras (solo si sigue lento varios segundos), luego baja a 1× y por último quita el bloom; los tirones de más de 0,2 s no cuentan.
 
-## El tren del escaparate (`escaparates.html`)
+## La calle de los trenes (`escaparates.html`)
+
+Nombre elegido por Jon el 26 de noviembre de 2026 (antes, «el tren del escaparate»; «Embobados» no le gustó). «Trenes de Navidad» va en la descripción y en la frase para compartir.
+
 
 Enfoque actual (23–24 de noviembre de 2026, a petición de Jon). **Los usuarios no hacen nada**: un niño pasea de la mano de su madre por una calle nevada con tiendas y se queda embobado con los trenes de los escaparates. Busca llegar al adulto que hacía eso de niño, que vuelva cada día y que lo comparta. Sin servidor, sin base de datos, sin gente simulada y sin preguntar de dónde es nadie. La cámara va detrás del niño y al pinchar un escaparate se entra en él. `kit.js` y `musica.js` son copias limpias de `tren.js`; toca retirar `tren.html` e `idle.html`.
 

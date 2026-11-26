@@ -1,4 +1,4 @@
-/* El tren del escaparate: un calendario de Adviento. Un niño pasea de la mano de su madre por una calle nevada y se para a
+/* La calle de los trenes: un calendario de Adviento. Un niño pasea de la mano de su madre por una calle nevada y se para a
    mirar los trenes de los escaparates: uno por día, y en cada uno una escena de la historia (esc-escenas.js). El paseo va solo y la cámara va detrás del niño. Al pinchar un escaparate se entra en él y se recorre con la
    cámara de mapa (esc-vista.js). Dos escenas con la misma cámara: la calle y lo que hay dentro de los escaparates, con su
    propia luz (ahí van también el cristal y la nieve que cae). Sin servidor: las marcas salen de esc-marcas.js. */
@@ -298,7 +298,7 @@ function escena(id) {hideCard(); E.st = 'escena'; E.t = 0; E.manual = false; E.a
 /* volver a ver la escena de un escaparate ya abierto */
 function verEscena(n = E.n) {if (E.st !== 'mira' || n >= AB()) return; dip(() => {E.dir = 1; madre.g.position.set(WX(n) - 46, 0, ZM); nino.g.position.set(WX(n) - 31, 0, ZN); madre.yaw = nino.yaw = 0; detras(tG, cam.p, cam.l); escena(n + 1)})}
 $('bSaltar').onclick = () => dip(() => ESCN.fin()); $('bEsc').onclick = () => {au(); verEscena()};
-$('finX').onclick = () => $('fin').classList.remove('on'); $('finGo').onclick = async () => {const text = 'Acuérdate de cuando íbamos a ver los escaparates. Te llamo ahora.'; if (navigator.share) try {await navigator.share({title: 'El tren del escaparate', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(`${text} ${url()}`); toast('Enlace copiado: mándaselo')} catch (e) {toast('No se ha podido copiar el enlace')}};
+$('finX').onclick = () => $('fin').classList.remove('on'); $('finGo').onclick = async () => {const text = 'Acuérdate de cuando íbamos a ver los escaparates. Te llamo ahora.'; if (navigator.share) try {await navigator.share({title: 'La calle de los trenes', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(`${text} ${url()}`); toast('Enlace copiado: mándaselo')} catch (e) {toast('No se ha podido copiar el enlace')}};
 
 /* ================= entrar en un escaparate ================= */
 let dipT = 0; function dip(fn, ms = 210) {if (FAST) {fn(); return} const el = $('dip'); el.classList.add('on'); clearTimeout(dipT); dipT = setTimeout(() => {fn(); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('on')))}, ms)}
@@ -473,7 +473,7 @@ function escucha() {
   oO.T = m.T; oO.s = m.tren.s; oO.w = m.tren.w; oO.off = m.tren.off; oO.clase = m.tren.clase; oO.nivel = nv; if (st === 'dentro') {oI.copy(m.g.matrixWorld).invert(); oV.copy(camera.position).applyMatrix4(oI); oO.c[0] = oV.x; oO.c[1] = oV.y; oO.c[2] = oV.z; const e = camera.matrixWorld.elements; oO.d[0] = e[0]; oO.d[1] = e[2]} else {oO.c[0] = 0; oO.c[1] = 14; oO.c[2] = 56; oO.d[0] = 1; oO.d[1] = 0} oyeTren(oO);
 }
 const url = () => window.ADVX_ESC_URL || location.origin + location.pathname;
-$('bShare').onclick = async () => {const m = AB() ? `🚂 Día ${AB()} · «${DIAS[AB() - 1].momento}»\n` : '🚂 ', text = `${m}¿Te acuerdas de cuando te quedabas embobado mirando el tren de un escaparate?`; if (navigator.share) try {await navigator.share({title: 'El tren del escaparate', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(url()); toast('Enlace copiado: pégalo donde quieras')} catch (e) {toast('No se ha podido copiar el enlace')}};
+$('bShare').onclick = async () => {const m = AB() ? `🚂 Día ${AB()} · «${DIAS[AB() - 1].momento}»\n` : '🚂 ', text = `${m}¿Te acuerdas de cuando te quedabas embobado mirando los trenes de Navidad de los escaparates?`; if (navigator.share) try {await navigator.share({title: 'La calle de los trenes', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(url()); toast('Enlace copiado: pégalo donde quieras')} catch (e) {toast('No se ha podido copiar el enlace')}};
 const NAVK = {ArrowLeft: [-34, 0], ArrowRight: [34, 0], ArrowUp: [0, -34], ArrowDown: [0, 34], a: [-34, 0], d: [34, 0], w: [0, -34], s: [0, 34]};
 addEventListener('keydown', e => {
   if (E.st === 'escena') {if (e.key === 'Escape') $('bSaltar').click(); return}

@@ -60,7 +60,7 @@ async def main():
         b = await p.chromium.launch(args=chromium_args(True)); ctx = await b.new_context(viewport={'width': 540, 'height': 960}, device_scale_factor=2); pg = await ctx.new_page()
         await pg.goto(f'http://127.0.0.1:8840/escaparates.html?dia={DIAS[0]}', wait_until='commit'); await pg.wait_for_function('window.__esc&&__esc.listo', timeout=120000)
         await pg.add_style_tag(content=CSS)
-        await pg.evaluate("window.__noAdapt=true;document.body.insertAdjacentHTML('beforeend','<div id=rot></div><div id=cie><div><b>El tren</b><i>del escaparate</i><span></span></div></div>');__esc.empezar();__esc.hold(true)")
+        await pg.evaluate("window.__noAdapt=true;document.body.insertAdjacentHTML('beforeend','<div id=rot></div><div id=cie><div><b>La calle</b><i>de los trenes</i><span></span></div></div>');__esc.empezar();__esc.hold(true)")
         for k, d in enumerate(DIAS):
             await pg.evaluate(f'__esc.ponDia({d})'); await pg.wait_for_timeout(1400)
             await pg.evaluate("(()=>{for(let i=0;i<600&&__esc.st==='paseo'&&Math.abs(__esc.E.x-__esc.n*340)>80;i++)__esc.step(1/30)})()")

@@ -1,4 +1,4 @@
-/* El tren del escaparate: interfaz mínima sobre la calle nevada. Misma paleta que el resto (papel crema, rojo, oro). */
+/* La calle de los trenes: interfaz mínima sobre la calle nevada. Misma paleta que el resto (papel crema, rojo, oro). */
 :root{color-scheme:dark;--night:#0a1026;--paper:#f1e6cc;--ink:#2b1a12;--ink2:#6d5642;--cream:#fbf3df;--red:#c41e2e;--red2:#8e1220;--green:#1b5a40;--gold:#e0ad45;--gold2:#a8771f;
   --ease-out:cubic-bezier(.23,1,.32,1);--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;min-width:0}
