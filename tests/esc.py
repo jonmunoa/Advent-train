@@ -506,8 +506,11 @@ async def main():
         check('el sonido se puede quitar y se recuerda', await pg.evaluate("document.getElementById('bSon').classList.contains('off')&&localStorage.getItem('advx-sonido')==='0'"))
         bad = [u for m, u in reqs if m != 'GET' or not u.startswith((f'http://127.0.0.1:{PORT}/', 'https://cdn.jsdelivr.net/npm/three@', 'https://fonts.', 'data:', 'blob:'))]
         check('no habla con ningún servidor: solo descarga la página, three.js y las letras', not bad, str(bad[:4]))
-        for q, (n, js) in enumerate([('paseo', "__esc.ir(__esc.n-1);__esc.step(4.5)"), ('mirando', "(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.mirar(.6);__esc.step(6)})()"), ('dentro', '__esc.entrar(__esc.n);__esc.step(4)')]):
+        for q, (n, js) in enumerate([('paseo', "__esc.ir(__esc.n-1);__esc.step(4.5)"), ('mirando', "(()=>{for(let i=0;i<2400&&__esc.st!=='mira';i++)__esc.step(1/30);__esc.mirar(.6);__esc.step(6)})()"), ('dentro', '__esc.entrar(__esc.n)')]):
             await pg.evaluate(js)
+            if n == 'dentro':
+                await pg.wait_for_function("__esc.st==='dentro'", timeout=60000)
+                await pg.evaluate('__esc.step(4)')
             m = await pg.evaluate('__esc.perf(60,1)')
             print(f"rendimiento {n}: {m['ms']} ms a 1×, {m['calls']} draw calls, {m['tris'] // 1000}k triángulos")
         await ctx.close()

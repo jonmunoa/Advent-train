@@ -220,7 +220,7 @@ function colocar(dt, t) {
   for (let k = 0; k < 3; k++) {
     const n = din && k === mod(E.n, 3) ? E.n : sitioDe(k, bi, PASO), x = WX(n), L = locs[k], F = lejos[k], cer = tapado(n); viste(L, n); L.g.position.x = x; L.g.visible = true; viste(F, n + 3 * E.dir); F.g.position.x = x + E.dir * PER; F.g.visible = !din; const c = cristal[k]; c.position.x = x;
     const cerca = din ? n === E.n : esc ? Math.abs(x - cx) < 300 : E.st === 'mira' ? Math.abs(x - cx) < 120 : Math.abs(E.az) > .7 ? Math.abs(x - cx) < 285 : ((x - cx) * E.dir > -95 && (x - cx) * E.dir < (LOWQ ? 240 : 285)) || (n === E.n && E.st !== 'paseo' && Math.abs(x - cx) < 400), abre = n >= 0 && n < N && n <= AB(); let m = null;
-    if (abre && cerca) {m = MU.get(n); if (!m && (n === E.n || (!esc && (!LOWQ || E.st !== 'paseo')))) prepara(n)} if (m) {vis.add(n); m.g.position.set(x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.smU.k.value = px * K; if (m.copos) {m.copos.t.value = t; m.copos.k.value = px * K; if (din) m.copos.c.value.copy(vista.pos)} m.update(dt, t)}
+    if (abre && cerca) {m = MU.get(n); if (m && !m.lista && !din) m = null; if (!m && (n === E.n || (!esc && (!LOWQ || E.st !== 'paseo')))) prepara(n)} if (m) {vis.add(n); m.g.position.set(x, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.smU.k.value = px * K; if (m.copos) {m.copos.t.value = t; m.copos.k.value = px * K; if (din) m.copos.c.value.copy(vista.pos)} m.update(dt, t)}
     L.foto.visible = !m && !din; c.visible = !!m && verCalle; F.foto.visible = !din; F.papel.visible = F.tapado; 
     // el papel cae cuando se enciende
     L.cae = cer ? 0 : Math.min(1.2, (L.cae ?? 1.2) + dt * 1.25); if (L.ult !== n) {L.ult = n; L.cae = cer ? 0 : 1.2} const u = L.cae / 1.2; L.papel.visible = u < 1; L.papel.position.y = (VY0 + VY1) / 2 - u * u * 92; L.papel.rotation.x = u * u * .5; L.papel.position.z = -.4 + u * 2.4; L.luz = lerp(L.luz ?? 1, cer ? .12 : 1, 1 - Math.exp(-2.4 * dt)); if (!listo) L.luz = cer ? .12 : 1; barrio.bloques.luz(n, L.luz); barrio.bloques.luz(n + 3 * E.dir, tapado(n + 3 * E.dir) ? .12 : 1);
@@ -239,7 +239,7 @@ const nueva = n => {const m = new Mundo(n, TEMAS[MAPS[n].id]); return {n, m, q: 
 /* empieza a montar la maqueta n, un paso por fotograma */
 function prepara(n) {if (n < 0 || n >= N || MU.has(n) || obra) return; obra = nueva(n)}
 /* lo que se ve al entrar: se monta después de la maqueta, también a trozos */
-const porDentro = m => [() => m.envuelve(), ...(LOWQ ? [() => compacta(m.domo, m.niv), Object.assign(() => espera(m.niv), {espera: true})] : []), () => {m.domoIt = null; separa(m.domo, 'dentro'); reflejos(m.domo, .5); enCola(m.domo); compila(dentro)}, () => techoDe(renderer, m)];
+const porDentro = m => [() => m.envuelve(), ...(LOWQ ? [() => compacta(m.domo, m.niv), Object.assign(() => espera(m.niv), {espera: true})] : []), () => {m.domoIt = null; separa(m.domo, 'dentro'); reflejos(m.domo, .5); enCola(m.domo); compila(dentro).then(() => {m.dentroOk = true})}, () => techoDe(renderer, m)];
 /* cuánto se puede montar en este fotograma: con la cámara quieta, más; andando o en una escena, solo lo que hace falta ya */
 let obraPausa = 0;   // en el móvil, tras un trozo caro se descansan unos fotogramas
 const obraMs = o => {const urge = !MU.has(o.n) && o.n === E.n; return E.st === 'inicio' ? 6 : E.st === 'mira' ? E.t > 1.5 || urge ? LOWQ ? .5 : 4 : 0 : E.st === 'dentro' ? urge || o.n === E.n ? 2.5 : LOWQ ? 0 : 1.5 : urge ? 2.5 : LOWQ || E.st === 'escena' ? 0 : 2};
@@ -264,7 +264,7 @@ const VISTAS = new WeakSet(), SUBE = [], TEXS = []; let sT = null, sS = null, sM
 const PEND = []; function encolaTex(x) {if (!x || !x.isTexture || x.isRenderTargetTexture || VISTAS.has(x)) return; const im = x.image; if (!im) {PEND.push(x); return} VISTAS.add(x); if (im.decode) im.decode().then(() => TEXS.push(x)).catch(() => {}); else TEXS.push(x)}
 function enCola(g) {const G = new Set(), T = encolaTex; g.traverse(o => {if (o.geometry && o.geometry.attributes.position) G.add(o.geometry); const mt = o.material; if (!mt) return; for (const k of ['map', 'normalMap', 'roughnessMap', 'alphaMap']) T(mt[k]); if (mt.uniforms) for (const k in mt.uniforms) T(mt.uniforms[k].value)}); TEX_TERR.forEach(T); for (const q of G) {if (!q.morphAttributes.position) {SUBE.push(q); continue} const h = new THREE.BufferGeometry(); h.attributes = q.attributes; h.index = q.index; h.boundingSphere = q.boundingSphere; SUBE.push(h)}}
 function termina({n, m}, luego) {
-  m.g.scale.setScalar(K); m.g.position.set(WX(n), VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = false; ULZ.lzI.value.compose(new THREE.Vector3(0, VY0 + 14.5, -39.5), m.g.quaternion, new THREE.Vector3(K, K, K)).invert(); ULZ.lzP.value = PASO; if (LOWQ) ligero(m.g); separa(m.g, 'dentro'); reflejos(m.g, .5); dentro.add(m.g); m.tren.s = m.T.L * .04; MU.set(n, m); const A = SITIOS[n + 1] || {}; if (!DIAS[n].sinMarca || !VENTA) for (let v = 1; v <= 4; v++) m.tren.setAd(v - 1, A[v] || null); if (!FO.has(n) && !SINFOTO && !(LOWQ && VITR)) {const f = () => {if (MU.get(n) === m && !FO.has(n)) {fotografia(n); version++}}; if (luego && !FAST) compila(dentro, FOTORT).then(f); else f()} else if (luego && !FAST) compila(dentro); enCola(m.g);
+  m.g.scale.setScalar(K); m.g.position.set(WX(n), VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = false; ULZ.lzI.value.compose(new THREE.Vector3(0, VY0 + 14.5, -39.5), m.g.quaternion, new THREE.Vector3(K, K, K)).invert(); ULZ.lzP.value = PASO; if (LOWQ) ligero(m.g); separa(m.g, 'dentro'); reflejos(m.g, .5); dentro.add(m.g); m.tren.s = m.T.L * .04; MU.set(n, m); const A = SITIOS[n + 1] || {}; if (!DIAS[n].sinMarca || !VENTA) for (let v = 1; v <= 4; v++) m.tren.setAd(v - 1, A[v] || null); {const foto = !FO.has(n) && !SINFOTO && !(LOWQ && VITR), f = () => {m.lista = true; if (foto && MU.get(n) === m && !FO.has(n)) {fotografia(n); version++}}; if (FAST) f(); else compila(dentro, foto ? FOTORT : undefined).then(f)} enCola(m.g);
   for (const q of [...MU.keys()].sort((a, b) => Math.abs(b - E.n) - Math.abs(a - E.n))) {if (MU.size <= (LOWQ ? 3 : 5) || Math.abs(q - E.n) <= 1 || q === n || q === E.k) continue; const w = MU.get(q); olvida(w); if (w.niv) w.niv.fuera = true; dentro.remove(w.g); w.g.traverse(o => {if (o.geometry) o.geometry.dispose()}); MU.delete(q)}
 }
 /* foto de un escaparate: la de verdad si ya se ha montado alguna vez; si no, la de m/esc/vitrinas.webp (las 24 en una imagen, se pide al
@@ -305,7 +305,13 @@ $('bSaltar').onclick = () => dip(() => ESCN.fin()); $('bEsc').onclick = () => {a
 $('finX').onclick = () => $('fin').classList.remove('on'); $('finGo').onclick = async () => {const text = 'Acuérdate de cuando íbamos a ver los escaparates. Te llamo ahora.'; if (navigator.share) try {await navigator.share({title: 'La calle de los trenes', text, url: url()}); return} catch (e) {if (e && e.name === 'AbortError') return} try {await navigator.clipboard.writeText(`${text} ${url()}`); toast('Enlace copiado: mándaselo')} catch (e) {toast('No se ha podido copiar el enlace')}};
 
 /* ================= entrar en un escaparate ================= */
-let dipT = 0; function dip(fn, ms = 210) {if (FAST) {fn(); return} const el = $('dip'); el.classList.add('on'); clearTimeout(dipT); dipT = setTimeout(() => {fn(); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('on')))}, ms)}
+/* cambio de plano: la imagen de ahora se queda encima y se desvanece sobre la nueva (fundido encadenado). Si no se puede copiar el
+   lienzo, fundido a la luz de la calle como antes */
+let dipT = 0; function dip(fn, ms = 210) {
+  if (FAST) {fn(); return} const c = $('dipC'); clearTimeout(dipT);
+  try {draw(); const s = Math.min(1, 900 / Math.max(canvas.width, canvas.height)), w = Math.round(canvas.width * s), h = Math.round(canvas.height * s); if (c.width !== w || c.height !== h) {c.width = w; c.height = h} c.getContext('2d').drawImage(renderer.domElement, 0, 0, w, h); c.classList.add('on'); fn(); requestAnimationFrame(() => requestAnimationFrame(() => c.classList.remove('on'))); return} catch (e) {c.classList.remove('on')}
+  const el = $('dip'); el.classList.add('on'); dipT = setTimeout(() => {fn(); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('on')))}, ms);
+}
 /* que se note que el escaparate se pincha: un botón sobre el cristal y un marco de luz que respira */
 const marcoL = (() => {const sh = new THREE.Shape(), w = VX + 2, y0 = VY0 - 1, y1 = VY1 + 1, r = 3, t = 1.7, rr = (o, w0, a, b, q) => {o.moveTo(-w0 + q, a); o.lineTo(w0 - q, a); o.quadraticCurveTo(w0, a, w0, a + q); o.lineTo(w0, b - q); o.quadraticCurveTo(w0, b, w0 - q, b); o.lineTo(-w0 + q, b); o.quadraticCurveTo(-w0, b, -w0, b - q); o.lineTo(-w0, a + q); o.quadraticCurveTo(-w0, a, -w0 + q, a)}; rr(sh, w, y0, y1, r); const h = new THREE.Path(); rr(h, w - t, y0 + t, y1 - t, r); sh.holes.push(h); const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 5), new THREE.MeshBasicMaterial({color: new THREE.Color(1.9, 1.35, .62), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false})); m.position.z = 1.6; m.visible = false; calle.add(m); return m})();
 let entT = 0, entX = -1, entY = -1, sobre = false; const entV = new THREE.Vector3();
@@ -318,11 +324,24 @@ $('entra').onclick = () => {despierta(); entrar(E.n)};
 /* al entrar, la cámara de cine graba el tren (con menos movimiento, solo si se pide) */
 let CINE = !REDUCED;
 function onCine(v) {const b = $('bCine'); b.classList.toggle('on', v); b.setAttribute('aria-pressed', v); document.body.classList.toggle('decine', v)}
-function entrar(n, {car} = {}) {
+function entrar(n, {car, ya} = {}) {
   if (E.st === 'inicio' || E.st === 'escena' || !listo) return; if (n < 0 || n >= N) return; if (tapado(n)) {if (n === E.n && E.st === 'mira') {E.manual = true; E.uT = E.uT > .5 ? .1 : 1; toca()} else if (n <= TOPE()) {ir(n); if (E.st === 'dentro') return} toast(n === AB() - 1 ? 'Ya está a punto de encenderse' : `Se enciende ${n === AB() ? cuando() : `el ${n + 1} de diciembre`}`); return}
-  if (E.st === 'dentro') {if (n !== E.n) cambia(n); else if (car !== undefined) vista.setFocus({car}); return} au(); hideCard();
+  if (E.st === 'dentro') {if (n !== E.n) cambia(n); else if (car !== undefined) vista.setFocus({car}); return} au(); hideCard(); if (!FAST && !HOLD && !ya && !dispuesta(n)) {preparaEntrada(n, car); return}
   const X = WX(n), cerca = Math.abs(X - camera.position.x) < 270 && camera.position.z > 12, fn = directo => {if (n !== E.n) {E.dir = n > E.n ? 1 : -1; E.n = n} E.pend = undefined; E.st = 'dentro'; E.t = 2; E.k = n; E.x = X; E.md = directo ? .35 : 0; aLaVentana(); const m = mundo(n); m.g.position.set(X, VY0 + 14.5, -39.5); m.g.rotation.x = TILT; m.g.visible = true; m.envolver(); separa(m.domo, 'dentro'); reflejos(m.domo, .5); vista.entra(m, {...(directo ? {desde: {p: V3().set(0, 46, 118), l: V3().set(0, 8, 0)}, dur: 1.5} : {dur: 1.9}), cine: car === undefined && CINE}); document.body.classList.add('dentro'); E.az = E.azT = E.el = E.elT = 0; caption(); pista(); if (car !== undefined) vista.setFocus({car}); if (!FAST) {whistle()}};
   if (cerca) fn(false); else dip(() => fn(true));
+}
+/* entrar sin congelar la imagen: si a la maqueta le falta algo (montarse, su envoltura o que la gráfica compile sus programas), la cámara
+   se arrima al cristal mientras se termina, deprisa, y entra en cuanto está */
+let entrando = null; const dispuesta = n => {const m = MU.get(n); return !!m && !!m.lista && !!m.dentroOk};
+async function preparaEntrada(n, car) {
+  if (entrando && entrando.n === n) return; const yo = entrando = {n}, b = $('entra'), t0 = performance.now(), vale = () => entrando === yo && E.st !== 'escena' && E.st !== 'dentro' && E.st !== 'inicio';
+  b.classList.add('va'); if (E.st === 'mira' && n === E.n) {E.manual = true; E.uT = Math.max(E.uT, .9)}
+  while (vale() && performance.now() - t0 < 15000) {
+    const m = MU.get(n); if (m && m.lista && m.domo && !m.domoIt && !(obra && obra.n === n)) {await compila(dentro); m.dentroOk = true; break}
+    prisa = true; if (!m) {if (obra && obra.n !== n) obra = null; prepara(n)} else if (!m.domo && !(obra && obra.n === n)) obra = {n, m, q: porDentro(m), fin: true};
+    await new Promise(r => requestAnimationFrame(r));
+  }
+  prisa = false; b.classList.remove('va'); const ok = vale(); if (entrando === yo) entrando = null; if (ok) entrar(n, {car, ya: true});
 }
 let yendo = null; const aqui = () => E.st === 'dentro' && yendo !== null ? yendo : E.n;   // a qué escaparate se está yendo, mientras se monta
 function cambia(n) {yendo = n; if (!MU.has(n)) {$('capN').textContent = MAPS[n].nombre; $('capS').textContent = 'Encendiendo…'} conMundo(n, () => {if (E.st === 'dentro' && n !== E.n) cambiaYa(n); else {yendo = null; clearTimeout(dipT); $('dip').classList.remove('on'); caption()}})}

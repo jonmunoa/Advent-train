@@ -132,6 +132,9 @@ body.contienda #bTi{display:inline-flex}
 #tun{position:fixed;inset:0;z-index:3;pointer-events:none;background:#05060c;opacity:0}
 #dip{position:fixed;inset:0;z-index:4;pointer-events:none;background:#eaf1ff;opacity:0;transition:opacity 260ms ease}
 #dip.on{opacity:1;transition-duration:190ms}
+#dipC{position:fixed;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;opacity:0;visibility:hidden;transition:opacity 560ms cubic-bezier(.45,0,.25,1),visibility 0s 560ms}
+#dipC.on{opacity:1;visibility:visible;transition:none}
+.entra.va::before,.entra.va::after{animation-duration:1.1s}
 .volver{position:fixed;left:50%;top:calc(14px + var(--safe-t));z-index:11;transform:translate(-50%,-8px);display:flex;align-items:center;gap:8px;padding:11px 18px 11px 13px;border:1.5px solid rgba(224,173,69,.7);border-radius:999px;background:rgba(10,16,38,.74);color:var(--cream);font-weight:600;font-size:14.5px;white-space:nowrap;cursor:pointer;opacity:0;visibility:hidden;transition:opacity 220ms var(--ease-out),transform 220ms var(--ease-out),visibility 220ms}
 body.dentro .volver{opacity:1;visibility:visible;transform:translate(-50%,0)}
 .volver:active{transform:translate(-50%,0) scale(.97)!important}
