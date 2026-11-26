@@ -118,6 +118,8 @@ Cómo funciona: el navegador lee `runs` directamente (solo columnas públicas) y
 
 La web sigue siendo estática. `scripts/build.mjs` solo copia los archivos a `dist/` y genera `dist/config.js` con las variables de entorno. `vercel.json` ya lo configura todo: build, carpeta de salida y caché de `m/` una semana.
 
+Publicada en https://tren-navidad.vercel.app/. Al desplegar, la portada es **el tren del escaparate** (`escaparates.html` se copia como `index.html`, y `/escaparates.html` redirige a `/`) y el juego de carreras pasa a `/adviento.html`. En local todo sigue con sus nombres de siempre.
+
 1. En [vercel.com](https://vercel.com), *Add New → Project* e importa `jonmunoa/Advent-train` (framework: *Other*; el resto lo lee de `vercel.json`).
 2. *Settings → Environment Variables* (Production y Preview):
    - `ADVX_TAG`: tu ID de afiliado de Amazon (p. ej. `tunombre-21`).

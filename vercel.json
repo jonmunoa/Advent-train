@@ -4,13 +4,16 @@
   "installCommand": "echo sin dependencias",
   "buildCommand": "node scripts/build.mjs",
   "outputDirectory": "dist",
+  "redirects": [
+    {"source": "/escaparates.html", "destination": "/", "permanent": true}
+  ],
   "headers": [
     {
       "source": "/m/(.*)",
       "headers": [{"key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400"}]
     },
     {
-      "source": "/(og.jpg|favicon.svg)",
+      "source": "/(og.jpg|og-escaparates.jpg|favicon.svg)",
       "headers": [{"key": "Cache-Control", "value": "public, max-age=86400"}]
     },
     {

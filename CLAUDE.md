@@ -28,7 +28,7 @@ src/main.js                todo el juego (módulo ES, ~900 líneas, secciones ma
 src/sim.js                 física, circuitos, campanas, medallas, codec del fantasma y validateRun (sin DOM; lo comparte la Edge Function)
 config.js                  configuración pública: TAG de Amazon, SITE_URL, SUPABASE_URL/KEY
 src/products.js            producto de Amazon de cada día (titulo, asin, busqueda)
-scripts/build.mjs, vercel.json   despliegue: copia a dist/ y genera dist/config.js desde ADVX_TAG, ADVX_SITE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
+scripts/build.mjs, vercel.json   despliegue: copia a dist/ (los escaparates de portada, las carreras en adviento.html) y genera dist/config.js desde ADVX_TAG, ADVX_SITE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
 og.jpg, favicon.svg        imagen para compartir (1200×630) e icono
 supabase/                  migración SQL (tabla runs + RLS) y Edge Function submit-run (handler.js + _shared/sim.js copiado)
 scripts/sync-shared.mjs    copia src/sim.js a supabase/functions/_shared (el e2e falla si difieren)
@@ -223,7 +223,7 @@ Enfoque actual (23–24 de noviembre de 2026, a petición de Jon). **Los usuario
 
 - Los escaparates leen el mismo `ADVX_TAG`. Falta ponerlo en Vercel: hasta entonces sale el marcador `TU-TAG-21` y el aviso de enlace de ejemplo. `SITE_URL` ya sale solo de `VERCEL_PROJECT_PRODUCTION_URL`.
 - Faltan los ASIN de `src/products.js`: sin ellos los enlaces son búsquedas de Amazon.
-- Desplegado en Vercel (26 de noviembre de 2026): https://tren-navidad.vercel.app/, conectado a GitHub (cada push a `main` despliega). La raíz sirve todavía el juego de carreras (`index.html`); los escaparates están en `/escaparates.html`, que no lleva etiquetas Open Graph (al compartirlo no sale imagen). En el emulador Android (Chrome, red del PC): primera carga 31 s y con caché 17 s; los módulos llegan en cadena (sin `modulepreload`).
+- Desplegado en Vercel (26 de noviembre de 2026): https://tren-navidad.vercel.app/, conectado a GitHub (cada push a `main` despliega). `build.mjs` pone los escaparates de portada (`escaparates.html` → `dist/index.html`, con `og-escaparates.jpg` para compartir) y el juego de carreras en `/adviento.html` (su `SITE_URL` apunta ahí); `vercel.json` redirige `/escaparates.html` a `/`. En el emulador Android, la primera carga tarda unos 30 s tanto desde Vercel como desde el PC: lo lento es montar y compilar en el móvil emulado, no la red. Sin medir en un móvil real.
 - La clasificación global está preparada (Supabase: `supabase/`), pero falta crear el proyecto y poner `SUPABASE_URL`/`SUPABASE_KEY` (README → «Clasificación global»). Sin ellos, `Board` guarda en `localStorage`.
 - La validación antitrampas (`validateRun` en `sim.js`) acota la física, pero no puede impedir un bot que conduzca de verdad.
 - Las campanas son 4 mallas cada una (sin instanciar): en órbita, el día 13 llega a ~290 draw calls. Si en Android cuesta, instanciarlas es lo primero.
