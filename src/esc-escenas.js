@@ -17,7 +17,7 @@ const atrezo = (m, tipo, k = 1) => {m.onBeforeCompile = s => {PN(s); s.fragmentS
 const esm = (c, o = {}) => new THREE.MeshPhysicalMaterial({color: c, roughness: .36, clearcoat: LOWQ ? 0 : .55, clearcoatRoughness: .28, ...o});
 const MT = {pan: atrezo(C(0xb8742e), 'grano', .6), pan2: atrezo(C(0xd8a860), 'grano', .6), papel: atrezo(C(0xe8dcc0, {side: THREE.DoubleSide, roughness: .9}), 'grano', .5), rojo: atrezo(esm(0x96101e), 'esmalte'), lana: atrezo(C(0x98121f, {roughness: 1}), 'tela', 12), nata: atrezo(C(0xe6dfd0, {roughness: 1}), 'tela', 10), cuero: atrezo(C(0x4a2c1c, {roughness: .55}), 'grano', .8), oro: C(0xc8933a, {metalness: .85, roughness: .3}), madera: atrezo(C(0x8a5a32, {roughness: .7}), 'veta', .7), negro: atrezo(C(0x17181d, {roughness: .5}), 'grano', .4), caja: atrezo(C(0xd8c49c, {roughness: .95}), 'grano', .5), cast: atrezo(C(0x4a2010, {roughness: .34}), 'grano', 1), nieve: C(0xf2f5fb, {roughness: .95, emissive: 0x1c2130}), saco: atrezo(C(0x6b4a2c, {roughness: 1}), 'tela', 1.2), fieltro: atrezo(C(0x1b1b20, {roughness: .92, side: THREE.DoubleSide}), 'tela', 40), cinta: atrezo(C(0x8a121e, {roughness: .5}), 'tela', 60), luz: new THREE.MeshBasicMaterial({color: new THREE.Color(2.6, 1.8, .9)})};
 /* cómo van vestidos los dos y los que salen en alguna escena */
-export const ROPAS = {nino: {bufanda: 0xc41e2e, mano: 0xc41e2e, bota: 0x8a5a2b}, madre: {mano: 0x33221a}};
+export const ROPAS = {nino: {bufanda: 0xc41e2e, mano: 0xc41e2e, bota: 0x8a5a2b}, madre: {mano: 0x8a5634}};
 export const DISFRAZ = {
   nina: {abrigo: 0xc79a34, abrigo2: 0x97742a, bufanda: 0x2f6d5a, bufanda2: 0xf3ecdd, pelo: 0x8a5a2c, mano: 0x2f6d5a, bota: 0x7a2f1c},
   vecino: {abrigo: 0x3c463a, abrigo2: 0x2c352b, pelo: 0xd8d4cc, bigote: 1, gafas: 1, mano: 0x2a2018},

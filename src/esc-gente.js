@@ -65,7 +65,7 @@ const osc = (c, f) => {const k = new THREE.Color(c); return (x, y, z, o) => o.co
 export const ROPA = {
   nino: {abrigo: 0x22324f, abrigo2: 0x1d3870, bufanda: 0xc41e2e, bufanda2: 0xf3ecdd, pelo: 0x5f3c20, bota: 0x8a5a2b, pant: 0x2a2c36, mano: 0xc41e2e},
   senor: {abrigo: 0x3a3f4c, abrigo2: 0x2a2e38, bufanda: null, pelo: 0x3a2a1c, bota: 0x241812, pant: 0x2a2c36, mano: 0xf0c4a4},
-  madre: {abrigo: 0x741826, abrigo2: 0x6c1a28, bufanda: 0xcfc0a0, bufanda2: 0xcfc0a0, pelo: 0x3c2416, bota: 0x3b2418, pant: 0x2b2530, mano: 0x33221a, boina: 0xd8cbb0},
+  madre: {abrigo: 0x741826, abrigo2: 0x6c1a28, bufanda: 0xcfc0a0, bufanda2: 0xcfc0a0, pelo: 0x3c2416, bota: 0x3b2418, pant: 0x2b2530, mano: 0x8a5634, boina: 0xd8cbb0},
 };
 const PIEL = 0xf0c4a4, ORO = 0xd9a441, CUERO = 0x4a2c1c, BLANCO = 0xf1ebe0;
 
@@ -192,7 +192,7 @@ export class Figura {
     if (R.mandil) {const fm = (t, y, o) => f(t, y, o); C.mas(panel(fm, -1.3, 1.3, .52 > y0 ? .64 : y0 + .02, 1.04, .014, {na: 26, nb: 16, borde: .006}), 'lana', osc(R.mandil, (x, y) => lerp(.85, 1, sstep(.64, .9, y))), this.pesoTronco()); C.mas(panel(fm, -.46, .46, 1.02, 1.28, .014, {na: 12, nb: 10, borde: .006}), 'lana', R.mandil, tro); for (const s of [-1, 1]) C.mas(panel(fm, s * .42 - .06, s * .42 + .06, 1.26, 1.42, .015, {na: 4, nb: 10}), 'lana', R.mandil, tro); C.mas(tira((a, b) => f(-a * 2 * PI, 1.02 + b * .028, .016), 48, 3, {cerrada: true}), 'lana', osc(R.mandil, () => .85), this.pesoTronco()); C.mas(panel(fm, -.3, .3, .78, .9, .02, {na: 8, nb: 8}), 'lana', osc(R.mandil, () => .94), this.pesoTronco())}
     if (R.bufanda) {this.bufandaCuello(C, R, {y: 1.352, r: .128, t: .036}); this.cola(C, R.bufanda, R.bufanda2 || R.bufanda, .105)} else C.mas(tira((a, b) => {const A = -a * 2 * PI, ab = Math.max(0, Math.cos(A)); return [Math.cos(A) * (.094 + .03 * Math.sin(b * PI)) - .006, 1.39 + .06 * b * (1 - .5 * ab), Math.sin(A) * (.1 + .034 * Math.sin(b * PI))]}, 44, 8, {cerrada: true}), 'lana', R.mandil ? 0xe9e6df : R.abrigo2, tro);
     C.mas(tira((a, b) => {const A = -a * 2 * PI, r = lerp(.09, .0615, Math.sqrt(b)); return [Math.cos(A) * r - .012, lerp(1.34, 1.43, b), Math.sin(A) * r]}, 34, 8, {cerrada: true}), 'liso', osc(0xe9e6df, (x, y) => lerp(.5, .9, sstep(1.37, 1.42, y))), tro);
-    [0, 1].forEach(i => this.manga(C, i, [[-.05, .066], [0, .082], [.09, .081], [.2, .071], [.3, .066], [.42, .06], [.47, .058]], {color: R.abrigo, puño: (C, i, y, z) => {this.mano(C, i, 'mano', 1.16, R.mano, [0x33221a, 0x1c1d22].includes(R.mano) ? 'cuero' : 'piel')}}));
+    [0, 1].forEach(i => this.manga(C, i, [[-.05, .066], [0, .082], [.09, .081], [.2, .071], [.3, .066], [.42, .06], [.47, .058]], {color: R.abrigo, puño: (C, i, y, z) => {this.mano(C, i, 'mano', 1.16, R.mano, [0x33221a, 0x1c1d22, 0x8a5634].includes(R.mano) ? 'cuero' : 'piel')}}));
     this.piernas2(C, {r: [[0, .1], [.3, .092], [.6, .078], [.9, .074], [1, .07]], color: R.pant, t: 'lana', bota: 'zapato', kb: 1.02, colB: R.bota, colS: 0x0e0a07, caña: -.005}); this.bag = new THREE.Group(); this.tro.add(this.bag);
   }
   /* ---------- cabeza ---------- */
