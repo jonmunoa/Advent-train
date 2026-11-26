@@ -25,7 +25,8 @@ PORT = 8765
 SHOTS = '--shots' in sys.argv
 GPU = '--gpu' in sys.argv
 DIST = '--dist' in sys.argv
-TAG = os.environ.get('ADVX_TAG', 'TU-TAG-21') if DIST else 'TU-TAG-21'
+CFG_TAG = __import__('re').search(r"TAG: '([^']*)'", open(os.path.join(ROOT, 'config.js'), encoding='utf-8').read()).group(1)
+TAG = os.environ.get('ADVX_TAG', CFG_TAG) if DIST else CFG_TAG
 
 # maquinista bot: salida perfecta, va al 97 % de la envolvente (frenando para repartir) y gasta el turbo cuando renta
 BOT = """(()=>{const A=__adv;for(let k=0;k<60000;k++){const G=A.G;if(A.mode==='finish'||A.mode==='end')break;
