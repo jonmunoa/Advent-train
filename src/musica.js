@@ -68,6 +68,14 @@ export const viento = () => {if (!sfx || !ac) return; noise(3.4, .05, 520); nois
 export const clac = () => {noise(.06, .16, 3200, 'bandpass'); noise(.05, .1, 900)};
 export const chuf = () => {noise(.2, .05, 900)};
 export const trenSuena = () => {for (let i = 0; i < 6; i++) setTimeout(() => noise(.18, .06, 700), i * 260)};
+/* tocar el escenario: nieve que salta, abeto que se sacude, llamar a la puerta, hielo, el árbol que brilla y la estrella fugaz */
+export const tocaNieve = () => {noise(.16, .05, 1300, 'bandpass'); noise(.09, .022, 4200, 'highpass')};
+export const sacude = () => {noise(.8, .02, 5600, 'highpass'); noise(.4, .03, 1500, 'bandpass'); tone(1568, .6, 'sine', .006, .2)};
+export const llama = () => {for (const w of [0, .19]) setTimeout(() => {tone(170, .12, 'sine', .1); tone(340, .06, 'triangle', .03); noise(.05, .06, 1100, 'bandpass')}, w * 1000)};
+export const tintin = () => {tone(2637, .7, 'sine', .018); tone(3520, .5, 'sine', .01, .07); tone(4186, .35, 'sine', .006, .13)};
+export const brilla = () => {[1568, 1976, 2349, 3136, 2637].forEach((f, i) => tone(f, .7, 'sine', .016, i * .08))};
+export const silbaTren = () => {if (N && N.st.listo && sfx) N.st.silbato(1, 1); else whistle()};
+export const fugaz = () => {[1760, 2217, 2637, 3322, 3951, 4699].forEach((f, i) => tone(f, .55 - i * .05, 'sine', .011, i * .05))};
 export const sonidoOn = () => sfx;
 export function setSonido(on) {sfx = on; store.set('advx-sonido', on ? '1' : '0'); if (on) au(); tic()}
 export {au, tone, noise, chime, bells, whistle};

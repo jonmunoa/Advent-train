@@ -74,6 +74,8 @@ async def main():
         b1 = await pg.evaluate('__esc.cam()')
         head = lambda q: math.atan2(q['l'][2] - q['p'][2], q['l'][0] - q['p'][0])
         check('arrastrar en la calle gira la vista alrededor del niño', abs(head(b1) - head(a)) > 0.2, f'{head(a):.2f} → {head(b1):.2f}')
+        r = await pg.evaluate("(()=>{const f=__esc.figura('nino'),k=__esc.toque(f.x,f.y);__esc.step(.5);return {k,s:__esc.saludando(),n:__esc.toque(innerWidth*.3,innerHeight*.95)}})()")
+        check('en la calle, al tocar al niño se vuelve y saluda; y tocando el suelo salta la nieve', r['k'] == 'nino' and 'nino' in r['s'] and r['n'] in ('nieve', 'fachada'), str(r))
 
         # 2) escena del día y tres escaparates
         await pg.evaluate("(()=>{for(let i=0;i<900&&__esc.st==='paseo';i++)__esc.step(1/30)})()")
@@ -250,6 +252,13 @@ async def main():
         await pg.wait_for_timeout(1500)
         r = await pg.evaluate("({i:__esc.vista.info(),a:__esc.vista.screen(-84,0,38),b:__esc.vista.screen(84,0,38),w:innerWidth,c:__esc.vista.cine})")
         check('con el cine apagado, restablecer encuadra la maqueta entera', not r['c'] and r['a']['x'] > -40 and r['b']['x'] < r['w'] + 40, str(r['a']))
+        # tocar el escenario: los abetos se sacuden la nieve, en las casas llaman a la puerta y por el cielo pasa una estrella fugaz
+        r = await pg.evaluate("""(()=>{const m=__esc.mundo(__esc.E.k),v=__esc.vista,W=innerWidth,H=innerHeight,on=s=>s.x>40&&s.x<W-40&&s.y>40&&s.y<H-40,o={};
+          for(const s of m.abetosN.map(a=>v.screen(a.x,a.y+a.h*.55,a.z)).filter(on).slice(0,8)){o.abeto=__esc.toque(s.x,s.y);if(o.abeto==='abeto')break}
+          const c=m.bloq.map(([x,z,ry,hw,hd,hh])=>v.screen(x,m.gy(x,z)+hh*.5,z)).filter(on)[0];if(c)o.casa=__esc.toque(c.x,c.y);
+          o.chispas=__esc.chispasVivas();v.look({el:.02,d:60,t:[0,m.gy(0,10)+8,10],az:1.4});__esc.step(.3);o.cielo=__esc.toque(W/2,30);o.fugaces=__esc.fugaces();__esc.restablece();__esc.step(1.6);return o})()""")
+        await pg.wait_for_timeout(600)
+        check('tocar la maqueta: los abetos, las casas y el cielo responden', r.get('abeto') == 'abeto' and r.get('casa', 'casa') == 'casa' and r['chispas'] > 5 and r['cielo'] == 'cielo' and r['fugaces'] == 1, str(r))
         await pg.click('#bCine')
         if SHOTS:
             await shot('5-dentro')
